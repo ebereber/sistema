@@ -1,24 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { MoreVertical, Pencil, Trash2, DollarSign, Plus } from "lucide-react"
+import { DollarSign, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,17 +12,34 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-import { PriceListDialog } from "./price-list-dialog"
-import type { PriceList } from "@/lib/services/price-lists"
+import type { PriceList } from "@/lib/services/price-lists";
+import { PriceListDialog } from "./price-list-dialog";
+import { PriceListSheet } from "./price-list-sheet";
 
 interface PriceListTableProps {
-  priceLists: PriceList[]
-  isLoading?: boolean
-  onDelete: (id: string) => void
-  onSuccess: () => void
+  priceLists: PriceList[];
+  isLoading?: boolean;
+  onDelete: (id: string) => void;
+  onSuccess: () => void;
 }
 
 export function PriceListTable({
@@ -47,38 +48,43 @@ export function PriceListTable({
   onDelete,
   onSuccess,
 }: PriceListTableProps) {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedPriceList, setSelectedPriceList] = useState<PriceList | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedPriceList, setSelectedPriceList] = useState<PriceList | null>(
+    null
+  );
 
   function openDeleteDialog(priceList: PriceList) {
-    setSelectedPriceList(priceList)
-    setDeleteDialogOpen(true)
+    setSelectedPriceList(priceList);
+    setDeleteDialogOpen(true);
   }
 
   function closeDeleteDialog() {
-    setDeleteDialogOpen(false)
-    setSelectedPriceList(null)
+    setDeleteDialogOpen(false);
+    setSelectedPriceList(null);
   }
 
   function handleConfirmDelete() {
     if (selectedPriceList) {
-      onDelete(selectedPriceList.id)
+      onDelete(selectedPriceList.id);
     }
-    closeDeleteDialog()
+    closeDeleteDialog();
   }
 
-  function formatPercentage(adjustmentType: string, percentage: number): string {
+  function formatPercentage(
+    adjustmentType: string,
+    percentage: number
+  ): string {
     if (adjustmentType === "DESCUENTO") {
-      return `-${percentage}%`
+      return `-${percentage}%`;
     }
-    return `+${percentage}%`
+    return `+${percentage}%`;
   }
 
   function getPercentageColor(adjustmentType: string): string {
     if (adjustmentType === "DESCUENTO") {
-      return "text-red-600"
+      return "text-red-600";
     }
-    return "text-green-600"
+    return "text-green-600";
   }
 
   if (isLoading) {
@@ -117,7 +123,7 @@ export function PriceListTable({
           </TableBody>
         </Table>
       </div>
-    )
+    );
   }
 
   if (priceLists.length === 0) {
@@ -128,7 +134,8 @@ export function PriceListTable({
         </div>
         <h3 className="font-semibold text-lg mb-2">No hay listas de precios</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Creá tu primera lista de precios para aplicar descuentos o aumentos automáticos.
+          Creá tu primera lista de precios para aplicar descuentos o aumentos
+          automáticos.
         </p>
         <PriceListDialog
           mode="create"
@@ -141,7 +148,7 @@ export function PriceListTable({
           }
         />
       </div>
-    )
+    );
   }
 
   return (
@@ -162,13 +169,20 @@ export function PriceListTable({
               <TableRow key={priceList.id}>
                 <TableCell className="font-medium">{priceList.name}</TableCell>
                 <TableCell>
-                  <Badge variant={priceList.is_automatic ? "default" : "secondary"}>
+                  <Badge variant={"outline"}>
                     {priceList.is_automatic ? "Automática" : "Manual"}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <span className={`font-medium ${getPercentageColor(priceList.adjustment_type)}`}>
-                    {formatPercentage(priceList.adjustment_type, priceList.adjustment_percentage)}
+                  <span
+                    className={`font-medium ${getPercentageColor(
+                      priceList.adjustment_type
+                    )}`}
+                  >
+                    {formatPercentage(
+                      priceList.adjustment_type,
+                      priceList.adjustment_percentage
+                    )}
                   </span>
                 </TableCell>
                 <TableCell>
@@ -185,12 +199,14 @@ export function PriceListTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <PriceListDialog
+                      <PriceListSheet
                         mode="edit"
                         priceListId={priceList.id}
                         onSuccess={onSuccess}
                         trigger={
-                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                          >
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
@@ -213,12 +229,16 @@ export function PriceListTable({
       </div>
 
       {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !open && closeDeleteDialog()}>
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => !open && closeDeleteDialog()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar lista de precios?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Los clientes con esta lista asignada quedarán sin lista de precios.
+              Esta acción no se puede deshacer. Los clientes con esta lista
+              asignada quedarán sin lista de precios.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -233,5 +253,5 @@ export function PriceListTable({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }
