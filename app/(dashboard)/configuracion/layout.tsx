@@ -21,7 +21,7 @@ import { useState } from "react";
 const menuItems = [
   { id: "organizacion", label: "Organización", icon: Building2 },
   { id: "preferencias", label: "Preferencias", icon: Settings },
-  { id: "puntos-venta", label: "Puntos de Venta", icon: MapPin },
+  { id: "puntos-de-venta", label: "Puntos de Venta", icon: MapPin },
   { id: "ubicaciones", label: "Ubicaciones", icon: Store },
   { id: "medios-pago", label: "Medios de Pago", icon: Wallet },
   { id: "categorias", label: "Categorías", icon: FolderOpen },
