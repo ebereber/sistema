@@ -27,9 +27,16 @@ export interface Customer {
     id: string
     name: string
   } | null
+  price_list?: {
+    id: string
+    name: string
+    is_automatic: boolean
+    adjustment_type: string
+    adjustment_percentage: number
+  } | null
 }
 
-export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at" | "assigned_seller">
+export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at" | "assigned_seller" | "price_list">
 export type CustomerUpdate = Partial<CustomerInsert>
 
 export interface CustomerFilters {
@@ -82,7 +89,8 @@ export async function getCustomerById(id: string): Promise<Customer> {
     .from("customers")
     .select(`
       *,
-      assigned_seller:users!assigned_seller_id(id, name)
+      assigned_seller:users!assigned_seller_id(id, name),
+      price_list:price_lists!price_list_id(id, name, is_automatic, adjustment_type, adjustment_percentage)
     `)
     .eq("id", id)
     .single()

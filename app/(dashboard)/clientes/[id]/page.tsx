@@ -367,7 +367,21 @@ export default function ClientePage({
                 <p className="text-xs text-muted-foreground">
                   Lista de precios
                 </p>
-                <p className="text-sm">Sin asignar</p>
+                <p className="text-sm">
+                  {customer.price_list ? (
+                    <>
+                      {customer.price_list.name}
+                      {customer.price_list.is_automatic && (
+                        <span className={`ml-1 ${customer.price_list.adjustment_type === "DESCUENTO" ? "text-red-600" : "text-green-600"}`}>
+                          ({customer.price_list.adjustment_type === "DESCUENTO" ? "-" : "+"}
+                          {customer.price_list.adjustment_percentage}%)
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    "Sin asignar"
+                  )}
+                </p>
               </div>
               {customer.payment_terms && (
                 <div>

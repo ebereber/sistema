@@ -34,15 +34,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 import { getSellers, type Seller } from "@/lib/services/customers"
+import { getPriceLists, type PriceList } from "@/lib/services/price-lists"
 import { PAYMENT_TERMS, type CommercialInfoData } from "@/lib/validations/customer"
 
 interface CommercialInfoDialogProps {
@@ -63,19 +58,27 @@ export function CommercialInfoDialog({
   const [assignedSellerId, setAssignedSellerId] = useState<string | null>(
     defaultValues?.assigned_seller_id || null
   )
+  const [priceListId, setPriceListId] = useState<string | null>(
+    defaultValues?.price_list_id || null
+  )
   const [paymentTerms, setPaymentTerms] = useState(defaultValues?.payment_terms || "")
 
   const [sellers, setSellers] = useState<Seller[]>([])
   const [isLoadingSellers, setIsLoadingSellers] = useState(false)
   const [sellerComboboxOpen, setSellerComboboxOpen] = useState(false)
 
+  const [priceLists, setPriceLists] = useState<PriceList[]>([])
+  const [isLoadingPriceLists, setIsLoadingPriceLists] = useState(false)
+
   useEffect(() => {
     if (open) {
       setTradeName(defaultValues?.trade_name || "")
       setNotes(defaultValues?.notes || "")
       setAssignedSellerId(defaultValues?.assigned_seller_id || null)
+      setPriceListId(defaultValues?.price_list_id || null)
       setPaymentTerms(defaultValues?.payment_terms || "")
       loadSellers()
+      loadPriceLists()
     }
   }, [open, defaultValues])
 
@@ -91,12 +94,24 @@ export function CommercialInfoDialog({
     }
   }
 
+  async function loadPriceLists() {
+    setIsLoadingPriceLists(true)
+    try {
+      const data = await getPriceLists()
+      setPriceLists(data)
+    } catch {
+      setPriceLists([])
+    } finally {
+      setIsLoadingPriceLists(false)
+    }
+  }
+
   function handleSave() {
     onSave({
       trade_name: tradeName || null,
       notes: notes || null,
       assigned_seller_id: assignedSellerId,
-      price_list_id: null, // Siempre null por ahora
+      price_list_id: priceListId,
       payment_terms: paymentTerms || null,
     })
     onOpenChange(false)
@@ -206,28 +221,32 @@ export function CommercialInfoDialog({
             </Popover>
           </div>
 
-          {/* Lista de Precios - DISABLED */}
+          {/* Lista de Precios */}
           <div className="grid gap-2">
-            <Label className="text-muted-foreground">Lista de Precios</Label>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Select disabled>
-                      <SelectTrigger className="opacity-50">
-                        <SelectValue placeholder="Disponible próximamente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">-</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Esta función estará disponible cuando se cree el módulo de listas de precios</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Label>Lista de Precios</Label>
+            <Select
+              value={priceListId || "none"}
+              onValueChange={(value) => setPriceListId(value === "none" ? null : value)}
+              disabled={isLoadingPriceLists}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccioná una lista de precios..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin lista de precios</SelectItem>
+                {priceLists.map((list) => (
+                  <SelectItem key={list.id} value={list.id}>
+                    {list.name}
+                    {list.is_automatic && (
+                      <span className="ml-2 text-muted-foreground text-xs">
+                        ({list.adjustment_type === "DESCUENTO" ? "-" : "+"}
+                        {list.adjustment_percentage}%)
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Condición de Pago */}
