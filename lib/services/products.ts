@@ -71,6 +71,74 @@ export interface StockMovement {
 export type ProductInsert = Omit<Product, "id" | "created_at" | "updated_at" | "category" | "supplier" | "stock" | "stock_quantity">
 export type ProductUpdate = Partial<ProductInsert> & { stock_quantity?: number }
 
+export interface GetProductsParams {
+  search?: string
+  active?: boolean
+  categoryId?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface GetProductsResult {
+  data: Product[]
+  count: number
+}
+
+/**
+ * Get products with filters and pagination
+ */
+export async function getProducts(params: GetProductsParams = {}): Promise<GetProductsResult> {
+  const supabase = createClient()
+
+  const {
+    search,
+    active,
+    categoryId,
+    page = 1,
+    pageSize = 20,
+  } = params
+
+  let query = supabase
+    .from("products")
+    .select(
+      `
+      *,
+      category:categories(id, name)
+    `,
+      { count: "exact" }
+    )
+
+  // Search filter
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+  }
+
+  // Status filter
+  if (active !== undefined) {
+    query = query.eq("active", active)
+  }
+
+  // Category filter
+  if (categoryId) {
+    query = query.eq("category_id", categoryId)
+  }
+
+  // Pagination
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const { data, error, count } = await query
+    .range(from, to)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+
+  return {
+    data: data || [],
+    count: count || 0,
+  }
+}
+
 /**
  * Get product by ID with relations
  */
