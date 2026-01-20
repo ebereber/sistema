@@ -84,69 +84,71 @@ export function LocationCard({
 
   return (
     <>
-      <Card className="">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <Card className="p-4 gap-4 px-0">
+        <CardHeader className="flex flex-row items-center px-4 justify-between ">
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-muted-foreground" />
             <CardTitle className="text-lg font-semibold">
               {location.name}
             </CardTitle>
+          </div>
+          <div className="flex gap-2">
             {location.is_main && (
-              <Badge variant="default" className="ml-2">
+              <Badge variant="secondary" className="text-xs">
                 Principal
               </Badge>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                  <span className="sr-only">Abrir menú</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <LocationSheet
+                  mode="edit"
+                  locationId={location.id}
+                  onSuccess={onSuccess}
+                  trigger={
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  }
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setArchiveDialogOpen(true)}>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archivar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                  disabled={hasAssignedPOS}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="h-4 w-4" />
-                <span className="sr-only">Abrir menú</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <LocationSheet
-                mode="edit"
-                locationId={location.id}
-                onSuccess={onSuccess}
-                trigger={
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                }
-              />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setArchiveDialogOpen(true)}>
-                <Archive className="mr-2 h-4 w-4" />
-                Archivar
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setDeleteDialogOpen(true)}
-                className="text-destructive focus:text-destructive"
-                disabled={hasAssignedPOS}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {location.address && (
+        <CardContent className="space-y-2 px-4">
+          {/* {location.address && (
             <p className="text-sm text-muted-foreground mb-4">
               {location.address}
             </p>
-          )}
+          )} */}
 
           {/* Puntos de Venta Section */}
           <Collapsible open={posOpen} onOpenChange={setPosOpen}>
             <div className="rounded-lg border border-border">
               <CollapsibleTrigger asChild>
-                <div className="flex px-4 justify-between ">
+                <div className="flex px-4 justify-between py-2">
                   <Button
                     variant="ghost"
-                    className=" hover:bg-red  justify-between px-2 h-10"
+                    className=" flex items-center gap-2 p-0 h-auto hover:bg-transparent"
                   >
                     <div className="flex items-center  gap-2">
                       <ChevronDown
@@ -171,7 +173,7 @@ export function LocationCard({
                     locationName={location.name}
                     onSuccess={onSuccess}
                     trigger={
-                      <Button variant="ghost" size="sm" className="mt-2 w-fit">
+                      <Button variant="ghost" size="sm" className=" w-fit">
                         <Plus className="mr-2 h-4 w-4" />
                         Agregar
                       </Button>
@@ -179,7 +181,7 @@ export function LocationCard({
                   />
                 </div>
               </CollapsibleTrigger>
-              <CollapsibleContent className="px-2 py-2">
+              <CollapsibleContent>
                 {location.points_of_sale &&
                 location.points_of_sale.length > 0 ? (
                   <div className="space-y-2 border-border border-t p-4">
@@ -203,7 +205,7 @@ export function LocationCard({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground py-2">
+                  <p className="text-sm border-border border-t p-4 text-muted-foreground py-4">
                     No hay puntos de venta asignados
                   </p>
                 )}
@@ -219,11 +221,11 @@ export function LocationCard({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div>
+                  <div className="rounded-lg border border-border  px-4  py-2">
                     <CollapsibleTrigger asChild disabled>
                       <Button
                         variant="ghost"
-                        className="w-full justify-between px-2 h-10 opacity-50 cursor-not-allowed"
+                        className="w-full justify-between px-0  opacity-50 cursor-not-allowed"
                         disabled
                       >
                         <div className="flex items-center gap-2">
@@ -252,11 +254,11 @@ export function LocationCard({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div>
+                  <div className="rounded-lg border border-border px-4  py-2">
                     <CollapsibleTrigger asChild disabled>
                       <Button
                         variant="ghost"
-                        className="w-full justify-between px-2 h-10 opacity-50 cursor-not-allowed"
+                        className="w-full justify-between px-0 opacity-50 cursor-not-allowed"
                         disabled
                       >
                         <div className="flex items-center gap-2">

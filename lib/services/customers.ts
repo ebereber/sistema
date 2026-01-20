@@ -1,251 +1,267 @@
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client";
 
 // Manual types since database.types.ts doesn't exist yet
 export interface Customer {
-  id: string
-  name: string
-  trade_name: string | null
-  tax_id: string | null
-  tax_id_type: string | null
-  legal_entity_type: string | null
-  tax_category: string | null
-  email: string | null
-  phone: string | null
-  street_address: string | null
-  apartment: string | null
-  postal_code: string | null
-  province: string | null
-  city: string | null
-  assigned_seller_id: string | null
-  price_list_id: string | null
-  payment_terms: string | null
-  notes: string | null
-  active: boolean
-  created_at: string
-  updated_at: string
+  id: string;
+  name: string;
+  trade_name: string | null;
+  tax_id: string | null;
+  tax_id_type: string | null;
+  legal_entity_type: string | null;
+  tax_category: string | null;
+  email: string | null;
+  phone: string | null;
+  street_address: string | null;
+  apartment: string | null;
+  postal_code: string | null;
+  province: string | null;
+  city: string | null;
+  assigned_seller_id: string | null;
+  price_list_id: string | null;
+  payment_terms: string | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
   assigned_seller?: {
-    id: string
-    name: string
-  } | null
+    id: string;
+    name: string;
+  } | null;
   price_list?: {
-    id: string
-    name: string
-    is_automatic: boolean
-    adjustment_type: string
-    adjustment_percentage: number
-  } | null
+    id: string;
+    name: string;
+    is_automatic: boolean;
+    adjustment_type: string;
+    adjustment_percentage: number;
+  } | null;
 }
 
-export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at" | "assigned_seller" | "price_list">
-export type CustomerUpdate = Partial<CustomerInsert>
+export type CustomerInsert = Omit<
+  Customer,
+  "id" | "created_at" | "updated_at" | "assigned_seller" | "price_list"
+>;
+export type CustomerUpdate = Partial<CustomerInsert>;
 
 export interface CustomerFilters {
-  search?: string
-  active?: boolean
+  search?: string;
+  active?: boolean;
 }
 
 export interface Seller {
-  id: string
-  name: string
-  email: string | null
+  id: string;
+  name: string;
+  email: string | null;
 }
 
 /**
  * Get all customers with optional filters
  */
-export async function getCustomers(filters?: CustomerFilters): Promise<Customer[]> {
-  const supabase = createClient()
+export async function getCustomers(
+  filters?: CustomerFilters,
+): Promise<Customer[]> {
+  const supabase = createClient();
 
   let query = supabase
     .from("customers")
-    .select(`
+    .select(
+      `
       *,
       assigned_seller:users!assigned_seller_id(id, name)
-    `)
-    .order("name", { ascending: true })
+    `,
+    )
+    .order("name", { ascending: true });
 
   if (filters?.search && filters.search.trim()) {
-    const searchTerm = filters.search.trim()
-    query = query.or(`name.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`)
+    const searchTerm = filters.search.trim();
+    query = query.or(`name.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`);
   }
 
   if (filters?.active !== undefined) {
-    query = query.eq("active", filters.active)
+    query = query.eq("active", filters.active);
   }
 
-  const { data, error } = await query
+  const { data, error } = await query;
 
-  if (error) throw error
-  return data || []
+  if (error) throw error;
+  return data || [];
 }
 
 /**
  * Get a customer by ID
  */
 export async function getCustomerById(id: string): Promise<Customer> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("customers")
-    .select(`
+    .select(
+      `
       *,
       assigned_seller:users!assigned_seller_id(id, name),
       price_list:price_lists!price_list_id(id, name, is_automatic, adjustment_type, adjustment_percentage)
-    `)
+      
+    `,
+    )
     .eq("id", id)
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) throw error;
+  return data;
 }
+/* price_list:price_lists!price_list_id(id, name, is_automatic, adjustment_type, adjustment_percentage) */
 
 /**
  * Create a new customer
  */
-export async function createCustomer(customer: CustomerInsert): Promise<Customer> {
-  const supabase = createClient()
+export async function createCustomer(
+  customer: CustomerInsert,
+): Promise<Customer> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("customers")
     .insert(customer)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Update a customer
  */
-export async function updateCustomer(id: string, customer: CustomerUpdate): Promise<Customer> {
-  const supabase = createClient()
+export async function updateCustomer(
+  id: string,
+  customer: CustomerUpdate,
+): Promise<Customer> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("customers")
     .update({ ...customer, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Archive a customer (soft delete)
  */
 export async function archiveCustomer(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { error } = await supabase
     .from("customers")
     .update({ active: false, updated_at: new Date().toISOString() })
-    .eq("id", id)
+    .eq("id", id);
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 /**
  * Unarchive a customer (restore)
  */
 export async function unarchiveCustomer(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { error } = await supabase
     .from("customers")
     .update({ active: true, updated_at: new Date().toISOString() })
-    .eq("id", id)
+    .eq("id", id);
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 /**
  * Delete a customer permanently
  */
 export async function deleteCustomer(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = createClient();
 
-  const { error } = await supabase
-    .from("customers")
-    .delete()
-    .eq("id", id)
+  const { error } = await supabase.from("customers").delete().eq("id", id);
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 /**
  * Get sellers for dropdown (users with role SELLER)
  */
 export async function getSellers(): Promise<Seller[]> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("users")
     .select("id, name, email")
     .eq("role", "SELLER")
     .eq("active", true)
-    .order("name")
+    .order("name");
 
   if (error) {
     // Table might not exist or no sellers
-    return []
+    return [];
   }
-  return data || []
+  return data || [];
 }
 
 /**
  * Get customer sales statistics
  */
 export async function getCustomerStats(customerId: string): Promise<{
-  totalOrders: number
-  totalSales: number
-  pendingBalance: number
+  totalOrders: number;
+  totalSales: number;
+  pendingBalance: number;
 }> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { count, error } = await supabase
     .from("sales")
     .select("*", { count: "exact", head: true })
-    .eq("customer_id", customerId)
+    .eq("customer_id", customerId);
 
   if (error) {
     // Table might not exist yet
-    return { totalOrders: 0, totalSales: 0, pendingBalance: 0 }
+    return { totalOrders: 0, totalSales: 0, pendingBalance: 0 };
   }
 
   // Get total amount
   const { data: sales } = await supabase
     .from("sales")
     .select("total")
-    .eq("customer_id", customerId)
+    .eq("customer_id", customerId);
 
-  const totalAmount = sales?.reduce((sum, s) => sum + (s.total || 0), 0) || 0
+  const totalAmount = sales?.reduce((sum, s) => sum + (s.total || 0), 0) || 0;
 
   return {
     totalOrders: count || 0,
     totalSales: totalAmount,
     pendingBalance: 0, // Hardcoded for now, will implement with payments
-  }
+  };
 }
 
 /**
  * Get recent sales for a customer
  */
-export async function getCustomerRecentSales(customerId: string, limit: number = 5) {
-  const supabase = createClient()
+export async function getCustomerRecentSales(
+  customerId: string,
+  limit: number = 5,
+) {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("sales")
     .select("id, sale_number, created_at, total")
     .eq("customer_id", customerId)
     .order("created_at", { ascending: false })
-    .limit(limit)
+    .limit(limit);
 
   if (error) {
     // Table might not exist yet
-    return []
+    return [];
   }
 
-  return data || []
+  return data || [];
 }

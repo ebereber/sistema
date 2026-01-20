@@ -32,6 +32,24 @@ Sistema de Punto de Venta (POS) completo desarrollado con Next.js 16, TypeScript
 - Package Manager: pnpm
 ```
 
+### Documentación
+
+### Uso de Context7
+
+Use Context7 MCP when I need library/API documentation, code generation, setup or configuration help.
+
+### Bibliotecas Específicas
+
+- Next.js: use library /vercel/next.js for API and docs
+- [Otras bibliotecas con sus IDs de Context7]
+
+### Convenciones de Código Next.js 16
+
+- Usa Server Components por defecto
+- Solo agrega 'use client' cuando sea estrictamente necesario (interactividad, hooks, eventos)
+- Prioriza el App Router sobre Pages Router
+- Usa las últimas características de Next.js 16
+
 ### Estructura de Carpetas
 
 ```
@@ -311,46 +329,176 @@ import { supabase } from "@/lib/supabase/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 ```
 
-### Tablas Principales
+## Estructura de Base de Datos (Supabase)
+
+### Tablas Implementadas ✅
 
 ```sql
 -- Usuarios (extiende auth.users)
-public.users (id, name, role, active)
+public.users (
+  id uuid,
+  email text,
+  name text,
+  role user_role, -- 'ADMIN' | 'SELLER' | 'VIEWER' | 'CASHIER'
+  active boolean,
+  created_at, updated_at
+)
 
--- Productos
-public.products (id, name, sku, barcode, price, cost, tax_rate, track_stock, ...)
+-- Ubicaciones/Sucursales
+public.locations (
+  id uuid,
+  name text,
+  address text,
+  is_main boolean, -- Solo una puede ser true
+  active boolean,
+  created_at, updated_at
+)
 
--- Clientes
-public.customers (id, name, tax_id_type, tax_id, email, phone, ...)
+-- Puntos de Venta
+public.point_of_sale (
+  id uuid,
+  number integer unique,
+  name text,
+  is_digital boolean, -- true = e-commerce, false = físico
+  location_id uuid, -- null si is_digital = true
+  enabled_for_arca boolean,
+  active boolean,
+  created_at, updated_at
+  -- Constraint: si no es digital, debe tener location_id
+)
+
+-- Categorías (jerárquicas)
+public.categories (
+  id uuid,
+  name text,
+  description text,
+  parent_id uuid, -- Self-reference para jerarquía
+  active boolean,
+  created_at, updated_at
+)
 
 -- Proveedores
-public.suppliers (id, name, tax_id, email, phone, ...)
+public.suppliers (
+  id uuid,
+  name text,
+  trade_name text,
+  tax_id text,
+  tax_id_type text, -- 'CUIT', 'CUIL', 'DNI'
+  legal_entity_type text, -- 'Física', 'Jurídica'
+  tax_category text, -- 'Consumidor Final', etc.
+  email text,
+  phone text,
+  street_address text,
+  apartment text,
+  postal_code text,
+  province text,
+  city text,
+  contact_person text,
+  business_description text,
+  payment_terms text,
+  notes text,
+  active boolean,
+  created_at, updated_at
+)
 
--- Ventas
-public.sales (id, sale_number, customer_id, seller_id, location_id, total, ...)
-public.sale_items (id, sale_id, product_id, quantity, unit_price, total, ...)
-public.payments (id, sale_id, method, amount, ...)
+-- Productos
+public.products (
+  id uuid,
+  name text,
+  description text,
+  product_type product_type, -- 'PRODUCT' | 'SERVICE' | 'KIT'
+  sku text unique,
+  barcode text unique,
+  oem_code text,
+  category_id uuid,
+  default_supplier_id uuid,
+  price numeric(10,2),
+  cost numeric(10,2),
+  margin_percentage numeric(5,2),
+  tax_rate numeric(5,2) default 21,
+  currency text default 'ARS',
+  track_stock boolean default false,
+  stock_quantity integer default 0, -- Stock total (suma de todas ubicaciones)
+  min_stock integer,
+  visibility text default 'SALES_AND_PURCHASES', -- 'SALES_AND_PURCHASES' | 'SALES_ONLY' | 'PURCHASES_ONLY'
+  image_url text,
+  active boolean,
+  created_at, updated_at
+)
 
--- Presupuestos
-public.quotes (id, quote_number, customer_id, status, total, ...)
-public.quote_items (id, quote_id, product_id, quantity, unit_price, total, ...)
+-- Stock por Ubicación
+public.stock (
+  id uuid,
+  product_id uuid,
+  location_id uuid,
+  quantity integer default 0,
+  updated_at,
+  unique(product_id, location_id)
+)
 
--- Compras
-public.purchases (id, purchase_number, supplier_id, status, total, ...)
-public.purchase_items (id, purchase_id, product_id, quantity, unit_cost, ...)
+-- Movimientos de Stock (Auditoría)
+public.stock_movements (
+  id uuid,
+  product_id uuid,
+  location_from_id uuid, -- null si es entrada inicial
+  location_to_id uuid, -- null si es salida/venta
+  quantity integer, -- Puede ser negativo
+  reason text, -- 'Stock inicial', 'Venta', 'Compra', 'Transferencia', 'Ajuste manual'
+  reference_type text, -- 'SALE' | 'PURCHASE' | 'TRANSFER' | 'ADJUSTMENT'
+  reference_id uuid, -- ID de la venta/compra/transferencia
+  created_by uuid,
+  created_at
+)
 
--- Stock
-public.stock (id, product_id, location_id, quantity)
+-- Historial de Precios (Auditoría)
+public.price_history (
+  id uuid,
+  product_id uuid,
+  cost numeric(10,2),
+  price numeric(10,2),
+  margin_percentage numeric(5,2),
+  tax_rate numeric(5,2),
+  reason text, -- 'Creación inicial', 'Compra X', 'Actualización manual', 'Actualización masiva'
+  created_by uuid,
+  created_at
+)
 
--- Ubicaciones
-public.locations (id, name, address, is_main, active)
+-- Listas de Precios
+public.price_lists (
+  id uuid,
+  name text,
+  description text,
+  is_automatic boolean default true,
+  adjustment_type text default 'AUMENTO', -- 'AUMENTO' | 'DESCUENTO'
+  adjustment_percentage numeric(5,2) default 0,
+  includes_tax boolean default true,
+  active boolean,
+  created_at, updated_at
+)
 
--- Categorías
-public.categories (id, name, description, parent_id)
-
--- Listas de precios
-public.price_lists (id, name, description, active)
-public.price_list_items (id, price_list_id, product_id, price)
+-- Clientes
+public.customers (
+  id uuid,
+  name text,
+  trade_name text,
+  tax_id text,
+  tax_id_type text default 'DNI', -- 'CUIT' | 'CUIL' | 'DNI'
+  legal_entity_type text default 'Física', -- 'Física' | 'Jurídica'
+  tax_category text default 'Consumidor Final',
+  email text,
+  phone text,
+  street_address text,
+  apartment text,
+  postal_code text,
+  province text,
+  city text,
+  assigned_seller_id uuid,
+  price_list_id uuid,
+  payment_terms text,
+  notes text,
+  active boolean,
+  created_at, updated_at
+)
 ```
 
 ### Tipos TypeScript
@@ -393,9 +541,7 @@ type EntityUpdate = Database["public"]["Tables"]["entities"]["Update"];
 /**
  * Obtener todas las entidades
  */
-export async function getEntities(filters?: {
-  // filtros opcionales
-}) {
+export async function getEntities(filters?: { // filtros opcionales }) {
   let query = supabase
     .from("entities")
     .select("*")

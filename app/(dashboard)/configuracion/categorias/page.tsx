@@ -94,6 +94,12 @@ function CategoriasPage() {
     setSheetOpen(true);
   }
 
+  function handleAddSubcategory(parentCategory: CategoryWithChildren) {
+    // Set the parent category as context for adding subcategory
+    setEditingCategory({ ...parentCategory, isAddingSubcategory: true } as CategoryWithChildren);
+    setSheetOpen(true);
+  }
+
   async function handleDelete(id: string) {
     try {
       await deleteCategory(id);
@@ -178,6 +184,7 @@ function CategoriasPage() {
             categories={paginatedCategories}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onAddSubcategory={handleAddSubcategory}
           />
 
           {/* Pagination */}

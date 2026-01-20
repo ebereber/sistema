@@ -1,6 +1,13 @@
 "use client";
 
-import { Monitor, MoreVertical, Pencil, Plus, Store, Trash2 } from "lucide-react";
+import {
+  Monitor,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Store,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -69,7 +76,7 @@ export function POSTable({
 
   if (isLoading) {
     return (
-      <div className="rounded-md border">
+      <div className="rounded-md border ">
         <Table>
           <TableHeader>
             <TableRow>
@@ -232,8 +239,10 @@ export function POSTable({
             <AlertDialogTitle>¿Eliminar punto de venta?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. El punto de venta{" "}
-              <strong>#{selectedPOS?.number} - {selectedPOS?.name}</strong> será
-              eliminado permanentemente.
+              <strong>
+                #{selectedPOS?.number} - {selectedPOS?.name}
+              </strong>{" "}
+              será eliminado permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

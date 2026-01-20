@@ -4,7 +4,9 @@ import {
   ChevronRight,
   Lightbulb,
   Package,
+  PanelLeft,
   Plus,
+  Settings,
   ShoppingBag,
   ShoppingCart,
 } from "lucide-react";
@@ -12,7 +14,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
-// Importamos todo de tu carpeta UI
 import {
   Collapsible,
   CollapsibleContent,
@@ -30,8 +31,19 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { DropdownMenuLabel } from "@radix-ui/react-dropdown-menu";
 import { ThemeSwitcher } from "../theme-switcher";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 const data = {
   company: {
@@ -70,15 +82,46 @@ const data = {
         { title: "Pagos", url: "/pagos" },
       ],
     },
+    {
+      title: "Configuración",
+      url: "/configuracion",
+      icon: Settings,
+    },
   ],
 };
 
+type SidebarMode = "expanded" | "collapsed" | "hover";
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
+  const [mode, setMode] = React.useState<SidebarMode>("hover");
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const { setOpen, open } = useSidebar();
+
+  // Control del Hover - MEJORADO para prevenir el glitch
+  const handleMouseEnter = () => {
+    // Solo abre automáticamente si está en modo hover Y el dropdown NO está abierto
+    if (mode === "hover" && !isDropdownOpen) {
+      setOpen(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Solo cierra automáticamente si está en modo hover Y el dropdown NO está abierto
+    if (mode === "hover" && !isDropdownOpen) {
+      setOpen(false);
+    }
+  };
 
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="border-b border-sidebar-border">
+    <Sidebar
+      variant={"sidebar"}
+      collapsible={mode === "expanded" ? "offcanvas" : "icon"}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      {...props}
+    >
+      <SidebarHeader className="border-b h-12 flex items-center justify-center border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -86,7 +129,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <data.company.logo className="size-4" />
                 </div>
-                <span className="text-base font-semibold">
+                <span className="text-sm font-semibold">
                   {data.company.name}
                 </span>
               </Link>
@@ -99,10 +142,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu className="gap-1 px-2 py-2">
           {data.navItems.map((item) => {
             const hasItems = item.items && item.items.length > 0;
-
-            // Detectamos si el grupo debe estar abierto (si estamos en una sub-ruta)
             const isChildActive = item.items?.some(
-              (sub) => pathname === sub.url
+              (sub) => pathname === sub.url,
             );
             const isParentActive = pathname === item.url;
 
@@ -111,7 +152,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <Collapsible
                   key={item.title}
                   asChild
-                  // defaultOpen hace que se abra solo al cargar si la ruta coincide
                   defaultOpen={isChildActive || isParentActive}
                   className="group/collapsible"
                 >
@@ -147,7 +187,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               );
             }
 
-            // Caso para ítems simples (sin hijos)
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
@@ -166,8 +205,54 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="mt-auto border-t border-sidebar-border p-4">
+      <SidebarFooter>
         <ThemeSwitcher />
+        <DropdownMenu onOpenChange={setIsDropdownOpen}>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="default" className="w-fit">
+              <PanelLeft />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuPortal>
+            <DropdownMenuContent side="right" align="end" className="w-56">
+              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-muted-foreground">
+                Control lateral
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              {/* Usamos RadioGroup para manejar el punto automáticamente */}
+              <DropdownMenuRadioGroup
+                value={mode}
+                onValueChange={(v) => setMode(v as SidebarMode)}
+              >
+                <DropdownMenuRadioItem
+                  value="expanded"
+                  onClick={() => setOpen(true)}
+                  className="text-xs flex items-center justify-between"
+                >
+                  Expandido
+                </DropdownMenuRadioItem>
+
+                <DropdownMenuRadioItem
+                  value="collapsed"
+                  onClick={() => setOpen(false)}
+                  className="text-xs flex items-center justify-between"
+                >
+                  Contraído
+                </DropdownMenuRadioItem>
+
+                <DropdownMenuRadioItem
+                  value="hover"
+                  onClick={() => setOpen(false)}
+                  className="text-xs flex items-center justify-between"
+                >
+                  Expandir al pasar el mouse
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenuPortal>
+        </DropdownMenu>
       </SidebarFooter>
 
       <SidebarRail />
