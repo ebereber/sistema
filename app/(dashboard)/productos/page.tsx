@@ -1,12 +1,30 @@
 "use client";
 
-import { AlertCircle, Package, Plus, Search, X } from "lucide-react";
+import {
+  AlertCircle,
+  Archive,
+  Copy,
+  History,
+  MoreVertical,
+  Package,
+  Pencil,
+  Plus,
+  Search,
+  Trash,
+  Truck,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { ArchiveProductDialog } from "@/components/productos/archive-product-dialog";
+import { DeleteProductDialog } from "@/components/productos/delete-product-dialog";
+import { PriceHistoryDialog } from "@/components/productos/price-history-dialog";
+import { StockManagementDialog } from "@/components/productos/stock-management-dialog";
+import { StockMovementsDialog } from "@/components/productos/stock-movements-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +37,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -46,7 +71,6 @@ import {
 import { useDebounce } from "@/hooks/use-debounce";
 import {
   getCategories,
-  type Category,
   type CategoryWithChildren,
 } from "@/lib/services/categories";
 import { getProducts, type Product } from "@/lib/services/products";
@@ -75,6 +99,17 @@ export default function ProductosPage() {
   // Popover states
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+
+  // Dialog states
+  const [stockManagementProduct, setStockManagementProduct] =
+    useState<Product | null>(null);
+  const [priceHistoryProduct, setPriceHistoryProduct] =
+    useState<Product | null>(null);
+  const [stockMovementsProduct, setStockMovementsProduct] =
+    useState<Product | null>(null);
+  const [archiveProduct, setArchiveProduct] = useState<Product | null>(null);
+  const [deleteProductDialog, setDeleteProductDialog] =
+    useState<Product | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -436,6 +471,7 @@ export default function ProductosPage() {
                   <TableHead className="text-center">Costo s/IVA</TableHead>
                   <TableHead className="text-center">Precio</TableHead>
                   <TableHead className="text-center">Estado</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -491,6 +527,95 @@ export default function ProductosPage() {
                       >
                         {product.active ? "Activo" : "Archivado"}
                       </Badge>
+                    </TableCell>
+
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/productos/${product.id}`);
+                            }}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStockManagementProduct(product);
+                            }}
+                          >
+                            <Package className="mr-2 h-4 w-4" />
+                            Gestionar Stock
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/productos/nuevo?duplicate=${product.id}`);
+                            }}
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Duplicar
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPriceHistoryProduct(product);
+                            }}
+                          >
+                            <History className="mr-2 h-4 w-4" />
+                            Historial de Precios
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStockMovementsProduct(product);
+                            }}
+                          >
+                            <Truck className="mr-2 h-4 w-4" />
+                            Movimientos de Stock
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setArchiveProduct(product);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Archive className="mr-2 h-4 w-4" />
+                            {product.active ? "Archivar" : "Activar"}
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteProductDialog(product);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -571,6 +696,62 @@ export default function ProductosPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Dialogs */}
+      {stockManagementProduct && (
+        <StockManagementDialog
+          product={stockManagementProduct}
+          onClose={() => setStockManagementProduct(null)}
+          onSuccess={() => {
+            setStockManagementProduct(null);
+            loadProducts();
+          }}
+        />
+      )}
+
+      {priceHistoryProduct && (
+        <PriceHistoryDialog
+          productId={priceHistoryProduct.id}
+          productName={priceHistoryProduct.name}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setPriceHistoryProduct(null);
+          }}
+        />
+      )}
+
+      {stockMovementsProduct && (
+        <StockMovementsDialog
+          productId={stockMovementsProduct.id}
+          productName={stockMovementsProduct.name}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setStockMovementsProduct(null);
+          }}
+        />
+      )}
+
+      {archiveProduct && (
+        <ArchiveProductDialog
+          product={archiveProduct}
+          onClose={() => setArchiveProduct(null)}
+          onSuccess={() => {
+            setArchiveProduct(null);
+            loadProducts();
+          }}
+        />
+      )}
+
+      {deleteProductDialog && (
+        <DeleteProductDialog
+          product={deleteProductDialog}
+          onClose={() => setDeleteProductDialog(null)}
+          onSuccess={() => {
+            setDeleteProductDialog(null);
+            loadProducts();
+          }}
+        />
       )}
     </div>
   );

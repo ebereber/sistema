@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -21,22 +21,29 @@ import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
 import {
   createProduct,
+  getProductById,
   isSkuUnique,
   isBarcodeUnique,
+  type Product,
 } from "@/lib/services/products";
 import { getLocations } from "@/lib/services/locations";
 import type { ProductFormInput, StockByLocationData } from "@/lib/validations/product";
 
 export default function NuevoProductoPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const duplicateId = searchParams.get("duplicate");
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSaveAndCreate, setIsSaveAndCreate] = useState(false);
   const [stockData, setStockData] = useState<StockByLocationData[]>([]);
   const [isLoadingStock, setIsLoadingStock] = useState(true);
+  const [initialData, setInitialData] = useState<Product | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
-  // Load locations for stock initialization
+  // Load locations and duplicate data if needed
   useEffect(() => {
-    async function loadLocations() {
+    async function loadData() {
       try {
         const locations = await getLocations();
         const initialStock = locations.map((loc) => ({
@@ -46,6 +53,36 @@ export default function NuevoProductoPage() {
           quantity: 0,
         }));
         setStockData(initialStock);
+
+        // If duplicating, load the product data
+        if (duplicateId) {
+          setIsDuplicating(true);
+          try {
+            const productToDuplicate = await getProductById(duplicateId);
+
+            // Prepare duplicated data (clear SKU, barcode, change name)
+            const duplicatedProduct: Product = {
+              ...productToDuplicate,
+              id: "", // Clear ID for new product
+              name: `${productToDuplicate.name} (copia)`,
+              sku: "", // Clear SKU - user must provide new one
+              barcode: null, // Clear barcode
+              stock_quantity: 0,
+              created_at: "",
+              updated_at: "",
+            };
+
+            setInitialData(duplicatedProduct);
+            toast.success("Producto duplicado", {
+              description: "Completá el SKU para crear el nuevo producto",
+            });
+          } catch (error) {
+            console.error("Error loading product to duplicate:", error);
+            toast.error("Error al duplicar", {
+              description: "No se pudo cargar el producto a duplicar",
+            });
+          }
+        }
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Error desconocido";
@@ -54,8 +91,8 @@ export default function NuevoProductoPage() {
         setIsLoadingStock(false);
       }
     }
-    loadLocations();
-  }, []);
+    loadData();
+  }, [duplicateId]);
 
   const handleSubmit = useCallback(
     async (data: ProductFormInput, stock: StockByLocationData[]) => {
@@ -199,7 +236,9 @@ export default function NuevoProductoPage() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Nuevo Producto</BreadcrumbPage>
+            <BreadcrumbPage>
+              {isDuplicating ? "Duplicar Producto" : "Nuevo Producto"}
+            </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -207,7 +246,14 @@ export default function NuevoProductoPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Nuevo Producto</h1>
+          <h1 className="text-3xl font-bold">
+            {isDuplicating ? "Duplicar Producto" : "Nuevo Producto"}
+          </h1>
+          {isDuplicating && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Completá el SKU y ajustá los datos necesarios
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -251,6 +297,7 @@ export default function NuevoProductoPage() {
       <div id="product-form">
         <ProductForm
           mode="create"
+          initialData={initialData}
           stockData={stockData}
           onSubmit={handleSubmit}
           isLoading={isLoading}

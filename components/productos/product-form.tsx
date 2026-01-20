@@ -112,9 +112,9 @@ export function ProductForm({
     form.setValue("price", priceCalculations.precioConIVA);
   }, [priceCalculations.precioConIVA, form]);
 
-  // Load initial data in edit mode
+  // Load initial data (for edit mode or duplication)
   useEffect(() => {
-    if (mode === "edit" && initialData) {
+    if (initialData) {
       form.reset({
         name: initialData.name,
         description: initialData.description || "",
@@ -139,7 +139,7 @@ export function ProductForm({
         active: initialData.active,
       });
     }
-  }, [mode, initialData, form]);
+  }, [initialData, form]);
 
   // Stock state - managed internally, initialized from props
   const [internalStock, setInternalStock] = useState<StockByLocationData[]>(stockData);

@@ -476,3 +476,95 @@ export async function isBarcodeUnique(
   if (error) throw error
   return !data || data.length === 0
 }
+
+/**
+ * Update product stock from stock management dialog
+ */
+export async function updateProductStock(
+  productId: string,
+  data: {
+    stockByLocation: Array<{ location_id: string; quantity: number }>
+    userId: string
+  }
+): Promise<void> {
+  const supabase = createClient()
+
+  for (const stockItem of data.stockByLocation) {
+    // Get current stock for this location
+    const { data: currentStock } = await supabase
+      .from("stock")
+      .select("quantity")
+      .eq("product_id", productId)
+      .eq("location_id", stockItem.location_id)
+      .single()
+
+    const currentQty = currentStock?.quantity ?? 0
+
+    if (currentQty !== stockItem.quantity) {
+      const diff = stockItem.quantity - currentQty
+
+      // Upsert stock record
+      await supabase.from("stock").upsert(
+        {
+          product_id: productId,
+          location_id: stockItem.location_id,
+          quantity: stockItem.quantity,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "product_id,location_id" }
+      )
+
+      // Create movement record
+      await supabase.from("stock_movements").insert({
+        product_id: productId,
+        [diff > 0 ? "location_to_id" : "location_from_id"]: stockItem.location_id,
+        quantity: Math.abs(diff),
+        reason: "Ajuste manual desde gestión de stock",
+        reference_type: "ADJUSTMENT",
+        created_by: data.userId,
+      })
+    }
+  }
+
+  // Update total stock in products table
+  const totalStock = data.stockByLocation.reduce((sum, s) => sum + s.quantity, 0)
+  await supabase
+    .from("products")
+    .update({ stock_quantity: totalStock, updated_at: new Date().toISOString() })
+    .eq("id", productId)
+}
+
+/**
+ * Delete a product permanently or archive if it has references
+ */
+export async function deleteProduct(id: string): Promise<void> {
+  const supabase = createClient()
+
+  // Check if product has sales references
+  const { data: movements } = await supabase
+    .from("stock_movements")
+    .select("id")
+    .eq("product_id", id)
+    .eq("reference_type", "SALE")
+    .limit(1)
+
+  if (movements && movements.length > 0) {
+    // Product has references, archive instead of delete
+    await supabase
+      .from("products")
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq("id", id)
+
+    throw new Error("El producto tiene referencias y fue archivado")
+  }
+
+  // Delete related records first
+  await supabase.from("stock_movements").delete().eq("product_id", id)
+  await supabase.from("stock").delete().eq("product_id", id)
+  await supabase.from("price_history").delete().eq("product_id", id)
+
+  // Delete product
+  const { error } = await supabase.from("products").delete().eq("id", id)
+
+  if (error) throw error
+}
