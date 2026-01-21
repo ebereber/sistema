@@ -18,16 +18,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { createClient } from "@/lib/supabase/client";
+import { getLocations } from "@/lib/services/locations";
 import {
   createProduct,
   getProductById,
-  isSkuUnique,
   isBarcodeUnique,
+  isSkuUnique,
   type Product,
 } from "@/lib/services/products";
-import { getLocations } from "@/lib/services/locations";
-import type { ProductFormInput, StockByLocationData } from "@/lib/validations/product";
+import { createClient } from "@/lib/supabase/client";
+import type {
+  ProductFormInput,
+  StockByLocationData,
+} from "@/lib/validations/product";
 
 export default function NuevoProductoPage() {
   const router = useRouter();
@@ -86,7 +89,9 @@ export default function NuevoProductoPage() {
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Error desconocido";
-        toast.error("Error al cargar ubicaciones", { description: errorMessage });
+        toast.error("Error al cargar ubicaciones", {
+          description: errorMessage,
+        });
       } finally {
         setIsLoadingStock(false);
       }
@@ -195,11 +200,11 @@ export default function NuevoProductoPage() {
         setIsLoading(false);
       }
     },
-    [router, isSaveAndCreate]
+    [router, isSaveAndCreate],
   );
 
   // Handle keyboard shortcut for save and create
-  useEffect(() => {
+  /* useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
@@ -214,7 +219,7 @@ export default function NuevoProductoPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, []); */
 
   if (isLoadingStock) {
     return (

@@ -75,8 +75,18 @@ export interface GetProductsParams {
   search?: string
   active?: boolean
   categoryId?: string
+  visibility?: string[]
+  stockFilter?: "WITH_STOCK" | "WITHOUT_STOCK" | "NEGATIVE_STOCK"
   page?: number
   pageSize?: number
+}
+
+export interface BulkFilters {
+  search?: string
+  active?: boolean
+  categoryId?: string
+  visibility?: string[]
+  stockFilter?: "WITH_STOCK" | "WITHOUT_STOCK" | "NEGATIVE_STOCK"
 }
 
 export interface GetProductsResult {
@@ -94,6 +104,8 @@ export async function getProducts(params: GetProductsParams = {}): Promise<GetPr
     search,
     active,
     categoryId,
+    visibility,
+    stockFilter,
     page = 1,
     pageSize = 20,
   } = params
@@ -121,6 +133,20 @@ export async function getProducts(params: GetProductsParams = {}): Promise<GetPr
   // Category filter
   if (categoryId) {
     query = query.eq("category_id", categoryId)
+  }
+
+  // Visibility filter
+  if (visibility && visibility.length > 0) {
+    query = query.in("visibility", visibility)
+  }
+
+  // Stock filter
+  if (stockFilter === "WITH_STOCK") {
+    query = query.gt("stock_quantity", 0)
+  } else if (stockFilter === "WITHOUT_STOCK") {
+    query = query.eq("stock_quantity", 0)
+  } else if (stockFilter === "NEGATIVE_STOCK") {
+    query = query.lt("stock_quantity", 0)
   }
 
   // Pagination
@@ -567,4 +593,378 @@ export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from("products").delete().eq("id", id)
 
   if (error) throw error
+}
+
+// ============================================================================
+// BULK OPERATIONS
+// ============================================================================
+
+/**
+ * Get all product IDs matching filters (for "Select all" functionality)
+ */
+export async function getAllProductIds(filters: BulkFilters): Promise<string[]> {
+  const supabase = createClient()
+
+  let query = supabase.from("products").select("id")
+
+  if (filters.search) {
+    query = query.or(`name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%`)
+  }
+
+  if (filters.active !== undefined) {
+    query = query.eq("active", filters.active)
+  }
+
+  if (filters.categoryId) {
+    query = query.eq("category_id", filters.categoryId)
+  }
+
+  if (filters.visibility && filters.visibility.length > 0) {
+    query = query.in("visibility", filters.visibility)
+  }
+
+  if (filters.stockFilter === "WITH_STOCK") {
+    query = query.gt("stock_quantity", 0)
+  } else if (filters.stockFilter === "WITHOUT_STOCK") {
+    query = query.eq("stock_quantity", 0)
+  } else if (filters.stockFilter === "NEGATIVE_STOCK") {
+    query = query.lt("stock_quantity", 0)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+  return data?.map((p) => p.id) || []
+}
+
+/**
+ * Bulk update prices
+ */
+export async function bulkUpdatePrices(params: {
+  productIds?: string[]
+  filters?: BulkFilters
+  operation: "increase" | "decrease"
+  type: "percentage" | "fixed"
+  value: number
+  userId: string
+}): Promise<number> {
+  const supabase = createClient()
+
+  // Get products to update
+  let productIds = params.productIds
+  if (!productIds && params.filters) {
+    productIds = await getAllProductIds(params.filters)
+  }
+
+  if (!productIds || productIds.length === 0) {
+    return 0
+  }
+
+  // Get current prices
+  const { data: products, error: fetchError } = await supabase
+    .from("products")
+    .select("id, price, cost, margin_percentage, tax_rate")
+    .in("id", productIds)
+
+  if (fetchError) throw fetchError
+
+  // Calculate and update new prices
+  let updatedCount = 0
+  for (const product of products || []) {
+    let newPrice = product.price
+
+    if (params.type === "percentage") {
+      const multiplier =
+        params.operation === "increase"
+          ? 1 + params.value / 100
+          : 1 - params.value / 100
+      newPrice = product.price * multiplier
+    } else {
+      newPrice =
+        params.operation === "increase"
+          ? product.price + params.value
+          : product.price - params.value
+    }
+
+    newPrice = Math.max(0, newPrice)
+
+    // Update product
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({ price: newPrice, updated_at: new Date().toISOString() })
+      .eq("id", product.id)
+
+    if (updateError) throw updateError
+
+    // Create price history
+    await supabase.from("price_history").insert({
+      product_id: product.id,
+      cost: product.cost,
+      price: newPrice,
+      margin_percentage: product.margin_percentage,
+      tax_rate: product.tax_rate,
+      reason: `Actualización masiva: ${params.operation === "increase" ? "Aumento" : "Disminución"} ${params.value}${params.type === "percentage" ? "%" : "$"}`,
+      created_by: params.userId,
+    })
+
+    updatedCount++
+  }
+
+  return updatedCount
+}
+
+/**
+ * Bulk update stock
+ */
+export async function bulkUpdateStock(params: {
+  productIds?: string[]
+  filters?: BulkFilters
+  locationId: string
+  operation: "replace" | "increase"
+  quantity: number
+  reason?: string
+  userId: string
+}): Promise<number> {
+  const supabase = createClient()
+
+  // Get products to update
+  let productIds = params.productIds
+  if (!productIds && params.filters) {
+    productIds = await getAllProductIds(params.filters)
+  }
+
+  if (!productIds || productIds.length === 0) {
+    return 0
+  }
+
+  let updatedCount = 0
+  for (const productId of productIds) {
+    // Get current stock for this location
+    const { data: currentStock } = await supabase
+      .from("stock")
+      .select("quantity")
+      .eq("product_id", productId)
+      .eq("location_id", params.locationId)
+      .single()
+
+    const currentQty = currentStock?.quantity ?? 0
+    const newQty =
+      params.operation === "replace"
+        ? params.quantity
+        : currentQty + params.quantity
+
+    if (currentQty !== newQty) {
+      const diff = newQty - currentQty
+
+      // Upsert stock record
+      await supabase.from("stock").upsert(
+        {
+          product_id: productId,
+          location_id: params.locationId,
+          quantity: newQty,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "product_id,location_id" }
+      )
+
+      // Create movement record
+      await supabase.from("stock_movements").insert({
+        product_id: productId,
+        [diff > 0 ? "location_to_id" : "location_from_id"]: params.locationId,
+        quantity: Math.abs(diff),
+        reason: params.reason || "Actualización masiva de stock",
+        reference_type: "ADJUSTMENT",
+        created_by: params.userId,
+      })
+
+      // Update total stock in product
+      const { data: allStock } = await supabase
+        .from("stock")
+        .select("quantity")
+        .eq("product_id", productId)
+
+      const totalStock = allStock?.reduce((sum, s) => sum + s.quantity, 0) ?? 0
+
+      await supabase
+        .from("products")
+        .update({ stock_quantity: totalStock, updated_at: new Date().toISOString() })
+        .eq("id", productId)
+
+      updatedCount++
+    }
+  }
+
+  return updatedCount
+}
+
+/**
+ * Bulk assign category
+ */
+export async function bulkAssignCategory(params: {
+  productIds?: string[]
+  filters?: BulkFilters
+  categoryId: string | null
+}): Promise<number> {
+  const supabase = createClient()
+
+  // Get products to update
+  let productIds = params.productIds
+  if (!productIds && params.filters) {
+    productIds = await getAllProductIds(params.filters)
+  }
+
+  if (!productIds || productIds.length === 0) {
+    return 0
+  }
+
+  const { error } = await supabase
+    .from("products")
+    .update({ category_id: params.categoryId, updated_at: new Date().toISOString() })
+    .in("id", productIds)
+
+  if (error) throw error
+
+  return productIds.length
+}
+
+/**
+ * Get product status counts (active vs inactive) for bulk operations
+ */
+export async function getProductStatusCounts(params: {
+  productIds?: string[]
+  filters?: BulkFilters
+}): Promise<{ active: number; inactive: number }> {
+  const supabase = createClient()
+
+  // Get products to count
+  let productIds = params.productIds
+  if (!productIds && params.filters) {
+    productIds = await getAllProductIds(params.filters)
+  }
+
+  if (!productIds || productIds.length === 0) {
+    return { active: 0, inactive: 0 }
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("active")
+    .in("id", productIds)
+
+  if (error) throw error
+
+  const active = data?.filter((p) => p.active).length ?? 0
+  const inactive = data?.filter((p) => !p.active).length ?? 0
+
+  return { active, inactive }
+}
+
+/**
+ * Bulk archive/activate products
+ * Only updates products that actually need to change state
+ */
+export async function bulkArchive(params: {
+  productIds?: string[]
+  filters?: BulkFilters
+  archive: boolean
+}): Promise<number> {
+  const supabase = createClient()
+
+  // Get products to update
+  let productIds = params.productIds
+  if (!productIds && params.filters) {
+    productIds = await getAllProductIds(params.filters)
+  }
+
+  if (!productIds || productIds.length === 0) {
+    return 0
+  }
+
+  // Only update products that are in the opposite state
+  // archive: true -> only update active products (active = true)
+  // archive: false -> only update inactive products (active = false)
+  const { data, error } = await supabase
+    .from("products")
+    .update({ active: !params.archive, updated_at: new Date().toISOString() })
+    .in("id", productIds)
+    .eq("active", params.archive) // Only update products currently in the opposite state
+    .select("id")
+
+  if (error) throw error
+
+  return data?.length ?? 0
+}
+
+/**
+ * Check which products have references (for bulk delete preview)
+ */
+export async function checkProductsWithReferences(productIds: string[]): Promise<{
+  canDelete: string[]
+  hasReferences: string[]
+}> {
+  const supabase = createClient()
+
+  const canDelete: string[] = []
+  const hasReferences: string[] = []
+
+  for (const id of productIds) {
+    const { data: movements } = await supabase
+      .from("stock_movements")
+      .select("id")
+      .eq("product_id", id)
+      .eq("reference_type", "SALE")
+      .limit(1)
+
+    if (movements && movements.length > 0) {
+      hasReferences.push(id)
+    } else {
+      canDelete.push(id)
+    }
+  }
+
+  return { canDelete, hasReferences }
+}
+
+/**
+ * Bulk delete products (archives those with references)
+ */
+export async function bulkDelete(params: {
+  productIds?: string[]
+  filters?: BulkFilters
+}): Promise<{ deleted: number; archived: number }> {
+  const supabase = createClient()
+
+  // Get products to delete
+  let productIds = params.productIds
+  if (!productIds && params.filters) {
+    productIds = await getAllProductIds(params.filters)
+  }
+
+  if (!productIds || productIds.length === 0) {
+    return { deleted: 0, archived: 0 }
+  }
+
+  // Check which products have references
+  const { canDelete, hasReferences } = await checkProductsWithReferences(productIds)
+
+  // Archive products with references
+  if (hasReferences.length > 0) {
+    await supabase
+      .from("products")
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .in("id", hasReferences)
+  }
+
+  // Delete products without references
+  for (const id of canDelete) {
+    await supabase.from("stock_movements").delete().eq("product_id", id)
+    await supabase.from("stock").delete().eq("product_id", id)
+    await supabase.from("price_history").delete().eq("product_id", id)
+    await supabase.from("products").delete().eq("id", id)
+  }
+
+  return {
+    deleted: canDelete.length,
+    archived: hasReferences.length,
+  }
 }

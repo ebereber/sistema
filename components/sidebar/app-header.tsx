@@ -3,7 +3,6 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { CommandMenu } from "./command-menu";
-import { NavUser } from "./nav-user";
 import { UserMenu } from "./user-menu";
 
 export function AppHeader() {
@@ -35,13 +34,13 @@ export function AppHeader() {
         </Button> */}
 
         {/* Settings */}
-        <NavUser
+        {/* <NavUser
           user={{
             name: "Lorianaleg ",
             email: "lorianaleg57@gmail.com",
             avatar: "/avatars/shadcn.jpg",
           }}
-        />
+        /> */}
         {/* User Menu */}
         <UserMenu />
       </div>

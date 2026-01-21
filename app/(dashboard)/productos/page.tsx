@@ -3,13 +3,17 @@
 import {
   AlertCircle,
   Archive,
+  ChevronDown,
   Copy,
+  DollarSign,
+  Download,
   History,
   MoreVertical,
   Package,
   Pencil,
   Plus,
   Search,
+  Tag,
   Trash,
   Truck,
   X,
@@ -21,6 +25,12 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ArchiveProductDialog } from "@/components/productos/archive-product-dialog";
+import { BulkActionsBar } from "@/components/productos/bulk-actions-bar";
+import { BulkArchiveDialog } from "@/components/productos/bulk-archive-dialog";
+import { BulkCategoryAssignDialog } from "@/components/productos/bulk-category-assign-dialog";
+import { BulkDeleteDialog } from "@/components/productos/bulk-delete-dialog";
+import { BulkPriceUpdateDialog } from "@/components/productos/bulk-price-update-dialog";
+import { BulkStockUpdateDialog } from "@/components/productos/bulk-stock-update-dialog";
 import { DeleteProductDialog } from "@/components/productos/delete-product-dialog";
 import { PriceHistoryDialog } from "@/components/productos/price-history-dialog";
 import { StockManagementDialog } from "@/components/productos/stock-management-dialog";
@@ -36,6 +46,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import {
   DropdownMenu,
@@ -73,9 +84,26 @@ import {
   getCategories,
   type CategoryWithChildren,
 } from "@/lib/services/categories";
-import { getProducts, type Product } from "@/lib/services/products";
+import {
+  getAllProductIds,
+  getProducts,
+  type BulkFilters,
+  type Product,
+} from "@/lib/services/products";
 
 const PAGE_SIZE = 20;
+
+const VISIBILITY_OPTIONS = [
+  { value: "SALES_AND_PURCHASES", label: "Ventas y Compras" },
+  { value: "SALES_ONLY", label: "Solo Ventas" },
+  { value: "PURCHASES_ONLY", label: "Solo Compras" },
+];
+
+const STOCK_OPTIONS = [
+  { value: "WITH_STOCK", label: "Con stock" },
+  { value: "WITHOUT_STOCK", label: "Sin stock" },
+  { value: "NEGATIVE_STOCK", label: "Stock negativo" },
+];
 
 export default function ProductosPage() {
   const router = useRouter();
@@ -90,6 +118,8 @@ export default function ProductosPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>(["active"]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [visibilityFilter, setVisibilityFilter] = useState<string[]>([]);
+  const [stockFilter, setStockFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   // Categories for filter
@@ -99,8 +129,16 @@ export default function ProductosPage() {
   // Popover states
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+  const [visibilityPopoverOpen, setVisibilityPopoverOpen] = useState(false);
+  const [stockPopoverOpen, setStockPopoverOpen] = useState(false);
 
-  // Dialog states
+  // Selection state
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
+    new Set(),
+  );
+  const [allSelected, setAllSelected] = useState(false);
+
+  // Dialog states for individual actions
   const [stockManagementProduct, setStockManagementProduct] =
     useState<Product | null>(null);
   const [priceHistoryProduct, setPriceHistoryProduct] =
@@ -111,10 +149,36 @@ export default function ProductosPage() {
   const [deleteProductDialog, setDeleteProductDialog] =
     useState<Product | null>(null);
 
+  // Bulk dialog states
+  const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = useState(false);
+  const [bulkStockDialogOpen, setBulkStockDialogOpen] = useState(false);
+  const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
+  const [bulkArchiveDialogOpen, setBulkArchiveDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+
   const debouncedSearch = useDebounce(search, 300);
 
   // Calculate pagination
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Build current filters object for bulk operations
+  const currentFilters: BulkFilters = {
+    search: debouncedSearch || undefined,
+    active:
+      statusFilter.length === 1 ? statusFilter.includes("active") : undefined,
+    categoryId: categoryFilter || undefined,
+    visibility: visibilityFilter.length > 0 ? visibilityFilter : undefined,
+    stockFilter: stockFilter as BulkFilters["stockFilter"],
+  };
+
+  // Check if any filter is active (besides default status)
+  const hasActiveFilters =
+    search ||
+    statusFilter.length !== 1 ||
+    !statusFilter.includes("active") ||
+    categoryFilter ||
+    visibilityFilter.length > 0 ||
+    stockFilter;
 
   // Load categories for filter
   useEffect(() => {
@@ -168,6 +232,12 @@ export default function ProductosPage() {
         search: debouncedSearch || undefined,
         active: activeFilter,
         categoryId: categoryFilter || undefined,
+        visibility: visibilityFilter.length > 0 ? visibilityFilter : undefined,
+        stockFilter: stockFilter as
+          | "WITH_STOCK"
+          | "WITHOUT_STOCK"
+          | "NEGATIVE_STOCK"
+          | undefined,
         page,
         pageSize: PAGE_SIZE,
       });
@@ -181,7 +251,14 @@ export default function ProductosPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, statusFilter, categoryFilter, page]);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    categoryFilter,
+    visibilityFilter,
+    stockFilter,
+    page,
+  ]);
 
   useEffect(() => {
     loadProducts();
@@ -190,7 +267,25 @@ export default function ProductosPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, categoryFilter]);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    categoryFilter,
+    visibilityFilter,
+    stockFilter,
+  ]);
+
+  // Clear selection when filters change
+  useEffect(() => {
+    setSelectedProducts(new Set());
+    setAllSelected(false);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    categoryFilter,
+    visibilityFilter,
+    stockFilter,
+  ]);
 
   // Filter functions
   function toggleStatus(status: string) {
@@ -202,18 +297,73 @@ export default function ProductosPage() {
     });
   }
 
+  function toggleVisibility(visibility: string) {
+    setVisibilityFilter((prev) => {
+      if (prev.includes(visibility)) {
+        return prev.filter((v) => v !== visibility);
+      }
+      return [...prev, visibility];
+    });
+  }
+
   function clearFilters() {
     setSearch("");
     setStatusFilter(["active"]);
     setCategoryFilter(null);
+    setVisibilityFilter([]);
+    setStockFilter(null);
     setPage(1);
   }
 
-  const hasActiveFilters =
-    search ||
-    statusFilter.length !== 1 ||
-    !statusFilter.includes("active") ||
-    categoryFilter;
+  // Selection functions
+  function toggleProductSelection(productId: string) {
+    setSelectedProducts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+    setAllSelected(false);
+  }
+
+  function toggleAllOnPage() {
+    const allOnPageSelected = products.every((p) => selectedProducts.has(p.id));
+    if (allOnPageSelected) {
+      // Deselect all on page
+      setSelectedProducts((prev) => {
+        const newSet = new Set(prev);
+        products.forEach((p) => newSet.delete(p.id));
+        return newSet;
+      });
+      setAllSelected(false);
+    } else {
+      // Select all on page
+      setSelectedProducts((prev) => {
+        const newSet = new Set(prev);
+        products.forEach((p) => newSet.add(p.id));
+        return newSet;
+      });
+    }
+  }
+
+  async function selectAllProducts() {
+    try {
+      const allIds = await getAllProductIds(currentFilters);
+      setSelectedProducts(new Set(allIds));
+      setAllSelected(true);
+    } catch (error) {
+      console.error("Error selecting all products:", error);
+      toast.error("Error al seleccionar todos los productos");
+    }
+  }
+
+  function clearSelection() {
+    setSelectedProducts(new Set());
+    setAllSelected(false);
+  }
 
   // Format currency
   function formatCurrency(amount: number): string {
@@ -246,161 +396,400 @@ export default function ProductosPage() {
     return statusFilter.includes("active") ? "Activo" : "Archivado";
   }
 
+  // Get visibility label
+  function getVisibilityLabel(): string {
+    if (visibilityFilter.length === 0) return "";
+    if (visibilityFilter.length === 1) {
+      return (
+        VISIBILITY_OPTIONS.find((v) => v.value === visibilityFilter[0])
+          ?.label || ""
+      );
+    }
+    return `${visibilityFilter.length} seleccionados`;
+  }
+
+  // Get stock label
+  function getStockLabel(): string {
+    if (!stockFilter) return "";
+    return STOCK_OPTIONS.find((s) => s.value === stockFilter)?.label || "";
+  }
+
+  // Bulk action handlers
+  function handleBulkSuccess() {
+    loadProducts();
+    clearSelection();
+  }
+
+  // Check if all products on page are selected
+  const allOnPageSelected =
+    products.length > 0 && products.every((p) => selectedProducts.has(p.id));
+  const someOnPageSelected =
+    products.some((p) => selectedProducts.has(p.id)) && !allOnPageSelected;
+
   return (
     <div className="space-y-6">
+      {/* Bulk Actions Bar */}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Productos</h1>
-        <Button asChild>
-          <Link href="/productos/nuevo">
-            <Plus className="mr-2 h-4 w-4" />
-            Crear...
-            <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              N
-            </kbd>
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Exportar siempre visible */}
+          <Button
+            variant="outline"
+            onClick={() => toast.info("Exportación próximamente")}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
+          </Button>
+
+          {/* Crear siempre visible */}
+          <Button asChild>
+            <Link href="/productos/nuevo">
+              <Plus className="mr-2 h-4 w-4" />
+              Crear...
+              <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                N
+              </kbd>
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre o SKU..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o SKU..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-        {/* Status Filter */}
-        <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm">
-              {statusFilter.length === 0 || statusFilter.length === 2 ? (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Estado
-                </>
-              ) : (
-                <>
-                  Estado
-                  <Badge variant="secondary" className="ml-2">
-                    {getStatusLabel()}
-                  </Badge>
-                </>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Filtrar por estado" />
-              <CommandList>
-                <CommandEmpty>Sin resultados</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem onSelect={() => toggleStatus("active")}>
-                    <Checkbox
-                      checked={statusFilter.includes("active")}
-                      className="mr-2"
-                    />
-                    Activo
-                  </CommandItem>
-                  <CommandItem onSelect={() => toggleStatus("archived")}>
-                    <Checkbox
-                      checked={statusFilter.includes("archived")}
-                      className="mr-2"
-                    />
-                    Archivado
-                  </CommandItem>
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+          {/* Status Filter */}
+          <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                {statusFilter.length === 0 || statusFilter.length === 2 ? (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Estado
+                  </>
+                ) : (
+                  <>
+                    Estado
+                    <Badge variant="secondary" className="ml-2">
+                      {getStatusLabel()}
+                    </Badge>
+                  </>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Filtrar por estado" />
+                <CommandList>
+                  <CommandEmpty>Sin resultados</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem onSelect={() => toggleStatus("active")}>
+                      <Checkbox
+                        checked={statusFilter.includes("active")}
+                        className="mr-2"
+                      />
+                      Activo
+                    </CommandItem>
+                    <CommandItem onSelect={() => toggleStatus("archived")}>
+                      <Checkbox
+                        checked={statusFilter.includes("archived")}
+                        className="mr-2"
+                      />
+                      Archivado
+                    </CommandItem>
+                  </CommandGroup>
+                  <CommandSeparator />
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        setStatusFilter(["active"]);
+                        setStatusPopoverOpen(false);
+                      }}
+                      className="justify-center text-sm"
+                    >
+                      Limpiar filtro
+                    </CommandItem>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
-        {/* Category Filter */}
-        <Popover
-          open={categoryPopoverOpen}
-          onOpenChange={setCategoryPopoverOpen}
-        >
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm">
-              {!categoryFilter ? (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Categoría
-                </>
-              ) : (
-                <>
-                  Categoría
-                  <Badge variant="secondary" className="ml-2">
-                    {getCategoryName(categoryFilter)}
-                  </Badge>
-                </>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Filtrar por categoría" />
-              <CommandList>
-                <CommandEmpty>
-                  {categoriesLoading ? "Cargando..." : "Sin categorías"}
-                </CommandEmpty>
-                <CommandGroup>
-                  {categories.map((category) => (
-                    <div key={category.id}>
-                      {/* Parent category */}
-                      <CommandItem
-                        onSelect={() => {
-                          setCategoryFilter(
-                            categoryFilter === category.id ? null : category.id
-                          );
-                          setCategoryPopoverOpen(false);
-                        }}
-                      >
-                        <Checkbox
-                          checked={categoryFilter === category.id}
-                          className="mr-2"
-                        />
-                        <span className="font-medium">{category.name}</span>
-                      </CommandItem>
-
-                      {/* Child categories (indented) */}
-                      {category.children?.map((child) => (
+          {/* Category Filter */}
+          <Popover
+            open={categoryPopoverOpen}
+            onOpenChange={setCategoryPopoverOpen}
+          >
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                {!categoryFilter ? (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Categoría
+                  </>
+                ) : (
+                  <>
+                    Categoría
+                    <Badge variant="secondary" className="ml-2">
+                      {getCategoryName(categoryFilter)}
+                    </Badge>
+                  </>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Filtrar por categoría" />
+                <CommandList>
+                  <CommandEmpty>
+                    {categoriesLoading ? "Cargando..." : "Sin categorías"}
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {categories.map((category) => (
+                      <div key={category.id}>
+                        {/* Parent category */}
                         <CommandItem
-                          key={child.id}
                           onSelect={() => {
                             setCategoryFilter(
-                              categoryFilter === child.id ? null : child.id
+                              categoryFilter === category.id
+                                ? null
+                                : category.id,
                             );
                             setCategoryPopoverOpen(false);
                           }}
-                          className="pl-8"
                         >
                           <Checkbox
-                            checked={categoryFilter === child.id}
+                            checked={categoryFilter === category.id}
                             className="mr-2"
                           />
-                          {child.name}
+                          <span className="font-medium">{category.name}</span>
                         </CommandItem>
-                      ))}
-                    </div>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
 
-        {/* Clear Filters */}
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            <X className="mr-2 h-4 w-4" />
-            Limpiar filtros
-          </Button>
+                        {/* Child categories (indented) */}
+                        {category.children?.map((child) => (
+                          <CommandItem
+                            key={child.id}
+                            onSelect={() => {
+                              setCategoryFilter(
+                                categoryFilter === child.id ? null : child.id,
+                              );
+                              setCategoryPopoverOpen(false);
+                            }}
+                            className="pl-8"
+                          >
+                            <Checkbox
+                              checked={categoryFilter === child.id}
+                              className="mr-2"
+                            />
+                            {child.name}
+                          </CommandItem>
+                        ))}
+                      </div>
+                    ))}
+                  </CommandGroup>
+                  <CommandSeparator />
+                  {categoryFilter && (
+                    <>
+                      <CommandSeparator />
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            setCategoryFilter(null);
+                            setCategoryPopoverOpen(false);
+                          }}
+                          className="justify-center text-sm "
+                        >
+                          Limpiar filtro
+                        </CommandItem>
+                      </CommandGroup>
+                    </>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          {/* Visibility Filter */}
+          <Popover
+            open={visibilityPopoverOpen}
+            onOpenChange={setVisibilityPopoverOpen}
+          >
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                {visibilityFilter.length === 0 ? (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Visibilidad
+                  </>
+                ) : (
+                  <>
+                    Visibilidad
+                    <Badge variant="secondary" className="ml-2">
+                      {getVisibilityLabel()}
+                    </Badge>
+                  </>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Filtrar por visibilidad" />
+                <CommandList>
+                  <CommandEmpty>Sin resultados</CommandEmpty>
+                  <CommandGroup>
+                    {VISIBILITY_OPTIONS.map((option) => (
+                      <CommandItem
+                        key={option.value}
+                        onSelect={() => toggleVisibility(option.value)}
+                      >
+                        <Checkbox
+                          checked={visibilityFilter.includes(option.value)}
+                          className="mr-2"
+                        />
+                        {option.label}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+
+                  {visibilityFilter.length > 0 && (
+                    <>
+                      <CommandSeparator />
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            setVisibilityFilter([]);
+                            setVisibilityPopoverOpen(false);
+                          }}
+                          className="justify-center text-sm "
+                        >
+                          Limpiar filtro
+                        </CommandItem>
+                      </CommandGroup>
+                    </>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          {/* Stock Filter */}
+          <Popover open={stockPopoverOpen} onOpenChange={setStockPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                {!stockFilter ? (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Stock
+                  </>
+                ) : (
+                  <>
+                    Stock
+                    <Badge variant="secondary" className="ml-2">
+                      {getStockLabel()}
+                    </Badge>
+                  </>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Filtrar por stock" />
+                <CommandList>
+                  <CommandEmpty>Sin resultados</CommandEmpty>
+                  <CommandGroup>
+                    {STOCK_OPTIONS.map((option) => (
+                      <CommandItem
+                        key={option.value}
+                        onSelect={() => {
+                          setStockFilter(
+                            stockFilter === option.value ? null : option.value,
+                          );
+                          setStockPopoverOpen(false);
+                        }}
+                      >
+                        <Checkbox
+                          checked={stockFilter === option.value}
+                          className="mr-2"
+                        />
+                        {option.label}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                  <CommandSeparator />
+                  {stockFilter && (
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => {
+                          setStockFilter(null);
+                          setStockPopoverOpen(false);
+                        }}
+                        className="justify-center text-sm"
+                      >
+                        Limpiar filtro
+                      </CommandItem>
+                    </CommandGroup>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="mr-2 h-4 w-4" />
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+        {/* Solo mostrar si NO hay selección */}
+        {selectedProducts.size === 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild className="ml-10">
+              <Button variant="outline">
+                Acciones masivas
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setBulkPriceDialogOpen(true)}>
+                <DollarSign className="mr-2 h-4 w-4" />
+                Actualizar precios
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setBulkStockDialogOpen(true)}>
+                <Package className="mr-2 h-4 w-4" />
+                Actualizar stock
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setBulkCategoryDialogOpen(true)}>
+                <Tag className="mr-2 h-4 w-4" />
+                Asignar categoría
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setBulkArchiveDialogOpen(true)}>
+                <Archive className="mr-2 h-4 w-4" />
+                Archivar/Desarchivar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setBulkDeleteDialogOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -428,6 +817,7 @@ export default function ProductosPage() {
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-5 w-5" />
               <Skeleton className="h-12 w-12 rounded" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-[200px]" />
@@ -459,6 +849,19 @@ export default function ProductosPage() {
         </div>
       )}
 
+      <BulkActionsBar
+        selectedCount={allSelected ? totalCount : selectedProducts.size}
+        totalCount={totalCount}
+        allSelected={allSelected}
+        onSelectAll={selectAllProducts}
+        onClearSelection={clearSelection}
+        onUpdatePrices={() => setBulkPriceDialogOpen(true)}
+        onUpdateStock={() => setBulkStockDialogOpen(true)}
+        onAssignCategory={() => setBulkCategoryDialogOpen(true)}
+        onArchive={() => setBulkArchiveDialogOpen(true)}
+        onDelete={() => setBulkDeleteDialogOpen(true)}
+      />
+
       {/* Products Table */}
       {!isLoading && !error && products.length > 0 && (
         <>
@@ -466,6 +869,20 @@ export default function ProductosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={allOnPageSelected}
+                      ref={(el) => {
+                        if (el) {
+                          (
+                            el as HTMLButtonElement & { indeterminate: boolean }
+                          ).indeterminate = someOnPageSelected;
+                        }
+                      }}
+                      onCheckedChange={toggleAllOnPage}
+                      aria-label="Seleccionar todos"
+                    />
+                  </TableHead>
                   <TableHead className="w-[40%]">Producto</TableHead>
                   <TableHead className="text-center">Stock</TableHead>
                   <TableHead className="text-center">Costo s/IVA</TableHead>
@@ -479,9 +896,20 @@ export default function ProductosPage() {
                   <TableRow
                     key={product.id}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => router.push(`/productos/${product.id}`)}
+                    data-selected={selectedProducts.has(product.id)}
                   >
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedProducts.has(product.id)}
+                        onCheckedChange={() =>
+                          toggleProductSelection(product.id)
+                        }
+                        aria-label={`Seleccionar ${product.name}`}
+                      />
+                    </TableCell>
+                    <TableCell
+                      onClick={() => router.push(`/productos/${product.id}`)}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded border bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
                           {product.image_url ? (
@@ -505,26 +933,36 @@ export default function ProductosPage() {
                       </div>
                     </TableCell>
 
-                    <TableCell className="text-center">
+                    <TableCell
+                      className="text-center"
+                      onClick={() => router.push(`/productos/${product.id}`)}
+                    >
                       <span className="text-blue-600 font-medium">
                         {product.stock_quantity || 0}
                       </span>
                     </TableCell>
 
-                    <TableCell className="text-center">
+                    <TableCell
+                      className="text-center"
+                      onClick={() => router.push(`/productos/${product.id}`)}
+                    >
                       {product.cost ? formatCurrency(product.cost) : "-"}
                     </TableCell>
 
-                    <TableCell className="text-center">
+                    <TableCell
+                      className="text-center"
+                      onClick={() => router.push(`/productos/${product.id}`)}
+                    >
                       <span className="text-blue-600 font-medium">
                         {formatCurrency(product.price)}
                       </span>
                     </TableCell>
 
-                    <TableCell className="text-center">
-                      <Badge
-                        variant={product.active ? "default" : "secondary"}
-                      >
+                    <TableCell
+                      className="text-center"
+                      onClick={() => router.push(`/productos/${product.id}`)}
+                    >
+                      <Badge variant={product.active ? "default" : "secondary"}>
                         {product.active ? "Activo" : "Archivado"}
                       </Badge>
                     </TableCell>
@@ -564,7 +1002,9 @@ export default function ProductosPage() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/productos/nuevo?duplicate=${product.id}`);
+                              router.push(
+                                `/productos/nuevo?duplicate=${product.id}`,
+                              );
                             }}
                           >
                             <Copy className="mr-2 h-4 w-4" />
@@ -698,7 +1138,7 @@ export default function ProductosPage() {
         </>
       )}
 
-      {/* Dialogs */}
+      {/* Individual Dialogs */}
       {stockManagementProduct && (
         <StockManagementDialog
           product={stockManagementProduct}
@@ -753,6 +1193,60 @@ export default function ProductosPage() {
           }}
         />
       )}
+
+      {/* Bulk Dialogs */}
+      {/* allSelected: true si el usuario seleccionó todos O si no hay selección (acción desde header) */}
+      <BulkPriceUpdateDialog
+        selectedIds={Array.from(selectedProducts)}
+        filters={currentFilters}
+        allSelected={allSelected || selectedProducts.size === 0}
+        totalCount={totalCount}
+        open={bulkPriceDialogOpen}
+        onOpenChange={setBulkPriceDialogOpen}
+        onSuccess={handleBulkSuccess}
+      />
+
+      <BulkStockUpdateDialog
+        selectedIds={Array.from(selectedProducts)}
+        filters={currentFilters}
+        allSelected={allSelected || selectedProducts.size === 0}
+        totalCount={totalCount}
+        open={bulkStockDialogOpen}
+        onOpenChange={setBulkStockDialogOpen}
+        onSuccess={handleBulkSuccess}
+      />
+
+      <BulkCategoryAssignDialog
+        selectedIds={Array.from(selectedProducts)}
+        filters={currentFilters}
+        allSelected={allSelected || selectedProducts.size === 0}
+        totalCount={totalCount}
+        open={bulkCategoryDialogOpen}
+        onOpenChange={setBulkCategoryDialogOpen}
+        onSuccess={handleBulkSuccess}
+      />
+
+      <BulkArchiveDialog
+        selectedIds={Array.from(selectedProducts)}
+        filters={currentFilters}
+        allSelected={allSelected || selectedProducts.size === 0}
+        totalCount={totalCount}
+        hasFilters={!!hasActiveFilters}
+        open={bulkArchiveDialogOpen}
+        onOpenChange={setBulkArchiveDialogOpen}
+        onSuccess={handleBulkSuccess}
+      />
+
+      <BulkDeleteDialog
+        selectedIds={Array.from(selectedProducts)}
+        filters={currentFilters}
+        allSelected={allSelected || selectedProducts.size === 0}
+        totalCount={totalCount}
+        hasFilters={!!hasActiveFilters}
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+        onSuccess={handleBulkSuccess}
+      />
     </div>
   );
 }
