@@ -260,7 +260,7 @@ export default function NuevoProductoPage() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center md:flex-row flex-col gap-2">
           <Button
             type="button"
             variant="outline"
@@ -274,15 +274,16 @@ export default function NuevoProductoPage() {
             disabled={isLoading}
           >
             Guardar y crear otro
-            <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            {/* <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
               <span className="text-xs">&#8984;</span>Enter
-            </kbd>
+            </kbd> */}
           </Button>
           <Button
             type="submit"
             form="product-form"
             disabled={isLoading}
             onClick={() => setIsSaveAndCreate(false)}
+            className="w-full md:w-fit"
           >
             {isLoading ? (
               <>

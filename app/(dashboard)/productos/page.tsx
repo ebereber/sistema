@@ -439,18 +439,20 @@ export default function ProductosPage() {
             variant="outline"
             onClick={() => toast.info("Exportación próximamente")}
           >
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
+            <Download className="sm:mr-2 h-4 w-4" />
+            <span className="hidden sm:block">Exportar</span>
           </Button>
 
           {/* Crear siempre visible */}
           <Button asChild>
             <Link href="/productos/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Crear...
-              <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                N
-              </kbd>
+              <Plus className="sm:mr-2 h-4 w-4" />
+              <div className="hidden sm:block">
+                Crear...
+                <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                  N
+                </kbd>
+              </div>
             </Link>
           </Button>
         </div>
@@ -757,7 +759,7 @@ export default function ProductosPage() {
         {/* Solo mostrar si NO hay selección */}
         {selectedProducts.size === 0 && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild className="ml-10">
+            <DropdownMenuTrigger asChild className="">
               <Button variant="outline">
                 Acciones masivas
                 <ChevronDown className="ml-2 h-4 w-4" />

@@ -25,7 +25,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { createClient } from "@/lib/supabase/client";
 import {
   activateProduct,
   archiveProduct,
@@ -35,7 +34,11 @@ import {
   updateProduct,
   type Product,
 } from "@/lib/services/products";
-import type { ProductFormInput, StockByLocationData } from "@/lib/validations/product";
+import { createClient } from "@/lib/supabase/client";
+import type {
+  ProductFormInput,
+  StockByLocationData,
+} from "@/lib/validations/product";
 
 export default function ProductoDetailPage() {
   const params = useParams();
@@ -115,7 +118,10 @@ export default function ProductoDetailPage() {
 
         // Validate barcode uniqueness if provided and changed
         if (data.barcode && data.barcode !== product.barcode) {
-          const barcodeIsUnique = await isBarcodeUnique(data.barcode, product.id);
+          const barcodeIsUnique = await isBarcodeUnique(
+            data.barcode,
+            product.id,
+          );
           if (!barcodeIsUnique) {
             toast.error("Código de barras duplicado", {
               description: "Ya existe un producto con este código de barras",
@@ -177,12 +183,14 @@ export default function ProductoDetailPage() {
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Error desconocido";
-        toast.error("Error al actualizar producto", { description: errorMessage });
+        toast.error("Error al actualizar producto", {
+          description: errorMessage,
+        });
       } finally {
         setIsSaving(false);
       }
     },
-    [product]
+    [product],
   );
 
   const handleArchive = useCallback(async () => {
@@ -245,7 +253,8 @@ export default function ProductoDetailPage() {
     );
   }
 
-  const productTypeLabel = product.product_type === "SERVICE" ? "Servicio" : "Producto";
+  const productTypeLabel =
+    product.product_type === "SERVICE" ? "Servicio" : "Producto";
 
   return (
     <div className="space-y-6">

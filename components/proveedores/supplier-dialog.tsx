@@ -260,7 +260,11 @@ export function SupplierDialog({
           ) : (
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  form.handleSubmit(onSubmit)(e);
+                }}
                 className="space-y-4"
               >
                 {/* ARCA Search */}
