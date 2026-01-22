@@ -1,275 +1,448 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Percent, DollarSign, Trash2 } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  DollarSign,
+  Percent,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   formatPrice,
-  type DiscountType,
-  type ItemDiscount,
-  type GlobalDiscount,
   type CartItem,
-} from "@/lib/validations/sale"
+  type DiscountType,
+  type GlobalDiscount,
+  type ItemDiscount,
+} from "@/lib/validations/sale";
 
-interface ItemDiscountDialogProps {
-  mode: "item"
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  item: CartItem
-  onApply: (discount: ItemDiscount | null) => void
+interface DiscountDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  items: CartItem[];
+  globalDiscount: GlobalDiscount | null;
+  onApplyItemDiscount: (id: string, discount: ItemDiscount | null) => void;
+  onApplyGlobalDiscount: (discount: GlobalDiscount | null) => void;
 }
 
-interface GlobalDiscountDialogProps {
-  mode: "global"
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  subtotal: number
-  currentDiscount: GlobalDiscount | null
-  onApply: (discount: GlobalDiscount | null) => void
+interface ItemDiscountState {
+  type: DiscountType;
+  value: string;
 }
 
-type DiscountDialogProps = ItemDiscountDialogProps | GlobalDiscountDialogProps
+export function DiscountDialog({
+  open,
+  onOpenChange,
+  items,
+  globalDiscount,
+  onApplyItemDiscount,
+  onApplyGlobalDiscount,
+}: DiscountDialogProps) {
+  // Global discount state
+  const [globalType, setGlobalType] = useState<DiscountType>("percentage");
+  const [globalValue, setGlobalValue] = useState("");
 
-export function DiscountDialog(props: DiscountDialogProps) {
-  const { mode, open, onOpenChange, onApply } = props
+  // Item discounts state
+  const [itemDiscounts, setItemDiscounts] = useState<
+    Record<string, ItemDiscountState>
+  >({});
+  const [isProductSectionOpen, setIsProductSectionOpen] = useState(true);
 
-  const [discountType, setDiscountType] = useState<DiscountType>("percentage")
-  const [value, setValue] = useState("")
-  const [error, setError] = useState<string | null>(null)
-
-  // Initialize with existing discount when opening
+  // Initialize state when opening
   useEffect(() => {
     if (open) {
-      if (mode === "item") {
-        const item = (props as ItemDiscountDialogProps).item
+      // Initialize global discount
+      if (globalDiscount) {
+        setGlobalType(globalDiscount.type);
+        setGlobalValue(globalDiscount.value.toString());
+      } else {
+        setGlobalType("percentage");
+        setGlobalValue("");
+      }
+
+      // Initialize item discounts
+      const initialItemDiscounts: Record<string, ItemDiscountState> = {};
+      items.forEach((item) => {
         if (item.discount) {
-          setDiscountType(item.discount.type)
-          setValue(item.discount.value.toString())
+          initialItemDiscounts[item.id] = {
+            type: item.discount.type,
+            value: item.discount.value.toString(),
+          };
         } else {
-          setDiscountType("percentage")
-          setValue("")
+          initialItemDiscounts[item.id] = {
+            type: "percentage",
+            value: "",
+          };
         }
-      } else {
-        const currentDiscount = (props as GlobalDiscountDialogProps).currentDiscount
-        if (currentDiscount) {
-          setDiscountType(currentDiscount.type)
-          setValue(currentDiscount.value.toString())
+      });
+      setItemDiscounts(initialItemDiscounts);
+    }
+  }, [open, globalDiscount, items]);
+
+  // Check if there are any discounts
+  const hasAnyDiscounts = (): boolean => {
+    if (globalDiscount) return true;
+    return items.some((item) => item.discount !== null);
+  };
+
+  // Count items with discounts
+  const itemsWithDiscountsCount = items.filter(
+    (item) => item.discount !== null,
+  ).length;
+
+  // Handle item discount change
+  const handleItemDiscountChange = (
+    itemId: string,
+    field: "type" | "value",
+    newValue: string,
+  ) => {
+    setItemDiscounts((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: newValue,
+      },
+    }));
+  };
+
+  // Remove item discount
+  const handleRemoveItemDiscount = (itemId: string) => {
+    setItemDiscounts((prev) => ({
+      ...prev,
+      [itemId]: {
+        type: "percentage",
+        value: "",
+      },
+    }));
+  };
+
+  // Remove all discounts
+  const handleRemoveAllDiscounts = () => {
+    setGlobalValue("");
+    const clearedItemDiscounts: Record<string, ItemDiscountState> = {};
+    items.forEach((item) => {
+      clearedItemDiscounts[item.id] = {
+        type: "percentage",
+        value: "",
+      };
+    });
+    setItemDiscounts(clearedItemDiscounts);
+  };
+
+  // Apply all discounts
+  const handleApply = () => {
+    // Apply global discount
+    const globalNumValue = parseFloat(globalValue);
+    if (!isNaN(globalNumValue) && globalNumValue > 0) {
+      onApplyGlobalDiscount({ type: globalType, value: globalNumValue });
+    } else {
+      onApplyGlobalDiscount(null);
+    }
+
+    // Apply item discounts
+    items.forEach((item) => {
+      const itemDiscount = itemDiscounts[item.id];
+      if (itemDiscount) {
+        const numValue = parseFloat(itemDiscount.value);
+        if (!isNaN(numValue) && numValue > 0) {
+          onApplyItemDiscount(item.id, {
+            type: itemDiscount.type,
+            value: numValue,
+          });
         } else {
-          setDiscountType("percentage")
-          setValue("")
+          onApplyItemDiscount(item.id, null);
         }
       }
-      setError(null)
-    }
-  }, [open, mode, props])
+    });
 
-  const calculatePreview = (): { original: number; discounted: number; saved: number } => {
-    const numValue = parseFloat(value) || 0
+    onOpenChange(false);
+  };
 
-    if (mode === "item") {
-      const item = (props as ItemDiscountDialogProps).item
-      const original = item.price * item.quantity
-      let saved = 0
+  // Calculate preview
+  const calculatePreview = () => {
+    let subtotal = 0;
+    let totalItemDiscounts = 0;
 
-      if (discountType === "percentage") {
-        saved = original * (numValue / 100)
+    items.forEach((item) => {
+      const itemSubtotal = item.price * item.quantity;
+      subtotal += itemSubtotal;
+
+      const itemDiscount = itemDiscounts[item.id];
+      if (itemDiscount && itemDiscount.value) {
+        const numValue = parseFloat(itemDiscount.value) || 0;
+        if (itemDiscount.type === "percentage") {
+          totalItemDiscounts += itemSubtotal * (numValue / 100);
+        } else {
+          totalItemDiscounts += Math.min(
+            numValue * item.quantity,
+            itemSubtotal,
+          );
+        }
+      }
+    });
+
+    const afterItemDiscounts = subtotal - totalItemDiscounts;
+
+    let globalDiscountAmount = 0;
+    const globalNumValue = parseFloat(globalValue) || 0;
+    if (globalNumValue > 0) {
+      if (globalType === "percentage") {
+        globalDiscountAmount = afterItemDiscounts * (globalNumValue / 100);
       } else {
-        saved = Math.min(numValue * item.quantity, original)
-      }
-
-      return {
-        original,
-        discounted: original - saved,
-        saved,
-      }
-    } else {
-      const subtotal = (props as GlobalDiscountDialogProps).subtotal
-      let saved = 0
-
-      if (discountType === "percentage") {
-        saved = subtotal * (numValue / 100)
-      } else {
-        saved = Math.min(numValue, subtotal)
-      }
-
-      return {
-        original: subtotal,
-        discounted: subtotal - saved,
-        saved,
+        globalDiscountAmount = Math.min(globalNumValue, afterItemDiscounts);
       }
     }
-  }
 
-  const validateAndApply = () => {
-    const numValue = parseFloat(value)
+    const total = afterItemDiscounts - globalDiscountAmount;
 
-    if (isNaN(numValue) || numValue < 0) {
-      setError("Ingresa un valor válido")
-      return
-    }
+    return {
+      subtotal,
+      itemDiscounts: totalItemDiscounts,
+      globalDiscount: globalDiscountAmount,
+      total: Math.max(0, total),
+    };
+  };
 
-    if (discountType === "percentage" && numValue > 100) {
-      setError("El porcentaje no puede ser mayor a 100%")
-      return
-    }
-
-    const preview = calculatePreview()
-    if (preview.saved > preview.original) {
-      setError("El descuento no puede ser mayor al total")
-      return
-    }
-
-    if (numValue === 0) {
-      onApply(null)
-    } else {
-      onApply({ type: discountType, value: numValue })
-    }
-    onOpenChange(false)
-  }
-
-  const handleRemoveDiscount = () => {
-    onApply(null)
-    onOpenChange(false)
-  }
-
-  const preview = calculatePreview()
-  const hasExistingDiscount =
-    mode === "item"
-      ? !!(props as ItemDiscountDialogProps).item.discount
-      : !!(props as GlobalDiscountDialogProps).currentDiscount
-
-  const title =
-    mode === "item"
-      ? `Descuento: ${(props as ItemDiscountDialogProps).item.name}`
-      : "Descuento general"
-
-  const description =
-    mode === "item"
-      ? "Aplica un descuento a este producto"
-      : "Aplica un descuento al total de la venta"
+  const preview = calculatePreview();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-185 w-full  max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle className="text-sm">Descuentos</DialogTitle>
+          <DialogDescription className="hidden"></DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 py-4">
-          {/* Discount type selector */}
-          <div className="space-y-2">
-            <Label>Tipo de descuento</Label>
-            <Tabs
-              value={discountType}
-              onValueChange={(v) => setDiscountType(v as DiscountType)}
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="percentage" className="gap-2">
-                  <Percent className="h-4 w-4" />
-                  Porcentaje
-                </TabsTrigger>
-                <TabsTrigger value="fixed" className="gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Monto fijo
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+        <div className="flex-1 overflow-y-auto space-y-6 py-4">
+          {/* Global discount section */}
+          <div className="space-y-3">
+            <div className="flex  items-center justify-between rounded-md border bg-muted p-4 ">
+              <h3 className="font-medium text-sm">Descuento global</h3>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={globalType}
+                  onValueChange={(v) => setGlobalType(v as DiscountType)}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">
+                      <div className="flex items-center gap-1">
+                        <Percent className="h-3 w-3" />
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="fixed">
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
 
-          {/* Value input */}
-          <div className="space-y-2">
-            <Label htmlFor="discount-value">
-              {discountType === "percentage" ? "Porcentaje (%)" : "Monto ($)"}
-            </Label>
-            <div className="relative">
-              <Input
-                id="discount-value"
-                type="number"
-                min={0}
-                max={discountType === "percentage" ? 100 : undefined}
-                step="0.01"
-                placeholder={discountType === "percentage" ? "10" : "100"}
-                value={value}
-                onChange={(e) => {
-                  setValue(e.target.value)
-                  setError(null)
-                }}
-                className="pr-8"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                {discountType === "percentage" ? "%" : "$"}
-              </span>
+                <div className="relative flex-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={globalType === "percentage" ? 100 : undefined}
+                    step="0.01"
+                    placeholder={
+                      globalType === "percentage" ? "Ej. 10" : "Ej. 100"
+                    }
+                    value={globalValue}
+                    onChange={(e) => setGlobalValue(e.target.value)}
+                    className="h-8 w-28  [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                    {globalType === "percentage" ? "%" : "$"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Error message */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {/* Item discounts section */}
+          <Collapsible
+            open={isProductSectionOpen}
+            onOpenChange={setIsProductSectionOpen}
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full flex justify-between rounded-md border bg-muted p-4 md:flex-row"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">
+                    Descuentos por producto
+                  </span>
+                  {itemsWithDiscountsCount > 0 && (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900 dark:text-green-300">
+                      {itemsWithDiscountsCount}
+                    </span>
+                  )}
+                </div>
+                {isProductSectionOpen ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
+              {items.map((item) => {
+                const itemDiscount = itemDiscounts[item.id];
+                const hasValue =
+                  itemDiscount?.value && parseFloat(itemDiscount.value) > 0;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-lg border p-3 space-y-2 flex justify-between"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className=" line-clamp-2 md:text-sm text-xs font-medium leading-tight">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.sku} • {formatPrice(item.price)} x{" "}
+                          {item.quantity}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Select
+                        value={itemDiscount?.type || "percentage"}
+                        onValueChange={(v) =>
+                          handleItemDiscountChange(item.id, "type", v)
+                        }
+                      >
+                        <SelectTrigger className="w-20 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">%</SelectItem>
+                          <SelectItem value="fixed">$</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="group relative flex-1">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={
+                            itemDiscount?.type === "percentage"
+                              ? 100
+                              : undefined
+                          }
+                          step="0.01"
+                          placeholder="Ej. 10%"
+                          value={itemDiscount?.value || ""}
+                          onChange={(e) =>
+                            handleItemDiscountChange(
+                              item.id,
+                              "value",
+                              e.target.value,
+                            )
+                          }
+                          className="h-8 flex-1 w-28  [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                        />
+                        {hasValue && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive absolute right-1 top-1"
+                            onClick={() => handleRemoveItemDiscount(item.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Preview */}
-          {parseFloat(value) > 0 && (
-            <div className="rounded-lg bg-muted p-3 text-sm">
+        </div>
+
+        <DialogFooter className=" flex flex-col! gap-2  pt-4">
+          {(preview.itemDiscounts > 0 || preview.globalDiscount > 0) && (
+            <div className="rounded-lg border  p-3 text-sm space-y-1">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  {mode === "item" ? "Subtotal" : "Total actual"}
-                </span>
-                <span>{formatPrice(preview.original)}</span>
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatPrice(preview.subtotal)}</span>
               </div>
-              <div className="flex justify-between text-green-600">
-                <span>Descuento</span>
-                <span>-{formatPrice(preview.saved)}</span>
-              </div>
-              <div className="mt-1 flex justify-between border-t pt-1 font-semibold">
-                <span>Nuevo total</span>
-                <span>{formatPrice(preview.discounted)}</span>
+              {preview.itemDiscounts > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Desc. por producto</span>
+                  <span>-{formatPrice(preview.itemDiscounts)}</span>
+                </div>
+              )}
+              {preview.globalDiscount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Descuento global</span>
+                  <span>-{formatPrice(preview.globalDiscount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t pt-1 font-semibold">
+                <span>Total</span>
+                <span>{formatPrice(preview.total)}</span>
               </div>
             </div>
           )}
-        </div>
-
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          {hasExistingDiscount && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleRemoveDiscount}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Quitar descuento
-            </Button>
-          )}
-          <div className="flex gap-2 sm:ml-auto">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancelar
-            </Button>
-            <Button type="button" onClick={validateAndApply}>
-              Aplicar
-            </Button>
+          <div className="flex justify-between flex-col gap-2 lg:flex-row">
+            {hasAnyDiscounts() && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRemoveAllDiscounts}
+                className="text-destructive hover:text-destructive sm:mr-auto"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar todos
+              </Button>
+            )}
+            <div className="flex gap-2 sm:ml-auto lg:flex-row flex-col w-full justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleApply}>
+                Aplicar
+              </Button>
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

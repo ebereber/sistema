@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Product } from "./products"
+import type { CartItem, GlobalDiscount, SelectedCustomer } from "@/lib/validations/sale"
 
 export interface ProductForSale {
   id: string
@@ -200,27 +201,11 @@ export async function getCustomerPriceListAdjustment(customerId: string): Promis
 export const CART_STORAGE_KEY = "pos_cart_data"
 
 export interface CartStorageData {
-  items: Array<{
-    id: string
-    productId: string
-    name: string
-    sku: string
-    price: number
-    quantity: number
-    taxRate: number
-    discount: { type: "percentage" | "fixed"; value: number } | null
-    imageUrl: string | null
-  }>
-  customer: {
-    id: string | null
-    name: string
-    taxId: string | null
-    taxCategory: string | null
-    priceListId: string | null
-    priceListAdjustment: number | null
-    priceListAdjustmentType: "AUMENTO" | "DESCUENTO" | null
-  }
-  globalDiscount: { type: "percentage" | "fixed"; value: number } | null
+  items: CartItem[]
+  customer: SelectedCustomer
+  globalDiscount: GlobalDiscount | null
+  note?: string
+  saleDate?: string
   savedAt: string
 }
 

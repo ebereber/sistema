@@ -2,6 +2,7 @@
 
 import { Minus, Plus, Trash2 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,15 +17,9 @@ interface CartItemProps {
   item: CartItemType;
   onQuantityChange: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
-  onDiscountClick: (item: CartItemType) => void;
 }
 
-export function CartItem({
-  item,
-  onQuantityChange,
-  onRemove,
-  onDiscountClick,
-}: CartItemProps) {
+export function CartItem({ item, onQuantityChange, onRemove }: CartItemProps) {
   const itemTotal = calculateItemTotal(item);
   const discountAmount = calculateItemDiscount(
     item.price,
@@ -52,38 +47,37 @@ export function CartItem({
     }
   };
 
-  const formatDiscount = (discount: ItemDiscount): string => {
+  const formatDiscountBadge = (discount: ItemDiscount): string => {
     if (discount.type === "percentage") {
-      return `-${discount.value}%`;
+      return `${discount.value}% OFF`;
     }
-    return `-${formatPrice(discount.value)}`;
+    return `${formatPrice(discount.value)} OFF`;
   };
 
   return (
-    <div className="group relative flex animate-in fade-in-0 items-center gap-3  py-2 duration-200 last:border-b-0">
-      {/* Header: Name and remove button */}
-
+    <div className="group relative flex animate-in fade-in-0 items-center gap-3 py-2 duration-200 last:border-b-0">
+      {/* Product info */}
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 md:text-sm text-xs font-medium  leading-tight">
+        <p className="line-clamp-2 md:text-sm text-xs font-medium leading-tight">
           {item.name}
         </p>
-        <div className="flex gap-2">
-          <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+          <span className="text-xs text-muted-foreground">SKU: {item.sku}</span>
           <span className="text-xs text-muted-foreground">
             {formatPrice(item.price)}
           </span>
           {hasDiscount && item.discount && (
-            <span
-              className="cursor-pointer text-green-600 dark:text-green-500  text-xs"
-              onClick={() => onDiscountClick(item)}
+            <Badge
+              variant="secondary"
+              className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-[10px] px-1.5 py-0"
             >
-              {formatDiscount(item.discount)} OFF
-            </span>
+              {formatDiscountBadge(item.discount)}
+            </Badge>
           )}
         </div>
       </div>
-      {/* Quantity controls */}
 
+      {/* Quantity controls */}
       <div className="ml-2 flex w-fit items-stretch">
         <Button
           variant="outline"
@@ -115,15 +109,8 @@ export function CartItem({
           <span className="sr-only">Incrementar</span>
         </Button>
       </div>
-      {/*  <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onRemove(item.id)}
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="sr-only">Eliminar</span>
-        </Button> */}
+
+      {/* Price column */}
       <div className="w-20 text-right flex flex-col">
         {hasDiscount && (
           <span className="text-xs text-muted-foreground line-through">
@@ -132,29 +119,6 @@ export function CartItem({
         )}
         <span className="font-semibold text-sm">{formatPrice(itemTotal)}</span>
       </div>
-
-      {/* Price and quantity row */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {/*  <span className="text-sm text-muted-foreground">
-            {formatPrice(item.price)}
-          </span> */}
-
-          {/*  {!hasDiscount && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs text-muted-foreground"
-              onClick={() => onDiscountClick(item)}
-            >
-              <Percent className="mr-1 h-3 w-3" />
-              Desc.
-            </Button>
-          )} */}
-        </div>
-      </div>
-
-      {/* Total row */}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -28,7 +29,6 @@ import {
   DEFAULT_CUSTOMER,
   generateCartItemId,
 } from "@/lib/validations/sale";
-import { ShoppingCart } from "lucide-react";
 
 export default function NuevaVentaPage() {
   const router = useRouter();
@@ -39,6 +39,10 @@ export default function NuevaVentaPage() {
   const [globalDiscount, setGlobalDiscount] = useState<GlobalDiscount | null>(
     null,
   );
+
+  // Additional cart state
+  const [note, setNote] = useState("");
+  const [saleDate, setSaleDate] = useState(new Date());
 
   // Add product to cart
   const handleAddProduct = useCallback(
@@ -85,6 +89,33 @@ export default function NuevaVentaPage() {
       toast(`${product.name} agregado al carrito`);
     },
     [customer.priceListAdjustment, customer.priceListAdjustmentType],
+  );
+
+  // Add custom item to cart
+  const handleAddCustomItem = useCallback(
+    (
+      name: string,
+      price: number,
+      quantity: number,
+      taxRate: number,
+      type: string,
+    ) => {
+      const customItem: CartItem = {
+        id: generateCartItemId(),
+        productId: null, // Indicates custom item
+        name,
+        sku: "CUSTOM",
+        price,
+        quantity,
+        taxRate,
+        discount: null,
+        imageUrl: null,
+      };
+
+      setCartItems((items) => [...items, customItem]);
+      toast(`${name} agregado al carrito`);
+    },
+    [],
   );
 
   // Update item quantity
@@ -143,10 +174,22 @@ export default function NuevaVentaPage() {
     [],
   );
 
+  // Change note
+  const handleNoteChange = useCallback((newNote: string) => {
+    setNote(newNote);
+  }, []);
+
+  // Change sale date
+  const handleSaleDateChange = useCallback((date: Date) => {
+    setSaleDate(date);
+    toast.info(`Fecha cambiada a ${date.toLocaleDateString("es-AR")}`);
+  }, []);
+
   // Clear cart
   const handleClearCart = useCallback(() => {
     setCartItems([]);
     setGlobalDiscount(null);
+    setNote("");
     toast("Carrito vaciado");
   }, []);
 
@@ -159,11 +202,13 @@ export default function NuevaVentaPage() {
       return;
     }
 
-    // Save cart data to session storage
+    // Save cart data to session storage (including note and saleDate)
     saveCartToStorage({
       items: cartItems,
       customer,
       globalDiscount,
+      note,
+      saleDate: saleDate.toISOString(),
       savedAt: new Date().toISOString(),
     });
 
@@ -174,9 +219,7 @@ export default function NuevaVentaPage() {
 
     // When checkout page is ready:
     // router.push('/ventas/checkout')
-  }, [cartItems, customer, globalDiscount]);
-
-  const isEmpty = cartItems.length === 0;
+  }, [cartItems, customer, globalDiscount, note, saleDate]);
 
   return (
     <div className="flex h-[calc(100vh-5.5rem)] gap-4 lg:flex-row flex-col ">
@@ -186,16 +229,21 @@ export default function NuevaVentaPage() {
       </div>
 
       {/* Right panel - Cart */}
-      <div className="flex-1 overflow-y-auto pr-4  lg:block hidden">
+      <div className="flex-1 overflow-y-auto pr-4 lg:block hidden">
         <CartPanel
           items={cartItems}
           customer={customer}
           globalDiscount={globalDiscount}
+          note={note}
+          saleDate={saleDate}
           onQuantityChange={handleQuantityChange}
           onRemoveItem={handleRemoveItem}
           onApplyItemDiscount={handleApplyItemDiscount}
           onCustomerChange={handleCustomerChange}
           onGlobalDiscountChange={handleGlobalDiscountChange}
+          onAddCustomItem={handleAddCustomItem}
+          onNoteChange={handleNoteChange}
+          onSaleDateChange={handleSaleDateChange}
           onContinue={handleContinue}
           onClearCart={handleClearCart}
         />
@@ -225,11 +273,16 @@ export default function NuevaVentaPage() {
                   items={cartItems}
                   customer={customer}
                   globalDiscount={globalDiscount}
+                  note={note}
+                  saleDate={saleDate}
                   onQuantityChange={handleQuantityChange}
                   onRemoveItem={handleRemoveItem}
                   onApplyItemDiscount={handleApplyItemDiscount}
                   onCustomerChange={handleCustomerChange}
                   onGlobalDiscountChange={handleGlobalDiscountChange}
+                  onAddCustomItem={handleAddCustomItem}
+                  onNoteChange={handleNoteChange}
+                  onSaleDateChange={handleSaleDateChange}
                   onContinue={handleContinue}
                   onClearCart={handleClearCart}
                 />

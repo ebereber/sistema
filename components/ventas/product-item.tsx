@@ -47,12 +47,20 @@ export function ProductItem({ product, onClick }: ProductItemProps) {
             SKU:{product.sku}
           </span>
           {lowStock && (
-            <Badge variant="outline" className="text-xs text-yellow-600">
+            <Badge
+              variant="secondary"
+              className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 text-[10px] px-1.5 py-0 border-none"
+            >
               Stock bajo
             </Badge>
           )}
+
+          {/* Badge de Sin Stock */}
           {!hasStock && (
-            <Badge variant="outline" className="text-xs text-destructive">
+            <Badge
+              variant="secondary"
+              className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-[10px] px-1.5 py-0 border-none"
+            >
               Sin stock
             </Badge>
           )}
@@ -61,7 +69,9 @@ export function ProductItem({ product, onClick }: ProductItemProps) {
 
       {/* Price and stock */}
       <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="font-semibold">{formatPrice(product.price)}</span>
+        <span className="font-semibold text-sm">
+          {formatPrice(product.price)}
+        </span>
         <span className="text-xs text-muted-foreground">
           {product.stockQuantity} en stock
         </span>

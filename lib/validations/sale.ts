@@ -11,7 +11,7 @@ export const itemDiscountSchema = z.object({
 // Schema for cart item
 export const cartItemSchema = z.object({
   id: z.string().uuid(),
-  productId: z.string().uuid(),
+  productId: z.string().uuid().nullable(), // null for custom items
   name: z.string(),
   sku: z.string(),
   price: z.number().min(0),

@@ -1,9 +1,26 @@
 "use client";
 
-import { ArrowRight, Percent, ShoppingCart, Trash2, User } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  EllipsisVertical,
+  PackagePlus,
+  Save,
+  ShoppingCart,
+  StickyNote,
+  Trash2,
+  User,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   type CartItem as CartItemType,
@@ -12,21 +29,37 @@ import {
   type ItemDiscount,
   type SelectedCustomer,
   calculateCartTotals,
+  formatPrice,
 } from "@/lib/validations/sale";
+import { Kbd } from "../ui/kbd";
+import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
-import { CartSummary } from "./cart-summary";
+import { ChangeDateDialog } from "./change-date-dialog";
 import { CustomerSelectDialog } from "./customer-select-dialog";
+import { CustomItemDialog } from "./custom-item-dialog";
 import { DiscountDialog } from "./discount-dialog";
+import { SaveQuoteDialog } from "./save-quote-dialog";
 
 interface CartPanelProps {
   items: CartItemType[];
   customer: SelectedCustomer;
   globalDiscount: GlobalDiscount | null;
+  note: string;
+  saleDate: Date;
   onQuantityChange: (id: string, quantity: number) => void;
   onRemoveItem: (id: string) => void;
   onApplyItemDiscount: (id: string, discount: ItemDiscount | null) => void;
   onCustomerChange: (customer: SelectedCustomer) => void;
   onGlobalDiscountChange: (discount: GlobalDiscount | null) => void;
+  onAddCustomItem: (
+    name: string,
+    price: number,
+    quantity: number,
+    taxRate: number,
+    type: string,
+  ) => void;
+  onNoteChange: (note: string) => void;
+  onSaleDateChange: (date: Date) => void;
   onContinue: () => void;
   onClearCart: () => void;
 }
@@ -35,75 +68,124 @@ export function CartPanel({
   items,
   customer,
   globalDiscount,
+  note,
+  saleDate,
   onQuantityChange,
   onRemoveItem,
   onApplyItemDiscount,
   onCustomerChange,
   onGlobalDiscountChange,
+  onAddCustomItem,
+  onNoteChange,
+  onSaleDateChange,
   onContinue,
   onClearCart,
 }: CartPanelProps) {
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
-  const [selectedItemForDiscount, setSelectedItemForDiscount] =
-    useState<CartItemType | null>(null);
-  const [globalDiscountDialogOpen, setGlobalDiscountDialogOpen] =
-    useState(false);
+  const [customItemDialogOpen, setCustomItemDialogOpen] = useState(false);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const [saveQuoteDialogOpen, setSaveQuoteDialogOpen] = useState(false);
 
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
-  // Handle keyboard shortcut for customer
+  // Check if there are any discounts
+  const hasItemDiscounts = totals.itemDiscounts > 0;
+  const hasGlobalDiscount = totals.globalDiscount > 0;
+  const hasAnyDiscounts = hasItemDiscounts || hasGlobalDiscount;
+
+  // Handle keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Only trigger if not in an input field
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      // ⌘C or Ctrl+C for customer
       if ((e.metaKey || e.ctrlKey) && e.key === "c" && !e.shiftKey) {
-        // Only trigger if not in an input field
-        if (
-          document.activeElement?.tagName !== "INPUT" &&
-          document.activeElement?.tagName !== "TEXTAREA"
-        ) {
-          e.preventDefault();
-          setCustomerDialogOpen(true);
+        e.preventDefault();
+        setCustomerDialogOpen(true);
+      }
+
+      // ⌘D or Ctrl+D for discounts
+      if ((e.metaKey || e.ctrlKey) && e.key === "d" && !e.shiftKey) {
+        e.preventDefault();
+        if (items.length > 0) {
+          setDiscountDialogOpen(true);
         }
+      }
+
+      // ⌘I or Ctrl+I for custom item
+      if ((e.metaKey || e.ctrlKey) && e.key === "i" && !e.shiftKey) {
+        e.preventDefault();
+        setCustomItemDialogOpen(true);
+      }
+
+      // ⌘N or Ctrl+N for note
+      if ((e.metaKey || e.ctrlKey) && e.key === "n" && !e.shiftKey) {
+        e.preventDefault();
+        setNoteDialogOpen(true);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  const handleItemDiscountClick = (item: CartItemType) => {
-    setSelectedItemForDiscount(item);
-    setDiscountDialogOpen(true);
-  };
-
-  const handleApplyItemDiscount = (discount: ItemDiscount | null) => {
-    if (selectedItemForDiscount) {
-      onApplyItemDiscount(selectedItemForDiscount.id, discount);
-    }
-    setSelectedItemForDiscount(null);
-  };
+  }, [items.length]);
 
   const isEmpty = items.length === 0;
 
   return (
-    <div className="flex  h-full flex-col rounded-lg mt-4 lg:mt-0 lg:border bg-sidebar">
+    <div className="flex h-full flex-col rounded-lg mt-4 lg:mt-0 lg:border bg-sidebar">
       {/* Header */}
-
       <div className="flex items-center p-2 justify-between">
-        <div className="  items-center gap-2">
-          {/* <ShoppingCart className="h-4 w-4" /> */}
+        <div className="items-center gap-2">
           <h2 className="font-semibold text-sm">Caja Principal</h2>
         </div>
-        {!isEmpty && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearCart}
-            className="text-muted-foreground hover:text-destructive "
-          >
-            <Trash2 className="mr-1 h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <EllipsisVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-fit">
+              <DropdownMenuItem onClick={() => setCustomItemDialogOpen(true)}>
+                <PackagePlus className="mr-2 size-4" />
+                Ítem Personalizado
+                <Kbd className="ml-auto">⌘I</Kbd>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setNoteDialogOpen(true)}>
+                <StickyNote className="mr-2 size-4" />
+                {note ? "Editar Nota" : "Agregar Nota"}
+                <Kbd className="ml-auto">⌘N</Kbd>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateDialogOpen(true)}>
+                <CalendarDays className="mr-2 size-4" />
+                Cambiar fecha
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setSaveQuoteDialogOpen(true)}>
+                <Save className="mr-2 size-4" />
+                Guardar como presupuesto
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {!isEmpty && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearCart}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Customer selector */}
@@ -121,8 +203,22 @@ export function CartPanel({
         </Button>
       </div>
 
+      {/* Note indicator */}
+      {note && (
+        <div className="border-b p-2">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+            onClick={() => setNoteDialogOpen(true)}
+          >
+            <StickyNote className="h-4 w-4 shrink-0" />
+            <span className="truncate">{note}</span>
+          </button>
+        </div>
+      )}
+
       {/* Cart items */}
-      <ScrollArea className="flex-1 h-full pr-4  overflow-hidden ">
+      <ScrollArea className="flex-1 h-full pr-4 overflow-hidden">
         <div className="p-4">
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -142,7 +238,6 @@ export function CartPanel({
                   item={item}
                   onQuantityChange={onQuantityChange}
                   onRemove={onRemoveItem}
-                  onDiscountClick={handleItemDiscountClick}
                 />
               ))}
             </div>
@@ -153,23 +248,58 @@ export function CartPanel({
       {/* Footer with totals and actions */}
       {!isEmpty && (
         <div className="border-t p-4">
-          {/* Global discount button */}
-          <div className="mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => setGlobalDiscountDialogOpen(true)}
-            >
-              <Percent className="mr-2 h-4 w-4" />
-              {globalDiscount
-                ? `Descuento: ${globalDiscount.type === "percentage" ? `${globalDiscount.value}%` : `$${globalDiscount.value}`}`
-                : "Agregar descuento general"}
-            </Button>
-          </div>
+          {/* Discount button or discount lines */}
+          {!hasAnyDiscounts ? (
+            <div className="mb-4 w-fit">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setDiscountDialogOpen(true)}
+              >
+                <span className="flex-1 text-left">+ Agregar descuento</span>
+                <kbd className="ml-2 hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
+                  {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}D
+                </kbd>
+              </Button>
+            </div>
+          ) : (
+            <div className="mb-4 space-y-2 text-sm">
+              {/* Item discounts line */}
+              {hasItemDiscounts && (
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
+                  onClick={() => setDiscountDialogOpen(true)}
+                >
+                  <span>Descuentos por producto</span>
+                  <span>-{formatPrice(totals.itemDiscounts)}</span>
+                </button>
+              )}
 
-          {/* Totals */}
-          <CartSummary totals={totals} globalDiscount={globalDiscount} />
+              {/* Global discount line */}
+              {hasGlobalDiscount && (
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
+                  onClick={() => setDiscountDialogOpen(true)}
+                >
+                  <span>
+                    Descuento global
+                    {globalDiscount?.type === "percentage" &&
+                      ` (${globalDiscount.value}%)`}
+                  </span>
+                  <span>-{formatPrice(totals.globalDiscount)}</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Total */}
+          <div className="flex items-center justify-between text-lg font-semibold">
+            <span>Total</span>
+            <span>{formatPrice(totals.total)}</span>
+          </div>
 
           {/* Continue button */}
           <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
@@ -187,25 +317,44 @@ export function CartPanel({
         onCustomerSelect={onCustomerChange}
       />
 
-      {/* Item discount dialog */}
-      {selectedItemForDiscount && (
-        <DiscountDialog
-          mode="item"
-          open={discountDialogOpen}
-          onOpenChange={setDiscountDialogOpen}
-          item={selectedItemForDiscount}
-          onApply={handleApplyItemDiscount}
-        />
-      )}
-
-      {/* Global discount dialog */}
+      {/* Unified discount dialog */}
       <DiscountDialog
-        mode="global"
-        open={globalDiscountDialogOpen}
-        onOpenChange={setGlobalDiscountDialogOpen}
-        subtotal={totals.subtotal - totals.itemDiscounts}
-        currentDiscount={globalDiscount}
-        onApply={onGlobalDiscountChange}
+        open={discountDialogOpen}
+        onOpenChange={setDiscountDialogOpen}
+        items={items}
+        globalDiscount={globalDiscount}
+        onApplyItemDiscount={onApplyItemDiscount}
+        onApplyGlobalDiscount={onGlobalDiscountChange}
+      />
+
+      {/* Custom item dialog */}
+      <CustomItemDialog
+        open={customItemDialogOpen}
+        onOpenChange={setCustomItemDialogOpen}
+        onAddItem={onAddCustomItem}
+      />
+
+      {/* Add note dialog */}
+      <AddNoteDialog
+        open={noteDialogOpen}
+        onOpenChange={setNoteDialogOpen}
+        note={note}
+        onNoteChange={onNoteChange}
+        onSave={() => {}}
+      />
+
+      {/* Change date dialog */}
+      <ChangeDateDialog
+        open={dateDialogOpen}
+        onOpenChange={setDateDialogOpen}
+        date={saleDate}
+        onDateChange={onSaleDateChange}
+      />
+
+      {/* Save quote dialog */}
+      <SaveQuoteDialog
+        open={saveQuoteDialogOpen}
+        onOpenChange={setSaveQuoteDialogOpen}
       />
     </div>
   );

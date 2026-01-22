@@ -1,27 +1,30 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Search, User, Loader2, UserPlus, Check } from "lucide-react"
+import { Check, Loader2, Search, User, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useDebounce } from "@/hooks/use-debounce"
-import { getCustomers, type Customer } from "@/lib/services/customers"
-import { DEFAULT_CUSTOMER, type SelectedCustomer } from "@/lib/validations/sale"
-import { getCustomerPriceListAdjustment } from "@/lib/services/sales"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useDebounce } from "@/hooks/use-debounce";
+import { getCustomers, type Customer } from "@/lib/services/customers";
+import { getCustomerPriceListAdjustment } from "@/lib/services/sales";
+import {
+  DEFAULT_CUSTOMER,
+  type SelectedCustomer,
+} from "@/lib/validations/sale";
 
 interface CustomerSelectDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  selectedCustomer: SelectedCustomer
-  onCustomerSelect: (customer: SelectedCustomer) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedCustomer: SelectedCustomer;
+  onCustomerSelect: (customer: SelectedCustomer) => void;
 }
 
 export function CustomerSelectDialog({
@@ -30,60 +33,60 @@ export function CustomerSelectDialog({
   selectedCustomer,
   onCustomerSelect,
 }: CustomerSelectDialogProps) {
-  const [search, setSearch] = useState("")
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [search, setSearch] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = useDebounce(search, 300);
 
   // Load customers when dialog opens or search changes
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
 
     async function loadCustomers() {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
         const data = await getCustomers({
           search: debouncedSearch || undefined,
           active: true,
-        })
-        setCustomers(data)
+        });
+        setCustomers(data);
       } catch (error) {
-        console.error("Error loading customers:", error)
+        console.error("Error loading customers:", error);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
-    loadCustomers()
-  }, [open, debouncedSearch])
+    loadCustomers();
+  }, [open, debouncedSearch]);
 
   // Reset search when dialog closes
   useEffect(() => {
     if (!open) {
-      setSearch("")
+      setSearch("");
     }
-  }, [open])
+  }, [open]);
 
   const handleSelectConsumidorFinal = () => {
-    onCustomerSelect(DEFAULT_CUSTOMER)
-    onOpenChange(false)
-  }
+    onCustomerSelect(DEFAULT_CUSTOMER);
+    onOpenChange(false);
+  };
 
   const handleSelectCustomer = async (customer: Customer) => {
     // Get price list adjustment if customer has one
-    let priceListAdjustment = null
-    let priceListAdjustmentType = null
-    let priceListId = customer.price_list_id
+    let priceListAdjustment = null;
+    let priceListAdjustmentType = null;
+    const priceListId = customer.price_list_id;
 
     if (priceListId) {
       try {
-        const adjustment = await getCustomerPriceListAdjustment(customer.id)
+        const adjustment = await getCustomerPriceListAdjustment(customer.id);
         if (adjustment) {
-          priceListAdjustment = adjustment.adjustmentPercentage
-          priceListAdjustmentType = adjustment.adjustmentType
+          priceListAdjustment = adjustment.adjustmentPercentage;
+          priceListAdjustmentType = adjustment.adjustmentType;
         }
       } catch (error) {
-        console.error("Error getting price list adjustment:", error)
+        console.error("Error getting price list adjustment:", error);
       }
     }
 
@@ -95,11 +98,11 @@ export function CustomerSelectDialog({
       priceListId,
       priceListAdjustment,
       priceListAdjustmentType,
-    })
-    onOpenChange(false)
-  }
+    });
+    onOpenChange(false);
+  };
 
-  const isConsumidorFinalSelected = selectedCustomer.id === null
+  const isConsumidorFinalSelected = selectedCustomer.id === null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,7 +123,9 @@ export function CustomerSelectDialog({
             </div>
             <div className="flex-1">
               <p className="font-medium">Consumidor Final</p>
-              <p className="text-sm text-muted-foreground">Sin datos de cliente</p>
+              <p className="text-sm text-muted-foreground">
+                Sin datos de cliente
+              </p>
             </div>
             {isConsumidorFinalSelected && (
               <Check className="h-5 w-5 text-primary" />
@@ -156,7 +161,7 @@ export function CustomerSelectDialog({
             ) : (
               <div className="flex flex-col gap-2">
                 {customers.map((customer) => {
-                  const isSelected = selectedCustomer.id === customer.id
+                  const isSelected = selectedCustomer.id === customer.id;
                   return (
                     <button
                       key={customer.id}
@@ -181,7 +186,7 @@ export function CustomerSelectDialog({
                       </div>
                       {isSelected && <Check className="h-5 w-5 text-primary" />}
                     </button>
-                  )
+                  );
                 })}
               </div>
             )}
@@ -195,5 +200,5 @@ export function CustomerSelectDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
