@@ -93,9 +93,9 @@ export function ProductSearchPanel({
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-16 h-12"
           />
-          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
+          {/* <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
             {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}F
-          </kbd>
+          </kbd> */}
         </div>
       </div>
 

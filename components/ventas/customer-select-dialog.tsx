@@ -3,10 +3,12 @@
 import { Check, Loader2, Search, User, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { CustomerDialog } from "@/components/clientes/customer-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -36,6 +38,7 @@ export function CustomerSelectDialog({
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -76,6 +79,7 @@ export function CustomerSelectDialog({
     // Get price list adjustment if customer has one
     let priceListAdjustment = null;
     let priceListAdjustmentType = null;
+    let priceListName = null;
     const priceListId = customer.price_list_id;
 
     if (priceListId) {
@@ -84,6 +88,7 @@ export function CustomerSelectDialog({
         if (adjustment) {
           priceListAdjustment = adjustment.adjustmentPercentage;
           priceListAdjustmentType = adjustment.adjustmentType;
+          priceListName = adjustment.priceListName;
         }
       } catch (error) {
         console.error("Error getting price list adjustment:", error);
@@ -96,109 +101,137 @@ export function CustomerSelectDialog({
       taxId: customer.tax_id,
       taxCategory: customer.tax_category,
       priceListId,
+      priceListName,
       priceListAdjustment,
       priceListAdjustmentType,
     });
     onOpenChange(false);
   };
 
+  const handleCustomerCreated = async (newCustomer: Customer) => {
+    // Select the newly created customer
+    await handleSelectCustomer(newCustomer);
+    setCreateDialogOpen(false);
+    setSearch("");
+  };
+
   const isConsumidorFinalSelected = selectedCustomer.id === null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Seleccionar cliente</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[85vh] sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Seleccionar cliente</DialogTitle>
+            <DialogDescription className="hidden" />
+          </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          {/* Consumidor Final option */}
-          <button
-            type="button"
-            onClick={handleSelectConsumidorFinal}
-            className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-              <User className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">Consumidor Final</p>
-              <p className="text-sm text-muted-foreground">
-                Sin datos de cliente
-              </p>
-            </div>
-            {isConsumidorFinalSelected && (
-              <Check className="h-5 w-5 text-primary" />
-            )}
-          </button>
-
-          {/* Search input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por nombre o CUIT/CUIL..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {/* Customer list */}
-          <ScrollArea className="h-[300px]">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex flex-col gap-4">
+            {/* Consumidor Final option */}
+            <button
+              type="button"
+              onClick={handleSelectConsumidorFinal}
+              className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                <User className="h-5 w-5 text-muted-foreground" />
               </div>
-            ) : customers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex-1">
+                <p className="font-medium">Consumidor Final</p>
                 <p className="text-sm text-muted-foreground">
-                  {search
-                    ? "No se encontraron clientes"
-                    : "No hay clientes registrados"}
+                  Sin datos de cliente
                 </p>
               </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {customers.map((customer) => {
-                  const isSelected = selectedCustomer.id === customer.id;
-                  return (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      onClick={() => handleSelectCustomer(customer)}
-                      className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <User className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{customer.name}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          {customer.tax_id && <span>{customer.tax_id}</span>}
-                          {customer.tax_category && (
-                            <>
-                              {customer.tax_id && <span>-</span>}
-                              <span>{customer.tax_category}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      {isSelected && <Check className="h-5 w-5 text-primary" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </ScrollArea>
+              {isConsumidorFinalSelected && (
+                <Check className="h-5 w-5 text-primary" />
+              )}
+            </button>
 
-          {/* Create new customer button */}
-          <Button variant="outline" className="w-full" disabled>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Crear nuevo cliente
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+            {/* Search input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por nombre o CUIT/CUIL..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Customer list */}
+            <ScrollArea className="h-[300px]">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : customers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {search
+                      ? "No se encontraron clientes"
+                      : "No hay clientes registrados"}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {customers.map((customer) => {
+                    const isSelected = selectedCustomer.id === customer.id;
+                    return (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        onClick={() => handleSelectCustomer(customer)}
+                        className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                          <User className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">
+                            {customer.name}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            {customer.tax_id && <span>{customer.tax_id}</span>}
+                            {customer.tax_category && (
+                              <>
+                                {customer.tax_id && <span>-</span>}
+                                <span>{customer.tax_category}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Check className="h-5 w-5 text-primary" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+
+            {/* Create new customer button */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Crear nuevo cliente
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customer create dialog */}
+      <CustomerDialog
+        mode="create"
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        submitButtonText="Crear y seleccionar"
+        onSuccess={handleCustomerCreated}
+      />
+    </>
   );
 }

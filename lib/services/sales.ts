@@ -158,6 +158,7 @@ export async function getProductByBarcode(
  */
 export async function getCustomerPriceListAdjustment(customerId: string): Promise<{
   priceListId: string | null
+  priceListName: string | null
   adjustmentType: "AUMENTO" | "DESCUENTO" | null
   adjustmentPercentage: number | null
 } | null> {
@@ -170,6 +171,7 @@ export async function getCustomerPriceListAdjustment(customerId: string): Promis
       price_list_id,
       price_list:price_lists!price_list_id(
         id,
+        name,
         adjustment_type,
         adjustment_percentage
       )
@@ -186,12 +188,14 @@ export async function getCustomerPriceListAdjustment(customerId: string): Promis
 
   const priceList = data.price_list as {
     id: string
+    name: string
     adjustment_type: string
     adjustment_percentage: number
   }
 
   return {
     priceListId: priceList.id,
+    priceListName: priceList.name,
     adjustmentType: priceList.adjustment_type as "AUMENTO" | "DESCUENTO",
     adjustmentPercentage: priceList.adjustment_percentage,
   }

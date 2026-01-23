@@ -8,6 +8,7 @@ import {
   Save,
   ShoppingCart,
   StickyNote,
+  Tag,
   Trash2,
   User,
 } from "lucide-react";
@@ -35,8 +36,8 @@ import { Kbd } from "../ui/kbd";
 import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
 import { ChangeDateDialog } from "./change-date-dialog";
-import { CustomerSelectDialog } from "./customer-select-dialog";
 import { CustomItemDialog } from "./custom-item-dialog";
+import { CustomerSelectDialog } from "./customer-select-dialog";
 import { DiscountDialog } from "./discount-dialog";
 import { SaveQuoteDialog } from "./save-quote-dialog";
 
@@ -201,6 +202,22 @@ export function CartPanel({
             {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}C
           </kbd>
         </Button>
+        {customer.priceListName && (
+          <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+            <Tag className="h-3 w-3" />
+            <span>
+              Lista:{" "}
+              <span className="font-medium">{customer.priceListName}</span>
+              {customer.priceListAdjustment !== 0 &&
+                customer.priceListAdjustment && (
+                  <span className="ml-1 text-green-600 font-medium">
+                    {customer.priceListAdjustmentType === "AUMENTO" ? "+" : "-"}
+                    {customer.priceListAdjustment}%
+                  </span>
+                )}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Note indicator */}

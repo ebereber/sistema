@@ -98,8 +98,7 @@ export async function getCustomerById(id: string): Promise<Customer> {
       `
       *,
       assigned_seller:users!assigned_seller_id(id, name),
-      price_list:price_lists!price_list_id(id, name, is_automatic, adjustment_type, adjustment_percentage)
-      
+      price_list:price_lists(id, name, is_automatic, adjustment_type, adjustment_percentage)
     `,
     )
     .eq("id", id)

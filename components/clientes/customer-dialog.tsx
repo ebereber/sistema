@@ -62,6 +62,9 @@ interface CustomerDialogProps {
   mode: "create" | "edit";
   customerId?: string;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  submitButtonText?: string;
   onSuccess?: (customer: Customer) => void;
 }
 
@@ -69,9 +72,22 @@ export function CustomerDialog({
   mode,
   customerId,
   trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  submitButtonText,
   onSuccess,
 }: CustomerDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // Support both controlled and uncontrolled modes
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (controlledOnOpenChange) {
+      controlledOnOpenChange(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -264,14 +280,16 @@ export function CustomerDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogTrigger asChild>
-          {trigger || (
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo cliente
-            </Button>
-          )}
-        </DialogTrigger>
+        {controlledOpen === undefined && (
+          <DialogTrigger asChild>
+            {trigger || (
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo cliente
+              </Button>
+            )}
+          </DialogTrigger>
+        )}
         <DialogContent className="sm:max-w-2xl bg-sidebar sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -527,7 +545,7 @@ export function CustomerDialog({
                     {isLoading && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {mode === "create" ? "Crear Cliente" : "Guardar Cambios"}
+                    {submitButtonText || (mode === "create" ? "Crear Cliente" : "Guardar Cambios")}
                   </Button>
                 </DialogFooter>
               </form>

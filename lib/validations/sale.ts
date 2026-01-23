@@ -14,6 +14,7 @@ export const cartItemSchema = z.object({
   productId: z.string().uuid().nullable(), // null for custom items
   name: z.string(),
   sku: z.string(),
+  basePrice: z.number().min(0), // Original price without price list adjustments
   price: z.number().min(0),
   quantity: z.number().int().min(1, "La cantidad debe ser al menos 1"),
   taxRate: z.number().min(0).max(100).default(21),
@@ -34,6 +35,7 @@ export const selectedCustomerSchema = z.object({
   taxId: z.string().optional().nullable(),
   taxCategory: z.string().optional().nullable(),
   priceListId: z.string().uuid().optional().nullable(),
+  priceListName: z.string().optional().nullable(),
   priceListAdjustment: z.number().optional().nullable(),
   priceListAdjustmentType: z.enum(["AUMENTO", "DESCUENTO"]).optional().nullable(),
 })
@@ -61,6 +63,7 @@ export const DEFAULT_CUSTOMER: SelectedCustomer = {
   taxId: null,
   taxCategory: "Consumidor Final",
   priceListId: null,
+  priceListName: null,
   priceListAdjustment: null,
   priceListAdjustmentType: null,
 }

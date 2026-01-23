@@ -77,6 +77,7 @@ export default function NuevaVentaPage() {
           name: product.name,
           sku: product.sku,
           price: adjustedPrice,
+          basePrice: product.price,
           quantity: 1,
           taxRate: product.taxRate,
           discount: null,
@@ -93,19 +94,14 @@ export default function NuevaVentaPage() {
 
   // Add custom item to cart
   const handleAddCustomItem = useCallback(
-    (
-      name: string,
-      price: number,
-      quantity: number,
-      taxRate: number,
-      type: string,
-    ) => {
+    (name: string, price: number, quantity: number, taxRate: number) => {
       const customItem: CartItem = {
         id: generateCartItemId(),
         productId: null, // Indicates custom item
         name,
         sku: "CUSTOM",
         price,
+        basePrice: price,
         quantity,
         taxRate,
         discount: null,
@@ -140,7 +136,6 @@ export default function NuevaVentaPage() {
     [],
   );
 
-  // Change customer (and update prices if needed)
   const handleCustomerChange = useCallback(
     (newCustomer: SelectedCustomer) => {
       const oldCustomer = customer;
@@ -154,12 +149,31 @@ export default function NuevaVentaPage() {
 
       setCustomer(newCustomer);
 
-      // If price list changed and cart has items, show notification
+      // AGREGAR ESTO: Recalcular precios si cambió la lista
       if (priceListChanged && cartItems.length > 0) {
+        setCartItems((items) =>
+          items.map((item) => {
+            // Solo recalcular productos, NO items personalizados
+            if (!item.productId) return item;
+
+            // Obtener precio base del producto (necesitamos guardarlo)
+            // Por ahora usamos el precio actual
+            const basePrice = item.price; // TODO: guardar base_price original
+
+            const newPrice = getAdjustedPrice(
+              basePrice,
+              newCustomer.priceListAdjustmentType,
+              newCustomer.priceListAdjustment,
+            );
+
+            return { ...item, price: newPrice };
+          }),
+        );
+
         const message =
           newCustomer.priceListId && newCustomer.priceListAdjustment
-            ? `Cliente con lista de precios: ${newCustomer.priceListAdjustmentType === "AUMENTO" ? "+" : "-"}${newCustomer.priceListAdjustment}%`
-            : `Cliente seleccionado: ${newCustomer.name}`;
+            ? `Precios actualizados con lista: ${newCustomer.priceListName} ${newCustomer.priceListAdjustmentType === "AUMENTO" ? "+" : "-"}${newCustomer.priceListAdjustment}%`
+            : `Cliente: ${newCustomer.name}`;
         toast.info(message);
       }
     },

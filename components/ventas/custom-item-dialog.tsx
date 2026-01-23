@@ -122,6 +122,7 @@ export function CustomItemDialog({
                 }
                 required
                 step="1"
+                className=" [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
               />
             </div>
           </div>
