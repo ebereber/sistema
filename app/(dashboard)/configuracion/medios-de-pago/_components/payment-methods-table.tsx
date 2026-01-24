@@ -23,7 +23,6 @@ import * as Icons from "lucide-react";
 import { MoreVertical, Pencil, Trash2, Wallet } from "lucide-react";
 import { useState } from "react";
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog";
-import { PaymentMethodFormDialog } from "./payment-method-form-dialog";
 
 const availabilityLabels: Record<string, string> = {
   VENTAS: "Ventas",
@@ -44,16 +43,15 @@ interface PaymentMethodsTableProps {
   paymentMethods: PaymentMethod[];
   isLoading: boolean;
   onRefresh: () => void;
+  onEdit: (method: PaymentMethod) => void;
 }
 
 export function PaymentMethodsTable({
   paymentMethods,
   isLoading,
   onRefresh,
+  onEdit,
 }: PaymentMethodsTableProps) {
-  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(
-    null,
-  );
   const [deletingMethod, setDeletingMethod] = useState<PaymentMethod | null>(
     null,
   );
@@ -116,7 +114,7 @@ export function PaymentMethodsTable({
 
   return (
     <>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -178,9 +176,7 @@ export function PaymentMethodsTable({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => setEditingMethod(method)}
-                        >
+                        <DropdownMenuItem onClick={() => onEdit(method)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
@@ -202,21 +198,6 @@ export function PaymentMethodsTable({
           </TableBody>
         </Table>
       </div>
-
-      {editingMethod && (
-        <PaymentMethodFormDialog
-          open={!!editingMethod}
-          onOpenChange={(open) => {
-            if (!open) setEditingMethod(null);
-          }}
-          type={editingMethod.type}
-          paymentMethod={editingMethod}
-          onSuccess={() => {
-            setEditingMethod(null);
-            onRefresh();
-          }}
-        />
-      )}
 
       {deletingMethod && (
         <DeleteConfirmationDialog

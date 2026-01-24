@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   CalendarDays,
   EllipsisVertical,
   PackagePlus,
@@ -12,7 +11,7 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +35,7 @@ import { Kbd } from "../ui/kbd";
 import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
 import { ChangeDateDialog } from "./change-date-dialog";
+import { CheckoutDialog } from "./checkout-dialog";
 import { CustomItemDialog } from "./custom-item-dialog";
 import { CustomerSelectDialog } from "./customer-select-dialog";
 import { DiscountDialog } from "./discount-dialog";
@@ -88,7 +88,7 @@ export function CartPanel({
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [saveQuoteDialogOpen, setSaveQuoteDialogOpen] = useState(false);
-
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
@@ -96,47 +96,6 @@ export function CartPanel({
   const hasItemDiscounts = totals.itemDiscounts > 0;
   const hasGlobalDiscount = totals.globalDiscount > 0;
   const hasAnyDiscounts = hasItemDiscounts || hasGlobalDiscount;
-
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // Only trigger if not in an input field
-      if (
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA"
-      ) {
-        return;
-      }
-
-      // ⌘C or Ctrl+C for customer
-      if ((e.metaKey || e.ctrlKey) && e.key === "c" && !e.shiftKey) {
-        e.preventDefault();
-        setCustomerDialogOpen(true);
-      }
-
-      // ⌘D or Ctrl+D for discounts
-      if ((e.metaKey || e.ctrlKey) && e.key === "d" && !e.shiftKey) {
-        e.preventDefault();
-        if (items.length > 0) {
-          setDiscountDialogOpen(true);
-        }
-      }
-
-      // ⌘I or Ctrl+I for custom item
-      if ((e.metaKey || e.ctrlKey) && e.key === "i" && !e.shiftKey) {
-        e.preventDefault();
-        setCustomItemDialogOpen(true);
-      }
-
-      // ⌘N or Ctrl+N for note
-      if ((e.metaKey || e.ctrlKey) && e.key === "n" && !e.shiftKey) {
-        e.preventDefault();
-        setNoteDialogOpen(true);
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [items.length]);
 
   const isEmpty = items.length === 0;
 
@@ -198,9 +157,11 @@ export function CartPanel({
         >
           <User className="mr-2 h-4 w-4" />
           <span className="flex-1 text-left truncate">{customer.name}</span>
-          <kbd className="ml-2 hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
-            {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}C
-          </kbd>
+
+          <span className="ml-2  truncate text-muted-foreground text-xs">
+            DNI
+            {customer.taxId}
+          </span>
         </Button>
         {customer.priceListName && (
           <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
@@ -275,9 +236,9 @@ export function CartPanel({
                 onClick={() => setDiscountDialogOpen(true)}
               >
                 <span className="flex-1 text-left">+ Agregar descuento</span>
-                <kbd className="ml-2 hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
+                {/*  <kbd className="ml-2 hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
                   {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}D
-                </kbd>
+                </kbd> */}
               </Button>
             </div>
           ) : (
@@ -319,10 +280,29 @@ export function CartPanel({
           </div>
 
           {/* Continue button */}
-          <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
+          {/* <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
             Continuar
             <ArrowRight className="ml-2 h-4 w-4" />
+          </Button> */}
+
+          {/* Continue button */}
+          <Button
+            className="mt-4 w-full"
+            size="lg"
+            onClick={() => setCheckoutOpen(true)}
+          >
+            Continuar
           </Button>
+
+          {/* Checkout Dialog */}
+          <CheckoutDialog
+            open={checkoutOpen}
+            onOpenChange={setCheckoutOpen}
+            subtotal={totals.subtotal}
+            tax={21}
+            total={totals.total}
+            customerName={customer.name}
+          />
         </div>
       )}
 
