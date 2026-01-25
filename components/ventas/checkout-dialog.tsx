@@ -173,6 +173,20 @@ export function CheckoutDialog({
     }
   }, [open]);
 
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setCurrentView("payment-list");
+      setSelectedPaymentMethod(null);
+      setSaleNumber(null);
+      setSplitPayments([]);
+      setCurrentSplitAmount("");
+      setIsPending(false);
+      setSelectedVoucher("COMPROBANTE_X");
+      setIsSubmitting(false);
+    }
+  }, [open]);
+
   const handlePaymentMethodClick = (methodId: string) => {
     if (currentView === "split-payment") {
       if (remaining <= 0) return;
@@ -318,10 +332,6 @@ export function CheckoutDialog({
       setSaleNumber(sale.sale_number);
       setCurrentView("confirmation");
 
-      // Notificar éxito después de mostrar confirmación
-      setTimeout(() => {
-        onSuccess(sale.sale_number);
-      }, 2000);
     } catch (error: unknown) {
       console.error("Error al crear venta:", error);
       toast.error("Error al confirmar la venta");
@@ -331,20 +341,18 @@ export function CheckoutDialog({
   };
 
   const handleNewSale = () => {
-    handleOpenChange(false);
+    if (saleNumber) {
+      onSuccess(saleNumber);
+    }
+    onOpenChange(false);
   };
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      setCurrentView("payment-list");
-      setSelectedPaymentMethod(null);
-      setSaleNumber(null);
-      setSplitPayments([]);
-      setCurrentSplitAmount("");
-      setIsSubmitting(false);
-      setIsPending(false);
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && saleNumber) {
+      // Si se cierra con venta confirmada, notificar éxito
+      onSuccess(saleNumber);
     }
-    onOpenChange(open);
+    onOpenChange(newOpen);
   };
 
   const selectedMethod = paymentMethods.find(
@@ -839,6 +847,7 @@ export function CheckoutDialog({
                       className="h-12 w-full text-base font-medium"
                       disabled={
                         isSubmitting ||
+                        currentView === "payment-list" ||
                         (currentView === "payment-form" &&
                           !selectedPaymentMethod) ||
                         (currentView === "split-payment" && !isPaymentComplete)

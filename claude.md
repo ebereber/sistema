@@ -54,81 +54,101 @@ Use Context7 MCP when I need library/API documentation, code generation, setup o
 
 ```
 app/
-├── (auth)/                    # Route group - Autenticación
-│   ├── confirm/
-│   ├── error/
-│   ├── forgot-password/
-│   ├── login/
-│   ├── sign-up/
-│   ├── sign-up-success/
-│   └── update-password/
+├── (auth)/                    # Autenticación (se asume por componentes de auth)
 ├── (dashboard)/               # Route group - Dashboard principal
 │   ├── clientes/
-│   │   ├── page.tsx          # Listado
-│   │   └── [id]/page.tsx     # Detalle/Editar
+│   │   └── page.tsx          # Listado de clientes
 │   ├── configuracion/
-│   │   ├── layout.tsx        # Layout con navegación lateral
-│   │   ├── page.tsx          # Organización (default)
-│   │   └── categorias/
-│   │       └── page.tsx      # Gestión de categorías
+│   │   ├── categorias/       # Gestión de categorías
+│   │   ├── colaboradores/    # Gestión de personal
+│   │   ├── listas-precios/   # Gestión de listas
+│   │   ├── medios-de-pago/   # Métodos de pago
+│   │   ├── puntos-de-venta/  # POS config
+│   │   ├── ubicaciones/      # Sucursales/Depósitos
+│   │   ├── layout.tsx
+│   │   └── page.tsx
 │   ├── presupuestos/
-│   │   ├── page.tsx          # Listado
-│   │   └── [id]/page.tsx     # Detalle/Editar
+│   │   ├── [id]/             # Detalle presupuesto
+│   │   └── page.tsx          # Listado
 │   ├── productos/
-│   │   ├── page.tsx          # Listado
-│   │   ├── nuevo/page.tsx    # Crear
-│   │   └── [id]/page.tsx     # Editar
+│   │   ├── [id]/             # Editar producto
+│   │   ├── nuevo/            # Crear producto
+│   │   └── page.tsx          # Listado principal
 │   ├── proveedores/
-│   │   ├── page.tsx          # Listado
-│   │   └── [id]/page.tsx     # Detalle/Editar
+│   │   ├── [id]/             # Detalle proveedor
+│   │   └── page.tsx          # Listado
 │   ├── ventas/
-│   │   ├── page.tsx          # Listado
-│   │   ├── nueva/page.tsx    # POS
-│   │   └── [id]/page.tsx     # Detalle
-│   ├── layout.tsx            # Layout con sidebar (solo para dashboard)
-│   └── page.tsx              # Home/Dashboard
-├── layout.tsx                # Layout raíz (global)
+│   │   ├── [id]/             # Detalle venta
+│   │   ├── nueva/            # Nueva venta (POS)
+│   │   └── page.tsx          # Listado de ventas
+│   ├── layout.tsx            # Layout con sidebar
+│   └── page.tsx              # Home del dashboard
+├── layout.tsx                # Layout raíz
 └── page.tsx                  # Landing/Redirect
 
 components/
-├── sidebar/                  # Componentes de navegación
-│   ├── app-sidebar.tsx      # Sidebar principal
-│   ├── nav-main.tsx         # Nav principal
-│   ├── nav-projects.tsx     # Nav proyectos
-│   └── nav-user.tsx         # Nav usuario
-├── ui/                      # Componentes shadcn/ui
-│   ├── button.tsx
-│   ├── input.tsx
-│   ├── card.tsx
-│   ├── dialog.tsx
-│   ├── form.tsx
-│   ├── table.tsx
-│   ├── toast.tsx
-│   └── ... (otros componentes)
-├── productos/               # Componentes específicos
-├── ventas/
-├── clientes/
-└── theme-switcher.tsx      # Toggle dark/light
+├── clientes/                 # Diálogos y tablas de clientes
+│   ├── commercial-info-dialog.tsx
+│   ├── customer-dialog.tsx
+│   └── customer-table.tsx
+├── configuracion/            # Componentes de administración
+│   ├── assign-pos-dialog.tsx
+│   ├── category-form-sheet.tsx
+│   ├── location-card.tsx
+│   ├── pos-table.tsx
+│   ├── price-list-dialog.tsx
+│   └── ... (otros componentes de config)
+├── productos/               # Gestión de stock y productos
+│   ├── archive-product-dialog.tsx
+│   ├── bulk-actions-bar.tsx
+│   ├── price-history-dialog.tsx
+│   ├── stock-management-dialog.tsx
+│   └── ... (otros componentes de productos)
+├── proveedores/             # Gestión de proveedores
+│   ├── address-dialog.tsx
+│   ├── fiscal-info-dialog.tsx
+│   └── supplier-table.tsx
+├── sidebar/                 # Estructura de navegación
+│   ├── app-header.tsx
+│   ├── app-sidebar.tsx
+│   ├── command-menu.tsx
+│   ├── nav-main.tsx
+│   └── user-menu.tsx
+├── ventas/                  # Componentes del punto de venta
+│   ├── add-note-dialog.tsx
+│   ├── cart-panel.tsx
+│   ├── checkout-dialog.tsx
+│   ├── customer-select-dialog.tsx
+│   └── product-search-panel.tsx
+├── auth-button.tsx          # Componentes de sesión
+├── login-form.tsx
+└── theme-switcher.tsx
 
 hooks/
-└── use-mobile.ts           # Detectar dispositivo móvil
+├── use-debounce.ts           # Hook para optimizar búsquedas
+└── use-mobile.ts             # Detección de dispositivos
 
 lib/
-├── supabase/
-│   ├── client.ts           # Cliente browser
-│   ├── server.ts           # Cliente server
-│   ├── proxy.ts            # Middleware auth
-│   └── database.types.ts   # Tipos generados
-├── services/               # Servicios de negocio
-│   ├── products.ts
+├── constants/
+│   └── argentina-locations.ts # Datos geográficos
+├── services/                 # Lógica de API/Supabase
+│   ├── categories.ts
 │   ├── customers.ts
+│   ├── payment-methods.ts
 │   ├── sales.ts
 │   └── ...
-├── validations/            # Schemas Zod
-│   ├── product.ts
+├── supabase/                 # Configuración de cliente/servidor
+│   ├── client.ts
+│   ├── proxy.ts
+│   └── server.ts
+├── utils/
+│   └── currency.ts           # Formateo de dinero
+├── validations/              # Schemas de Zod por entidad
+│   ├── category.ts
 │   ├── customer.ts
+│   ├── sale.ts
 │   └── ...
-└── utils.ts               # Utilidades (cn, etc.)
+└── utils.ts                 # Utilidades generales
 ```
 
 ### Ventajas de esta Estructura
