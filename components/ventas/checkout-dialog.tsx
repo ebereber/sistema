@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -174,6 +175,7 @@ export function CheckoutDialog({
 
   const handlePaymentMethodClick = (methodId: string) => {
     if (currentView === "split-payment") {
+      if (remaining <= 0) return;
       const amount = parseArgentineCurrency(currentSplitAmount);
       const method = paymentMethods.find((m) => m.id === methodId);
 
@@ -235,14 +237,21 @@ export function CheckoutDialog({
 
   const handleBack = () => {
     if (currentView === "payment-form") {
+      // Si es un pago único, vuelve a la lista
       setCurrentView("payment-list");
       setSelectedPaymentMethod(null);
     } else if (currentView === "split-payment") {
       if (splitPayments.length > 0) {
-        // Si hay pagos, volver a la lista principal preguntando
-        setSplitPayments([]);
+        // SI ESTAMOS EN PAGO 2, 3, etc:
+        // Borramos el último pago y volvemos a poner su monto en el input para "editarlo"
+        const lastPayment = splitPayments[splitPayments.length - 1];
+        const newPayments = splitPayments.slice(0, -1);
+        setSplitPayments(newPayments);
+        setCurrentSplitAmount(lastPayment.amount.toString());
+      } else {
+        // SI ESTAMOS EN PAGO 1: Volver al menú principal
+        setCurrentView("payment-list");
       }
-      setCurrentView("payment-list");
     }
   };
 
@@ -344,15 +353,16 @@ export function CheckoutDialog({
 
   // Calcular totales para pago dividido
   const totalPaid = splitPayments.reduce((sum, p) => sum + p.amount, 0);
-  const remaining = total - totalPaid;
+  const remaining = Math.max(0, total - totalPaid);
 
   const currentAmount = parseArgentineCurrency(currentSplitAmount);
   const isAmountValid = currentAmount > 0 && currentAmount <= remaining;
-  const isPaymentComplete = Math.abs(remaining) < 0.01; // Usar tolerancia para decimales
+  const isPaymentComplete = Math.abs(remaining) < 0.1; // Usar tolerancia para decimales
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="bottom" className="h-[95vh] w-full">
+        <SheetDescription className="hidden"></SheetDescription>
         {currentView === "confirmation" ? (
           <>
             <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
@@ -536,19 +546,25 @@ export function CheckoutDialog({
                           <CardDescription className="flex items-center gap-1">
                             Pago {splitPayments.length + 1}
                           </CardDescription>
+
                           <Button
+                            type="button"
                             variant="ghost"
                             size="sm"
                             onClick={handleBack}
                           >
-                            <ChevronLeft className="size-4" />
-                            Atrás
+                            <ChevronLeft className="mr-1 h-4 w-4" />
+                            {isPaymentComplete
+                              ? "Editar"
+                              : splitPayments.length === 0
+                                ? "Atrás"
+                                : "Atrás"}
                           </Button>
                         </CardHeader>
 
                         <CardContent className="space-y-4 px-4">
                           {/* Mostrar pagos anteriores */}
-                          {splitPayments.length > 0 && (
+                          {!isPaymentComplete && splitPayments.length > 0 && (
                             <div className="space-y-2">
                               {splitPayments.map((payment, index) => (
                                 <Item
@@ -608,14 +624,16 @@ export function CheckoutDialog({
                               <div className="space-y-2">
                                 <Label>Monto a pagar</Label>
                                 <CurrencyInput
-                                  type="text"
-                                  inputMode="numeric"
                                   value={currentSplitAmount}
-                                  onChange={(e) =>
-                                    setCurrentSplitAmount(e.target.value)
+                                  onValueChange={(value) =>
+                                    setCurrentSplitAmount(value.toFixed(2))
                                   }
                                   placeholder="$"
                                   className="h-10 font-medium md:text-lg"
+                                  isAllowed={(values) =>
+                                    values.floatValue == null ||
+                                    values.floatValue <= remaining
+                                  }
                                 />
                                 <p className="text-xs text-muted-foreground">
                                   Total restante: {formatPrice(remaining)}
