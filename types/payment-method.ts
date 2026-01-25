@@ -3,33 +3,39 @@ export type PaymentMethodType =
   | "CHEQUE"
   | "TARJETA"
   | "TRANSFERENCIA"
-  | "OTRO"
+  | "OTRO";
 
 export type PaymentMethodAvailability =
   | "VENTAS"
   | "COMPRAS"
-  | "VENTAS_Y_COMPRAS"
+  | "VENTAS_Y_COMPRAS";
+
+export interface GetPaymentMethodsFilters {
+  search?: string;
+  isActive?: boolean;
+  availability?: PaymentMethodAvailability;
+}
 
 export interface PaymentMethod {
-  id: string
-  name: string
-  type: PaymentMethodType
-  icon: string
-  fee_percentage: number
-  fee_fixed: number
-  requires_reference: boolean
-  availability: PaymentMethodAvailability
-  is_active: boolean
-  is_system: boolean
-  created_at: string
-  updated_at: string
+  id: string;
+  name: string;
+  type: PaymentMethodType;
+  icon: string;
+  fee_percentage: number;
+  fee_fixed: number;
+  requires_reference: boolean;
+  availability: PaymentMethodAvailability;
+  is_active: boolean;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export type PaymentMethodInsert = Omit<
   PaymentMethod,
   "id" | "created_at" | "updated_at"
->
-export type PaymentMethodUpdate = Partial<PaymentMethodInsert>
+>;
+export type PaymentMethodUpdate = Partial<PaymentMethodInsert>;
 
 export const PAYMENT_TYPE_CONFIG = {
   EFECTIVO: {
@@ -58,4 +64,4 @@ export const PAYMENT_TYPE_CONFIG = {
     label: "Otro",
     description: "Ej: Gift cards, puntos, cupones.",
   },
-} as const
+} as const;

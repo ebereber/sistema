@@ -1,7 +1,6 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -15,11 +14,11 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { CartPanel } from "@/components/ventas/cart-panel";
+import { CheckoutDialog } from "@/components/ventas/checkout-dialog";
 import { ProductSearchPanel } from "@/components/ventas/product-search-panel";
 import {
   type ProductForSale,
   getAdjustedPrice,
-  saveCartToStorage,
 } from "@/lib/services/sales";
 import {
   type CartItem,
@@ -31,8 +30,6 @@ import {
 } from "@/lib/validations/sale";
 
 export default function NuevaVentaPage() {
-  const router = useRouter();
-
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<SelectedCustomer>(DEFAULT_CUSTOMER);
@@ -43,6 +40,9 @@ export default function NuevaVentaPage() {
   // Additional cart state
   const [note, setNote] = useState("");
   const [saleDate, setSaleDate] = useState(new Date());
+
+  // Checkout state
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   // Add product to cart
   const handleAddProduct = useCallback(
@@ -216,24 +216,18 @@ export default function NuevaVentaPage() {
       return;
     }
 
-    // Save cart data to session storage (including note and saleDate)
-    saveCartToStorage({
-      items: cartItems,
-      customer,
-      globalDiscount,
-      note,
-      saleDate: saleDate.toISOString(),
-      savedAt: new Date().toISOString(),
-    });
+    setCheckoutOpen(true);
+  }, [cartItems.length]);
 
-    // Navigate to checkout (placeholder for now)
-    toast.info("Continuar al cobro", {
-      description: "La pantalla de cobro se implementará próximamente",
-    });
-
-    // When checkout page is ready:
-    // router.push('/ventas/checkout')
-  }, [cartItems, customer, globalDiscount, note, saleDate]);
+  // Handle sale success - clean up after confirmed sale
+  const handleSaleSuccess = useCallback((saleNumber: string) => {
+    setCartItems([]);
+    setGlobalDiscount(null);
+    setNote("");
+    setCustomer(DEFAULT_CUSTOMER);
+    setCheckoutOpen(false);
+    toast.success(`Venta confirmada: ${saleNumber}`);
+  }, []);
 
   return (
     <div className="flex h-[calc(100vh-5.5rem)] gap-4 lg:flex-row flex-col ">
@@ -306,6 +300,17 @@ export default function NuevaVentaPage() {
           </Drawer>
         </div>
       </div>
+
+      <CheckoutDialog
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+        cartItems={cartItems}
+        customer={customer}
+        globalDiscount={globalDiscount}
+        note={note}
+        saleDate={saleDate}
+        onSuccess={handleSaleSuccess}
+      />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CurrencyInput } from "../ui/currency-input";
 
 interface CustomItemDialogProps {
   open: boolean;
@@ -100,8 +101,8 @@ export function CustomItemDialog({
               <label className="flex select-none items-center gap-2 font-medium text-sm leading-none">
                 Precio unitario ($)
               </label>
-              <Input
-                placeholder="0,00"
+              <CurrencyInput
+                placeholder="$"
                 value={customItemPrice}
                 onChange={(e) => setCustomItemPrice(e.target.value)}
                 required

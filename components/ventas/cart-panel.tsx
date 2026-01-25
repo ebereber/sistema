@@ -35,7 +35,6 @@ import { Kbd } from "../ui/kbd";
 import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
 import { ChangeDateDialog } from "./change-date-dialog";
-import { CheckoutDialog } from "./checkout-dialog";
 import { CustomItemDialog } from "./custom-item-dialog";
 import { CustomerSelectDialog } from "./customer-select-dialog";
 import { DiscountDialog } from "./discount-dialog";
@@ -88,7 +87,6 @@ export function CartPanel({
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [saveQuoteDialogOpen, setSaveQuoteDialogOpen] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
@@ -280,29 +278,13 @@ export function CartPanel({
           </div>
 
           {/* Continue button */}
-          {/* <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
-            Continuar
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button> */}
-
-          {/* Continue button */}
           <Button
             className="mt-4 w-full"
             size="lg"
-            onClick={() => setCheckoutOpen(true)}
+            onClick={onContinue}
           >
             Continuar
           </Button>
-
-          {/* Checkout Dialog */}
-          <CheckoutDialog
-            open={checkoutOpen}
-            onOpenChange={setCheckoutOpen}
-            subtotal={totals.subtotal}
-            tax={21}
-            total={totals.total}
-            customerName={customer.name}
-          />
         </div>
       )}
 

@@ -8,7 +8,6 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
@@ -18,7 +17,21 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { formatPrice } from "@/lib/validations/sale";
+import { getPaymentMethods } from "@/lib/services/payment-methods";
+import {
+  createSale,
+  type PaymentInsert,
+  type SaleItemInsert,
+} from "@/lib/services/sales";
+import { parseArgentineCurrency } from "@/lib/utils/currency";
+import {
+  calculateCartTotals,
+  calculateItemTotal,
+  formatPrice,
+  type CartItem,
+  type GlobalDiscount,
+  type SelectedCustomer,
+} from "@/lib/validations/sale";
 import {
   Banknote,
   Building2,
@@ -29,15 +42,20 @@ import {
   DollarSign,
   Download,
   ExternalLink,
+  FileCheck,
   Gift,
   ListTodo,
+  Loader2,
   Mail,
   Pencil,
   Printer,
+  Smartphone,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { CurrencyInput } from "../ui/currency-input";
 import {
   Item,
   ItemActions,
@@ -50,10 +68,12 @@ import {
 interface CheckoutDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  subtotal: number;
-  tax: number;
-  total: number;
-  customerName?: string;
+  cartItems: CartItem[];
+  customer: SelectedCustomer;
+  globalDiscount: GlobalDiscount | null;
+  note: string;
+  saleDate: Date;
+  onSuccess: (saleNumber: string) => void;
 }
 
 type CheckoutView =
@@ -69,17 +89,32 @@ interface SplitPayment {
   amount: number;
   reference?: string;
 }
+const ICON_MAP = {
+  Banknote: Banknote,
+  FileCheck: FileCheck,
+  CreditCard: CreditCard,
+  Building2: Building2,
+  DollarSign: DollarSign,
+  Smartphone: Smartphone, // Para QR
+} as const;
 
 export function CheckoutDialog({
   open,
   onOpenChange,
-  subtotal,
-  tax,
-  total,
-  customerName = "Consumidor Final",
+  cartItems,
+  customer,
+  globalDiscount,
+  note,
+  saleDate,
+  onSuccess,
 }: CheckoutDialogProps) {
-  const [selectedVoucher, setSelectedVoucher] = useState("comprobanteX");
+  // Calculate totals from cart
+  const totals = calculateCartTotals(cartItems, globalDiscount);
+  const { subtotal, taxes: tax, total } = totals;
+
+  const [selectedVoucher, setSelectedVoucher] = useState("COMPROBANTE_X");
   const [isPending, setIsPending] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentView, setCurrentView] = useState<CheckoutView>("payment-list");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
     string | null
@@ -90,28 +125,56 @@ export function CheckoutDialog({
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([]);
   const [currentSplitAmount, setCurrentSplitAmount] = useState("");
   const [isAddingPartialPayment, setIsAddingPartialPayment] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<
+    Array<{
+      id: string;
+      name: string;
+      icon: React.ComponentType<{ className?: string }>;
+      shortcut: string;
+    }>
+  >([]);
 
-  const paymentMethods = [
-    { id: "tarjeta", name: "Tarjeta", icon: CreditCard, shortcut: "1" },
-    {
-      id: "transferencia",
-      name: "Transferencia",
-      icon: Building2,
-      shortcut: "2",
-    },
-    { id: "efectivo", name: "Efectivo", icon: Banknote, shortcut: "3" },
-    { id: "qr", name: "QR", icon: DollarSign, shortcut: "4" },
-  ];
+  const [isLoadingMethods, setIsLoadingMethods] = useState(true);
+
+  useEffect(() => {
+    async function loadPaymentMethods() {
+      setIsLoadingMethods(true);
+      try {
+        const methods = await getPaymentMethods({
+          isActive: true,
+          availability: "VENTAS", // o 'VENTAS_Y_COMPRAS'
+        });
+
+        // Mapear a formato del checkout
+        const mappedMethods = methods.map((m, index) => {
+          // Mapear el icono
+          const Icon = ICON_MAP[m.icon as keyof typeof ICON_MAP] || DollarSign;
+
+          return {
+            id: m.id, // ← UUID real
+            name: m.name,
+            icon: Icon,
+            shortcut: (index + 1).toString(),
+          };
+        });
+
+        setPaymentMethods(mappedMethods);
+      } catch (error) {
+        console.error("Error cargando medios de pago:", error);
+        toast.error("Error al cargar medios de pago");
+      } finally {
+        setIsLoadingMethods(false);
+      }
+    }
+
+    if (open) {
+      loadPaymentMethods();
+    }
+  }, [open]);
 
   const handlePaymentMethodClick = (methodId: string) => {
     if (currentView === "split-payment") {
-      // Limpiar el string: remover símbolos de moneda, espacios, y reemplazar coma por punto
-      const cleanAmount = currentSplitAmount
-        .replace(/[$\s]/g, "") // Remover $ y espacios
-        .replace(/\./g, "") // Remover separadores de miles (.)
-        .replace(",", "."); // Reemplazar coma decimal por punto
-
-      const amount = parseFloat(cleanAmount);
+      const amount = parseArgentineCurrency(currentSplitAmount);
       const method = paymentMethods.find((m) => m.id === methodId);
 
       if (method && amount > 0 && amount <= remaining) {
@@ -183,16 +246,79 @@ export function CheckoutDialog({
     }
   };
 
-  const handleConfirm = () => {
-    console.log("Confirmar venta", {
-      selectedVoucher,
-      isPending,
-      selectedPaymentMethod,
-      splitPayments,
-    });
+  const handleConfirm = async () => {
+    try {
+      setIsSubmitting(true);
 
-    setSaleNumber("COM-00001-00000007");
-    setCurrentView("confirmation");
+      // Preparar datos de la venta
+      const saleData = {
+        customer_id: customer.id || null,
+        subtotal,
+        discount: totals.itemDiscounts + totals.globalDiscount,
+        tax,
+        total,
+        notes: note || null,
+        status: (isPending ? "PENDING" : "COMPLETED") as
+          | "COMPLETED"
+          | "PENDING"
+          | "CANCELLED",
+        voucher_type: selectedVoucher,
+        sale_date: saleDate.toISOString(),
+      };
+
+      // Preparar items
+      const items: SaleItemInsert[] = cartItems.map((item) => ({
+        product_id: item.productId,
+        description: item.name,
+        sku: item.sku || null,
+        quantity: item.quantity,
+        unit_price: item.price,
+        discount:
+          item.discount?.type === "percentage"
+            ? (item.price * item.quantity * item.discount.value) / 100
+            : item.discount?.value || 0,
+        tax_rate: item.taxRate,
+        total: calculateItemTotal(item),
+      }));
+
+      // Preparar pagos
+      const payments: PaymentInsert[] =
+        currentView === "split-payment"
+          ? splitPayments.map((p) => ({
+              payment_method_id: p.methodId,
+              method_name: p.methodName,
+              amount: p.amount,
+              reference: p.reference || null,
+            }))
+          : selectedPaymentMethod
+            ? [
+                {
+                  payment_method_id: selectedPaymentMethod,
+                  method_name:
+                    paymentMethods.find((m) => m.id === selectedPaymentMethod)
+                      ?.name || "",
+                  amount: total,
+                  reference: null,
+                },
+              ]
+            : [];
+
+      // Guardar venta
+      const sale = await createSale(saleData, items, payments);
+
+      setSaleNumber(sale.sale_number);
+      setCurrentView("confirmation");
+
+      // Notificar éxito después de mostrar confirmación
+      setTimeout(() => {
+        onSuccess(sale.sale_number);
+      }, 2000);
+    } catch (error: unknown) {
+      console.error("Error al crear venta:", error);
+      toast.error("Error al confirmar la venta");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleNewSale = () => {
@@ -206,6 +332,8 @@ export function CheckoutDialog({
       setSaleNumber(null);
       setSplitPayments([]);
       setCurrentSplitAmount("");
+      setIsSubmitting(false);
+      setIsPending(false);
     }
     onOpenChange(open);
   };
@@ -218,13 +346,7 @@ export function CheckoutDialog({
   const totalPaid = splitPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - totalPaid;
 
-  // Limpiar el monto actual ingresado
-  const cleanCurrentAmount = currentSplitAmount
-    .replace(/[$\s]/g, "") // Remover $ y espacios
-    .replace(/\./g, "") // Remover separadores de miles (.)
-    .replace(",", "."); // Reemplazar coma decimal por punto
-
-  const currentAmount = parseFloat(cleanCurrentAmount) || 0;
+  const currentAmount = parseArgentineCurrency(currentSplitAmount);
   const isAmountValid = currentAmount > 0 && currentAmount <= remaining;
   const isPaymentComplete = Math.abs(remaining) < 0.01; // Usar tolerancia para decimales
 
@@ -321,15 +443,15 @@ export function CheckoutDialog({
           <>
             <SheetHeader className="gap-0.5 p-4">
               <SheetTitle className="text-base">
-                Confirmar venta a {customerName}
+                Confirmar venta a {customer.name}
               </SheetTitle>
             </SheetHeader>
 
             <form
               className="flex flex-1 flex-col overflow-hidden px-4"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                handleConfirm();
+                await handleConfirm();
               }}
             >
               <div className="flex flex-1 flex-col gap-6 overflow-y-auto pt-0.5 lg:flex-row">
@@ -485,7 +607,7 @@ export function CheckoutDialog({
                             <div className="fade-in animate-in space-y-6 duration-300">
                               <div className="space-y-2">
                                 <Label>Monto a pagar</Label>
-                                <Input
+                                <CurrencyInput
                                   type="text"
                                   inputMode="numeric"
                                   value={currentSplitAmount}
@@ -653,12 +775,12 @@ export function CheckoutDialog({
                     >
                       <div className="flex gap-4">
                         <Label
-                          htmlFor="voucher-comprobanteX"
+                          htmlFor="voucher-COMPROBANTE_X"
                           className="flex w-full cursor-pointer gap-3 rounded-md border p-4 has-[:checked]:border-primary has-[:checked]:bg-primary/5 dark:has-[:checked]:bg-primary/10"
                         >
                           <RadioGroupItem
-                            value="comprobanteX"
-                            id="voucher-comprobanteX"
+                            value="COMPROBANTE_X"
+                            id="voucher-COMPROBANTE_X"
                             className="mt-px"
                           />
                           <div className="flex flex-1 flex-col gap-1.5 leading-snug">
@@ -698,12 +820,16 @@ export function CheckoutDialog({
                       size="lg"
                       className="h-12 w-full text-base font-medium"
                       disabled={
+                        isSubmitting ||
                         (currentView === "payment-form" &&
                           !selectedPaymentMethod) ||
                         (currentView === "split-payment" && !isPaymentComplete)
                       }
                     >
-                      Confirmar venta
+                      {isSubmitting && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      {isSubmitting ? "Confirmando..." : "Confirmar venta"}
                     </Button>
                   </div>
                 </div>

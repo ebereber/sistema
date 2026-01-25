@@ -247,3 +247,99 @@ export function clearCartStorage(): void {
     sessionStorage.removeItem(CART_STORAGE_KEY)
   }
 }
+
+// =====================================================
+// Sale creation types and functions
+// =====================================================
+
+export interface SaleInsert {
+  customer_id: string | null
+  subtotal: number
+  discount: number
+  tax: number
+  total: number
+  notes: string | null
+  status: "COMPLETED" | "PENDING" | "CANCELLED"
+  voucher_type: string
+  sale_date: string
+}
+
+export interface SaleItemInsert {
+  product_id: string | null
+  description: string
+  sku: string | null
+  quantity: number
+  unit_price: number
+  discount: number
+  tax_rate: number
+  total: number
+}
+
+export interface PaymentInsert {
+  payment_method_id: string | null
+  method_name: string
+  amount: number
+  reference: string | null
+}
+
+/**
+ * Crear venta completa con items y pagos
+ */
+export async function createSale(
+  saleData: SaleInsert,
+  items: SaleItemInsert[],
+  payments: PaymentInsert[]
+) {
+  const supabase = createClient()
+
+  // 1. Generar número de venta
+  const { data: saleNumber, error: numberError } = await supabase.rpc(
+    "generate_sale_number",
+    { location_id_param: null }
+  )
+
+  if (numberError) throw numberError
+
+  // 2. Crear venta
+  const { data: sale, error: saleError } = await supabase
+    .from("sales")
+    .insert({
+      ...saleData,
+      sale_number: saleNumber,
+      seller_id: null,
+      location_id: null,
+      created_by: null,
+    })
+    .select()
+    .single()
+
+  if (saleError) throw saleError
+
+  // 3. Crear items
+  const itemsWithSaleId = items.map((item) => ({
+    ...item,
+    sale_id: sale.id,
+  }))
+
+  const { error: itemsError } = await supabase
+    .from("sale_items")
+    .insert(itemsWithSaleId)
+
+  if (itemsError) throw itemsError
+
+  // 4. Crear pagos
+  if (payments.length > 0) {
+    const paymentsWithSaleId = payments.map((payment) => ({
+      ...payment,
+      sale_id: sale.id,
+    }))
+
+    const { error: paymentsError } = await supabase
+      .from("payments")
+      .insert(paymentsWithSaleId)
+
+    if (paymentsError) throw paymentsError
+  }
+
+  return sale
+}
