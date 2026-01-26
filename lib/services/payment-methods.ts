@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
   PaymentMethod,
+  PaymentMethodAvailability,
   PaymentMethodInsert,
   PaymentMethodUpdate,
 } from "@/types/payment-method";
@@ -11,6 +12,7 @@ import type {
 export async function getPaymentMethods(filters?: {
   search?: string;
   isActive?: boolean;
+  availability?: PaymentMethodAvailability;
 }): Promise<PaymentMethod[]> {
   const supabase = createClient();
 
@@ -26,6 +28,12 @@ export async function getPaymentMethods(filters?: {
 
   if (filters?.isActive !== undefined) {
     query = query.eq("is_active", filters.isActive);
+  }
+
+  if (filters?.availability) {
+    query = query.or(
+      `availability.eq.${filters.availability},availability.eq.VENTAS_Y_COMPRAS`
+    );
   }
 
   const { data, error } = await query;

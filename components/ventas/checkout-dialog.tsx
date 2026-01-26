@@ -54,6 +54,7 @@ import {
   Smartphone,
   Trash2,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -81,8 +82,22 @@ interface CheckoutDialogProps {
 type CheckoutView =
   | "payment-list"
   | "payment-form"
+  | "card-select"
+  | "card-form"
+  | "reference-form"
   | "split-payment"
   | "confirmation";
+
+const CARD_TYPES = [
+  { id: 'visa-debito', name: 'Visa Débito', brand: 'visa', type: 'DEBITO', icon: '/tarjetas/visa.svg' },
+  { id: 'visa-credito', name: 'Visa Crédito', brand: 'visa', type: 'CREDITO', icon: '/tarjetas/visa.svg' },
+  { id: 'master-debito', name: 'Mastercard Débito', brand: 'master', type: 'DEBITO', icon: '/tarjetas/master.svg' },
+  { id: 'master-credito', name: 'Mastercard Crédito', brand: 'master', type: 'CREDITO', icon: '/tarjetas/master.svg' },
+  { id: 'cabal-debito', name: 'Cabal Débito', brand: 'cabal', type: 'DEBITO', icon: '/tarjetas/cabal.svg' },
+  { id: 'cabal-credito', name: 'Cabal Crédito', brand: 'cabal', type: 'CREDITO', icon: '/tarjetas/cabal.svg' },
+  { id: 'naranja', name: 'Naranja', brand: 'naranja', type: 'CREDITO', icon: '/tarjetas/naranja.svg' },
+  { id: 'american', name: 'American Express', brand: 'american', type: 'CREDITO', icon: '/tarjetas/american.svg' },
+] as const;
 
 interface SplitPayment {
   id: string;
@@ -136,8 +151,22 @@ export function CheckoutDialog({
       name: string;
       icon: React.ComponentType<{ className?: string }>;
       shortcut: string;
+      type: string;
+      requires_reference: boolean;
     }>
   >([]);
+
+  // Card payment states
+  const [selectedCardType, setSelectedCardType] = useState<typeof CARD_TYPES[number] | null>(null);
+  const [cardLote, setCardLote] = useState("");
+  const [cardCupon, setCardCupon] = useState("");
+
+  // Transfer payment state
+  const [paymentReference, setPaymentReference] = useState("");
+
+  // Split payment with card/reference states
+  const [pendingSplitAmount, setPendingSplitAmount] = useState<number>(0);
+  const [isFromSplitPayment, setIsFromSplitPayment] = useState(false);
 
   const [isLoadingMethods, setIsLoadingMethods] = useState(true);
 
@@ -160,10 +189,12 @@ export function CheckoutDialog({
           const Icon = ICON_MAP[m.icon as keyof typeof ICON_MAP] || DollarSign;
 
           return {
-            id: m.id, // ← UUID real
+            id: m.id,
             name: m.name,
             icon: Icon,
             shortcut: (index + 1).toString(),
+            type: m.type,
+            requires_reference: m.requires_reference,
           };
         });
 
@@ -202,6 +233,14 @@ export function CheckoutDialog({
       setIsPending(false);
       setSelectedVoucher("COMPROBANTE_X");
       setIsSubmitting(false);
+      // Reset card and reference states
+      setSelectedCardType(null);
+      setCardLote("");
+      setCardCupon("");
+      setPaymentReference("");
+      // Reset split payment with reference states
+      setPendingSplitAmount(0);
+      setIsFromSplitPayment(false);
     }
   }, [open]);
 
@@ -212,6 +251,21 @@ export function CheckoutDialog({
       const method = paymentMethods.find((m) => m.id === methodId);
 
       if (method && amount > 0 && amount <= remaining) {
+        // Si requiere referencia, ir al formulario correspondiente
+        if (method.requires_reference) {
+          setIsFromSplitPayment(true);
+          setPendingSplitAmount(amount);
+          setSelectedPaymentMethod(methodId);
+
+          if (method.type === "TARJETA") {
+            setCurrentView("card-select");
+          } else {
+            setCurrentView("reference-form");
+          }
+          return;
+        }
+
+        // Si no requiere referencia, agregar pago directamente
         const newPayment: SplitPayment = {
           id: Math.random().toString(36).substr(2, 9),
           methodId: method.id,
@@ -236,8 +290,22 @@ export function CheckoutDialog({
         }
       }
     } else {
+      const method = paymentMethods.find((m) => m.id === methodId);
+      if (!method) return;
+
       setSelectedPaymentMethod(methodId);
-      setCurrentView("payment-form");
+
+      // Si requiere referencia, mostrar formulario según tipo
+      if (method.requires_reference) {
+        if (method.type === "TARJETA") {
+          setCurrentView("card-select");
+        } else {
+          setCurrentView("reference-form");
+        }
+      } else {
+        // No requiere referencia, ir directo a confirmación
+        setCurrentView("payment-form");
+      }
     }
   };
 
@@ -267,11 +335,98 @@ export function CheckoutDialog({
     }
   };
 
+  const handleCompleteSplitPaymentWithReference = () => {
+    const method = paymentMethods.find((m) => m.id === selectedPaymentMethod);
+    if (!method) return;
+
+    const reference = selectedCardType
+      ? `${selectedCardType.name} - Lote: ${cardLote}, Cupón: ${cardCupon}`
+      : paymentReference || undefined;
+
+    const newPayment: SplitPayment = {
+      id: Math.random().toString(36).substr(2, 9),
+      methodId: method.id,
+      methodName: selectedCardType
+        ? `${method.name} - ${selectedCardType.name}`
+        : method.name,
+      amount: pendingSplitAmount,
+      reference,
+    };
+
+    const newSplitPayments = [...splitPayments, newPayment];
+    setSplitPayments(newSplitPayments);
+
+    const newTotalPaid = newSplitPayments.reduce((sum, p) => sum + p.amount, 0);
+    const newRemaining = total - newTotalPaid;
+
+    // Limpiar estados
+    setSelectedPaymentMethod(null);
+    setSelectedCardType(null);
+    setCardLote("");
+    setCardCupon("");
+    setPaymentReference("");
+    setPendingSplitAmount(0);
+
+    if (newRemaining > 0) {
+      setCurrentSplitAmount(newRemaining.toFixed(2));
+    } else {
+      setCurrentSplitAmount("");
+    }
+
+    setCurrentView("split-payment");
+    setIsFromSplitPayment(false);
+  };
+
   const handleBack = () => {
+    // Si venimos de split payment, volver a split-payment
+    if (isFromSplitPayment) {
+      if (currentView === "card-form") {
+        setCurrentView("card-select");
+        setCardLote("");
+        setCardCupon("");
+      } else if (
+        currentView === "card-select" ||
+        currentView === "reference-form"
+      ) {
+        setCurrentView("split-payment");
+        setSelectedPaymentMethod(null);
+        setSelectedCardType(null);
+        setPaymentReference("");
+        setPendingSplitAmount(0);
+        setIsFromSplitPayment(false);
+      }
+      return;
+    }
+
+    // Lógica existente para pago único
+    const method = paymentMethods.find((m) => m.id === selectedPaymentMethod);
+
     if (currentView === "payment-form") {
-      // Si es un pago único, vuelve a la lista
+      // Check if we came from card-form or reference-form
+      if (method?.type === "TARJETA" && selectedCardType) {
+        setCurrentView("card-form");
+      } else if (method?.requires_reference && paymentReference) {
+        setCurrentView("reference-form");
+      } else {
+        setCurrentView("payment-list");
+        setSelectedPaymentMethod(null);
+        setSelectedCardType(null);
+        setCardLote("");
+        setCardCupon("");
+        setPaymentReference("");
+      }
+    } else if (currentView === "card-form") {
+      setCurrentView("card-select");
+      setCardLote("");
+      setCardCupon("");
+    } else if (currentView === "card-select") {
       setCurrentView("payment-list");
       setSelectedPaymentMethod(null);
+      setSelectedCardType(null);
+    } else if (currentView === "reference-form") {
+      setCurrentView("payment-list");
+      setSelectedPaymentMethod(null);
+      setPaymentReference("");
     } else if (currentView === "split-payment") {
       if (splitPayments.length > 0) {
         // SI ESTAMOS EN PAGO 2, 3, etc:
@@ -326,6 +481,17 @@ export function CheckoutDialog({
         total: calculateItemTotal(item),
       }));
 
+      // Build payment reference
+      const buildPaymentReference = (): string | null => {
+        if (selectedCardType) {
+          return `${selectedCardType.name} - Lote: ${cardLote}, Cupón: ${cardCupon}`;
+        }
+        if (paymentReference) {
+          return paymentReference;
+        }
+        return null;
+      };
+
       // Preparar pagos
       const payments: PaymentInsert[] =
         currentView === "split-payment"
@@ -343,7 +509,7 @@ export function CheckoutDialog({
                     paymentMethods.find((m) => m.id === selectedPaymentMethod)
                       ?.name || "",
                   amount: total,
-                  reference: null,
+                  reference: buildPaymentReference(),
                 },
               ]
             : [];
@@ -763,6 +929,231 @@ export function CheckoutDialog({
                       </>
                     )}
 
+                    {/* Vista: Selección de tipo de tarjeta */}
+                    {currentView === "card-select" && (
+                      <>
+                        <CardHeader className="flex flex-row items-center justify-between px-4">
+                          <CardDescription>
+                            Seleccioná el tipo de tarjeta
+                          </CardDescription>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleBack}
+                          >
+                            <ChevronLeft className="mr-1 h-4 w-4" />
+                            Atrás
+                          </Button>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4 px-4">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {CARD_TYPES.map((card) => (
+                              <button
+                                key={card.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCardType(card);
+                                  setCurrentView("card-form");
+                                }}
+                                className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-muted/50"
+                              >
+                                <Image
+                                  src={card.icon}
+                                  alt={card.name}
+                                  width={48}
+                                  height={32}
+                                  className="h-8 w-auto object-contain"
+                                />
+                                <span className="text-center text-xs font-medium">
+                                  {card.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+
+                          <Separator />
+
+                          <div>
+                            <p className="mb-3 text-sm text-muted-foreground">
+                              O pagar con QR / Transferencia
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => {
+                                // Find the transfer payment method and switch to it
+                                const transferMethod = paymentMethods.find(
+                                  (m) => m.type === "TRANSFERENCIA"
+                                );
+                                if (transferMethod) {
+                                  setSelectedPaymentMethod(transferMethod.id);
+                                  setCurrentView("reference-form");
+                                }
+                              }}
+                            >
+                              <Smartphone className="mr-2 h-4 w-4" />
+                              QR / Transferencia
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </>
+                    )}
+
+                    {/* Vista: Formulario de tarjeta (lote y cupón) */}
+                    {currentView === "card-form" && selectedCardType && (
+                      <>
+                        <CardHeader className="flex flex-row items-center justify-between px-4">
+                          <CardDescription className="flex items-center gap-2">
+                            <Image
+                              src={selectedCardType.icon}
+                              alt={selectedCardType.name}
+                              width={32}
+                              height={20}
+                              className="h-5 w-auto object-contain"
+                            />
+                            {selectedCardType.name}
+                          </CardDescription>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleBack}
+                          >
+                            <ChevronLeft className="mr-1 h-4 w-4" />
+                            Cambiar
+                          </Button>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4 px-4">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="cardLote">Lote</Label>
+                              <input
+                                id="cardLote"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={4}
+                                value={cardLote}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 4);
+                                  setCardLote(value);
+                                }}
+                                placeholder="0001"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-center font-mono text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                autoFocus
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="cardCupon">Cupón</Label>
+                              <input
+                                id="cardCupon"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={4}
+                                value={cardCupon}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 4);
+                                  setCardCupon(value);
+                                  // Auto-advance cuando ambos tienen 4 dígitos
+                                  if (value.length === 4 && cardLote.length === 4) {
+                                    setTimeout(() => {
+                                      if (isFromSplitPayment) {
+                                        handleCompleteSplitPaymentWithReference();
+                                      } else {
+                                        setCurrentView("payment-form");
+                                      }
+                                    }, 300);
+                                  }
+                                }}
+                                placeholder="0001"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-center font-mono text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              />
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            className="w-full"
+                            disabled={
+                              cardLote.length !== 4 || cardCupon.length !== 4
+                            }
+                            onClick={() => {
+                              if (isFromSplitPayment) {
+                                handleCompleteSplitPaymentWithReference();
+                              } else {
+                                setCurrentView("payment-form");
+                              }
+                            }}
+                          >
+                            {isFromSplitPayment ? "Agregar pago" : "Continuar"}
+                            <ChevronRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </CardContent>
+                      </>
+                    )}
+
+                    {/* Vista: Formulario de referencia (transferencia) */}
+                    {currentView === "reference-form" && (
+                      <>
+                        <CardHeader className="flex flex-row items-center justify-between px-4">
+                          <CardDescription>
+                            Referencia de la transferencia
+                          </CardDescription>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleBack}
+                          >
+                            <ChevronLeft className="mr-1 h-4 w-4" />
+                            Atrás
+                          </Button>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4 px-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="paymentReference">
+                              Comprobante / Referencia
+                            </Label>
+                            <input
+                              id="paymentReference"
+                              type="text"
+                              value={paymentReference}
+                              onChange={(e) => setPaymentReference(e.target.value)}
+                              placeholder="Ej: CBU, número de operación..."
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              autoFocus
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Opcional: ingresá un dato para identificar la transferencia
+                            </p>
+                          </div>
+
+                          <Button
+                            type="button"
+                            className="w-full"
+                            onClick={() => {
+                              if (isFromSplitPayment) {
+                                handleCompleteSplitPaymentWithReference();
+                              } else {
+                                setCurrentView("payment-form");
+                              }
+                            }}
+                          >
+                            {isFromSplitPayment ? "Agregar pago" : "Aceptar"}
+                            <ChevronRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </CardContent>
+                      </>
+                    )}
+
                     {/* Vista: Formulario de pago único */}
                     {currentView === "payment-form" && selectedMethod && (
                       <>
@@ -783,13 +1174,37 @@ export function CheckoutDialog({
                         <CardContent className="space-y-4 px-4">
                           <div className="rounded-lg border p-2">
                             <div className="flex items-center gap-3">
-                              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted">
-                                <selectedMethod.icon className="size-5" />
-                              </div>
-                              <div>
+                              {selectedCardType ? (
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted p-2">
+                                  <Image
+                                    src={selectedCardType.icon}
+                                    alt={selectedCardType.name}
+                                    width={32}
+                                    height={20}
+                                    className="h-5 w-auto object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted">
+                                  <selectedMethod.icon className="size-5" />
+                                </div>
+                              )}
+                              <div className="flex-1">
                                 <h3 className="flex w-fit items-center gap-2 text-sm font-medium leading-snug">
-                                  {selectedMethod.name}
+                                  {selectedCardType
+                                    ? selectedCardType.name
+                                    : selectedMethod.name}
                                 </h3>
+                                {selectedCardType && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Lote: {cardLote} | Cupón: {cardCupon}
+                                  </p>
+                                )}
+                                {paymentReference && !selectedCardType && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Ref: {paymentReference}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -877,6 +1292,9 @@ export function CheckoutDialog({
                       disabled={
                         isSubmitting ||
                         currentView === "payment-list" ||
+                        currentView === "card-select" ||
+                        currentView === "card-form" ||
+                        currentView === "reference-form" ||
                         (currentView === "payment-form" &&
                           !selectedPaymentMethod) ||
                         (currentView === "split-payment" && !isPaymentComplete)
