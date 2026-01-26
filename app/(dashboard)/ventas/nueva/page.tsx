@@ -1,7 +1,8 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,11 @@ import {
   ProductSearchPanel,
   ProductSearchPanelRef,
 } from "@/components/ventas/product-search-panel";
-import { type ProductForSale, getAdjustedPrice } from "@/lib/services/sales";
+import {
+  type ProductForSale,
+  getAdjustedPrice,
+  getSaleItemsForDuplicate,
+} from "@/lib/services/sales";
 import {
   type CartItem,
   type GlobalDiscount,
@@ -30,6 +35,9 @@ import {
 } from "@/lib/validations/sale";
 
 export default function NuevaVentaPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const duplicateProcessed = useRef(false);
   const productSearchRef = useRef<ProductSearchPanelRef>(null);
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -44,6 +52,51 @@ export default function NuevaVentaPage() {
 
   // Checkout state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  // Load duplicate sale items if duplicateId is present
+  useEffect(() => {
+    const duplicateId = searchParams.get("duplicateId");
+
+    if (duplicateId && !duplicateProcessed.current) {
+      duplicateProcessed.current = true;
+
+      async function loadDuplicateItems() {
+        try {
+          const items = await getSaleItemsForDuplicate(duplicateId!);
+
+          if (items.length > 0) {
+            // Convert to CartItems
+            const newCartItems: CartItem[] = items.map((item) => ({
+              id: generateCartItemId(),
+              productId: item.productId,
+              name: item.name,
+              sku: item.sku || "CUSTOM",
+              price: item.price,
+              basePrice: item.price,
+              quantity: item.quantity,
+              taxRate: item.taxRate,
+              discount: null,
+              imageUrl: item.imageUrl,
+            }));
+
+            setCartItems(newCartItems);
+            toast.success(
+              `${items.length} producto(s) cargados de la venta anterior`,
+            );
+          }
+
+          // Clean URL without reloading the page
+          router.replace("/ventas/nueva", { scroll: false });
+        } catch (error) {
+          console.error("Error loading duplicate sale:", error);
+          toast.error("Error al cargar la venta para duplicar");
+          router.replace("/ventas/nueva", { scroll: false });
+        }
+      }
+
+      loadDuplicateItems();
+    }
+  }, [searchParams, router]);
 
   // Add product to cart
   const handleAddProduct = useCallback(

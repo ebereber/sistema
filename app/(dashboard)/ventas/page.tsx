@@ -731,7 +731,12 @@ export default function VentasPage() {
                               <ArrowLeftRight className="size-4" />
                               Crear cambio
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/ventas/nueva?duplicateId=${sale.id}`);
+                              }}
+                            >
                               <Copy className="size-4" />
                               Duplicar venta
                             </DropdownMenuItem>
@@ -815,7 +820,12 @@ export default function VentasPage() {
                             <ArrowLeftRight className="size-4" />
                             Crear cambio
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/ventas/nueva?duplicateId=${sale.id}`);
+                            }}
+                          >
                             <Copy className="size-4" />
                             Duplicar venta
                           </DropdownMenuItem>

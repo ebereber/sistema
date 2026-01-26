@@ -639,3 +639,53 @@ export async function getSales(
     totalPages: Math.ceil((count || 0) / pageSize),
   };
 }
+
+// =====================================================
+// Duplicate sale functions
+// =====================================================
+
+export interface DuplicateSaleItem {
+  productId: string | null;
+  name: string;
+  sku: string | null;
+  price: number;
+  quantity: number;
+  taxRate: number;
+  imageUrl: string | null;
+}
+
+/**
+ * Get sale items for duplicating a sale
+ */
+export async function getSaleItemsForDuplicate(
+  saleId: string,
+): Promise<DuplicateSaleItem[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("sale_items")
+    .select(
+      `
+      product_id,
+      description,
+      sku,
+      unit_price,
+      quantity,
+      tax_rate,
+      product:products(image_url)
+    `,
+    )
+    .eq("sale_id", saleId);
+
+  if (error) throw error;
+
+  return (data || []).map((item) => ({
+    productId: item.product_id,
+    name: item.description,
+    sku: item.sku,
+    price: item.unit_price,
+    quantity: item.quantity,
+    taxRate: item.tax_rate,
+    imageUrl: (item.product as { image_url: string | null } | null)?.image_url || null,
+  }));
+}
