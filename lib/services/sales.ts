@@ -370,3 +370,272 @@ export async function createSale(
 
   return sale;
 }
+
+// =====================================================
+// Sale detail types and functions
+// =====================================================
+
+export interface SaleWithDetails {
+  id: string;
+  sale_number: string;
+  customer: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    tax_id: string | null;
+    street_address: string | null;
+    city: string | null;
+  } | null;
+  seller: {
+    id: string;
+    name: string | null;
+  } | null;
+  location: {
+    id: string;
+    name: string;
+  } | null;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  notes: string | null;
+  status: "COMPLETED" | "PENDING" | "CANCELLED";
+  voucher_type: string;
+  sale_date: string;
+  created_at: string;
+  items: {
+    id: string;
+    product_id: string | null;
+    description: string;
+    sku: string | null;
+    quantity: number;
+    unit_price: number;
+    discount: number;
+    tax_rate: number;
+    total: number;
+    product: {
+      id: string;
+      name: string;
+      image_url: string | null;
+      cost: number | null;
+    } | null;
+  }[];
+  payments: {
+    id: string;
+    payment_method_id: string | null;
+    method_name: string;
+    amount: number;
+    reference: string | null;
+    payment_date: string;
+    payment_method: {
+      id: string;
+      name: string;
+      type: string;
+      fee_percentage: number;
+      fee_fixed: number;
+    } | null;
+  }[];
+}
+
+/**
+ * Get sale by ID with all relations
+ */
+export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("sales")
+    .select(
+      `
+      *,
+      customer:customers(id, name, email, phone, tax_id, street_address, city),
+      seller:users!sales_seller_id_fkey(id, name),
+      location:locations(id, name),
+      items:sale_items(
+        *,
+        product:products(id, name, image_url, cost)
+      ),
+      payments(
+        *,
+        payment_method:payment_methods(id, name, type, fee_percentage, fee_fixed)
+      )
+    `,
+    )
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null;
+    }
+    throw error;
+  }
+
+  return data as SaleWithDetails;
+}
+
+/**
+ * Update sale notes
+ */
+export async function updateSaleNotes(
+  id: string,
+  notes: string | null,
+): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase.from("sales").update({ notes }).eq("id", id);
+
+  if (error) throw error;
+}
+
+// =====================================================
+// Sale list types and functions
+// =====================================================
+
+export interface SaleListItem {
+  id: string;
+  sale_number: string;
+  sale_date: string;
+  status: "COMPLETED" | "PENDING" | "CANCELLED";
+  voucher_type: string;
+  total: number;
+  customer: {
+    id: string;
+    name: string;
+  } | null;
+  seller: {
+    id: string;
+    name: string | null;
+  } | null;
+}
+
+export interface GetSalesParams {
+  search?: string;
+  status?: "COMPLETED" | "PENDING" | "CANCELLED";
+  dateFrom?: string;
+  dateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  sellerId?: string;
+  voucherType?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface GetSalesResult {
+  data: SaleListItem[];
+  count: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Get sales list with filters and pagination
+ */
+export async function getSales(
+  params: GetSalesParams = {},
+): Promise<GetSalesResult> {
+  const supabase = createClient();
+
+  const {
+    search,
+    status,
+    dateFrom,
+    dateTo,
+    minAmount,
+    maxAmount,
+    sellerId,
+    voucherType,
+    page = 1,
+    pageSize = 20,
+  } = params;
+
+  let query = supabase
+    .from("sales")
+    .select(
+      `
+      id,
+      sale_number,
+      sale_date,
+      status,
+      voucher_type,
+      total,
+      customer:customers(id, name),
+      seller:users!sales_seller_id_fkey(id, name)
+    `,
+      { count: "exact" },
+    )
+    .order("sale_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  // Search filter (sale number)
+  if (search) {
+    query = query.ilike("sale_number", `%${search}%`);
+  }
+
+  // Status filter
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  // Date from filter
+  if (dateFrom) {
+    query = query.gte("sale_date", dateFrom);
+  }
+
+  // Date to filter
+  if (dateTo) {
+    query = query.lte("sale_date", dateTo);
+  }
+
+  // Min amount filter
+  if (minAmount !== undefined) {
+    query = query.gte("total", minAmount);
+  }
+
+  // Max amount filter
+  if (maxAmount !== undefined) {
+    query = query.lte("total", maxAmount);
+  }
+
+  // Seller filter
+  if (sellerId) {
+    query = query.eq("seller_id", sellerId);
+  }
+
+  // Voucher type filter
+  if (voucherType) {
+    query = query.eq("voucher_type", voucherType);
+  }
+
+  // Pagination
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  query = query.range(from, to);
+
+  const { data, error, count } = await query;
+
+  if (error) throw error;
+
+  // Map data to handle Supabase relation arrays
+  const mappedData: SaleListItem[] = (data || []).map((item) => ({
+    id: item.id,
+    sale_number: item.sale_number,
+    sale_date: item.sale_date,
+    status: item.status,
+    voucher_type: item.voucher_type,
+    total: item.total,
+    customer: item.customer as SaleListItem["customer"],
+    seller: item.seller as SaleListItem["seller"],
+  }));
+
+  return {
+    data: mappedData,
+    count: count || 0,
+    page,
+    pageSize,
+    totalPages: Math.ceil((count || 0) / pageSize),
+  };
+}
