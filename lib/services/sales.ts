@@ -1,35 +1,38 @@
-import { createClient } from "@/lib/supabase/client"
-import type { Product } from "./products"
-import type { CartItem, GlobalDiscount, SelectedCustomer } from "@/lib/validations/sale"
+import { createClient } from "@/lib/supabase/client";
+import type {
+  CartItem,
+  GlobalDiscount,
+  SelectedCustomer,
+} from "@/lib/validations/sale";
 
 export interface ProductForSale {
-  id: string
-  name: string
-  sku: string
-  barcode: string | null
-  price: number
-  taxRate: number
-  stockQuantity: number
-  imageUrl: string | null
-  categoryId: string | null
-  categoryName: string | null
+  id: string;
+  name: string;
+  sku: string;
+  barcode: string | null;
+  price: number;
+  taxRate: number;
+  stockQuantity: number;
+  imageUrl: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
 }
 
 export interface SearchProductsParams {
-  search?: string
-  categoryId?: string
-  limit?: number
+  search?: string;
+  categoryId?: string;
+  limit?: number;
 }
 
 /**
  * Search products optimized for POS (only active products visible in sales)
  */
 export async function searchProductsForSale(
-  params: SearchProductsParams = {}
+  params: SearchProductsParams = {},
 ): Promise<ProductForSale[]> {
-  const supabase = createClient()
+  const supabase = createClient();
 
-  const { search, categoryId, limit = 50 } = params
+  const { search, categoryId, limit = 50 } = params;
 
   let query = supabase
     .from("products")
@@ -45,29 +48,29 @@ export async function searchProductsForSale(
       image_url,
       category_id,
       category:categories(name)
-    `
+    `,
     )
     .eq("active", true)
     .in("visibility", ["SALES_AND_PURCHASES", "SALES_ONLY"])
     .order("name", { ascending: true })
-    .limit(limit)
+    .limit(limit);
 
   // Search by name, SKU, or barcode
   if (search && search.trim()) {
-    const searchTerm = search.trim()
+    const searchTerm = search.trim();
     query = query.or(
-      `name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%,barcode.ilike.%${searchTerm}%`
-    )
+      `name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%,barcode.ilike.%${searchTerm}%`,
+    );
   }
 
   // Filter by category
   if (categoryId) {
-    query = query.eq("category_id", categoryId)
+    query = query.eq("category_id", categoryId);
   }
 
-  const { data, error } = await query
+  const { data, error } = await query;
 
-  if (error) throw error
+  if (error) throw error;
 
   return (data || []).map((product) => ({
     id: product.id,
@@ -80,7 +83,7 @@ export async function searchProductsForSale(
     imageUrl: product.image_url,
     categoryId: product.category_id,
     categoryName: (product.category as { name: string } | null)?.name || null,
-  }))
+  }));
 }
 
 /**
@@ -89,16 +92,16 @@ export async function searchProductsForSale(
 export function getAdjustedPrice(
   basePrice: number,
   adjustmentType: "AUMENTO" | "DESCUENTO" | null | undefined,
-  adjustmentPercentage: number | null | undefined
+  adjustmentPercentage: number | null | undefined,
 ): number {
   if (!adjustmentType || adjustmentPercentage == null) {
-    return basePrice
+    return basePrice;
   }
 
   if (adjustmentType === "AUMENTO") {
-    return basePrice * (1 + adjustmentPercentage / 100)
+    return basePrice * (1 + adjustmentPercentage / 100);
   } else {
-    return basePrice * (1 - adjustmentPercentage / 100)
+    return basePrice * (1 - adjustmentPercentage / 100);
   }
 }
 
@@ -106,9 +109,9 @@ export function getAdjustedPrice(
  * Get product by barcode (for barcode scanner)
  */
 export async function getProductByBarcode(
-  barcode: string
+  barcode: string,
 ): Promise<ProductForSale | null> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("products")
@@ -124,19 +127,19 @@ export async function getProductByBarcode(
       image_url,
       category_id,
       category:categories(name)
-    `
+    `,
     )
     .eq("barcode", barcode)
     .eq("active", true)
     .in("visibility", ["SALES_AND_PURCHASES", "SALES_ONLY"])
-    .single()
+    .single();
 
   if (error) {
     if (error.code === "PGRST116") {
       // No rows returned
-      return null
+      return null;
     }
-    throw error
+    throw error;
   }
 
   return {
@@ -150,19 +153,21 @@ export async function getProductByBarcode(
     imageUrl: data.image_url,
     categoryId: data.category_id,
     categoryName: (data.category as { name: string } | null)?.name || null,
-  }
+  };
 }
 
 /**
  * Get price list adjustment for a customer
  */
-export async function getCustomerPriceListAdjustment(customerId: string): Promise<{
-  priceListId: string | null
-  priceListName: string | null
-  adjustmentType: "AUMENTO" | "DESCUENTO" | null
-  adjustmentPercentage: number | null
+export async function getCustomerPriceListAdjustment(
+  customerId: string,
+): Promise<{
+  priceListId: string | null;
+  priceListName: string | null;
+  adjustmentType: "AUMENTO" | "DESCUENTO" | null;
+  adjustmentPercentage: number | null;
 } | null> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("customers")
@@ -175,42 +180,42 @@ export async function getCustomerPriceListAdjustment(customerId: string): Promis
         adjustment_type,
         adjustment_percentage
       )
-    `
+    `,
     )
     .eq("id", customerId)
-    .single()
+    .single();
 
-  if (error) throw error
+  if (error) throw error;
 
   if (!data || !data.price_list) {
-    return null
+    return null;
   }
 
   const priceList = data.price_list as {
-    id: string
-    name: string
-    adjustment_type: string
-    adjustment_percentage: number
-  }
+    id: string;
+    name: string;
+    adjustment_type: string;
+    adjustment_percentage: number;
+  };
 
   return {
     priceListId: priceList.id,
     priceListName: priceList.name,
     adjustmentType: priceList.adjustment_type as "AUMENTO" | "DESCUENTO",
     adjustmentPercentage: priceList.adjustment_percentage,
-  }
+  };
 }
 
 // Session storage key for cart data
-export const CART_STORAGE_KEY = "pos_cart_data"
+export const CART_STORAGE_KEY = "pos_cart_data";
 
 export interface CartStorageData {
-  items: CartItem[]
-  customer: SelectedCustomer
-  globalDiscount: GlobalDiscount | null
-  note?: string
-  saleDate?: string
-  savedAt: string
+  items: CartItem[];
+  customer: SelectedCustomer;
+  globalDiscount: GlobalDiscount | null;
+  note?: string;
+  saleDate?: string;
+  savedAt: string;
 }
 
 /**
@@ -218,7 +223,7 @@ export interface CartStorageData {
  */
 export function saveCartToStorage(data: CartStorageData): void {
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data))
+    sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data));
   }
 }
 
@@ -227,16 +232,16 @@ export function saveCartToStorage(data: CartStorageData): void {
  */
 export function loadCartFromStorage(): CartStorageData | null {
   if (typeof window !== "undefined") {
-    const stored = sessionStorage.getItem(CART_STORAGE_KEY)
+    const stored = sessionStorage.getItem(CART_STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored)
+        return JSON.parse(stored);
       } catch {
-        return null
+        return null;
       }
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -244,7 +249,7 @@ export function loadCartFromStorage(): CartStorageData | null {
  */
 export function clearCartStorage(): void {
   if (typeof window !== "undefined") {
-    sessionStorage.removeItem(CART_STORAGE_KEY)
+    sessionStorage.removeItem(CART_STORAGE_KEY);
   }
 }
 
@@ -253,33 +258,33 @@ export function clearCartStorage(): void {
 // =====================================================
 
 export interface SaleInsert {
-  customer_id: string | null
-  subtotal: number
-  discount: number
-  tax: number
-  total: number
-  notes: string | null
-  status: "COMPLETED" | "PENDING" | "CANCELLED"
-  voucher_type: string
-  sale_date: string
+  customer_id: string | null;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  notes: string | null;
+  status: "COMPLETED" | "PENDING" | "CANCELLED";
+  voucher_type: string;
+  sale_date: string;
 }
 
 export interface SaleItemInsert {
-  product_id: string | null
-  description: string
-  sku: string | null
-  quantity: number
-  unit_price: number
-  discount: number
-  tax_rate: number
-  total: number
+  product_id: string | null;
+  description: string;
+  sku: string | null;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+  tax_rate: number;
+  total: number;
 }
 
 export interface PaymentInsert {
-  payment_method_id: string | null
-  method_name: string
-  amount: number
-  reference: string | null
+  payment_method_id: string | null;
+  method_name: string;
+  amount: number;
+  reference: string | null;
 }
 
 /**
@@ -288,58 +293,80 @@ export interface PaymentInsert {
 export async function createSale(
   saleData: SaleInsert,
   items: SaleItemInsert[],
-  payments: PaymentInsert[]
+  payments: PaymentInsert[],
+  locationId: string,
 ) {
-  const supabase = createClient()
+  const supabase = createClient();
+  // 1. Obtener usuario actual
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuario no autenticado");
 
-  // 1. Generar número de venta
+  // 2. Generar número de venta
   const { data: saleNumber, error: numberError } = await supabase.rpc(
     "generate_sale_number",
-    { location_id_param: null }
-  )
+    { location_id_param: locationId },
+  );
+  if (numberError) throw numberError;
 
-  if (numberError) throw numberError
-
-  // 2. Crear venta
+  // 3. Crear venta
   const { data: sale, error: saleError } = await supabase
     .from("sales")
     .insert({
       ...saleData,
       sale_number: saleNumber,
-      seller_id: null,
-      location_id: null,
-      created_by: null,
+      seller_id: user.id, // ← Usuario actual
+      location_id: locationId, // ← Ubicación
+      created_by: user.id, // ← Usuario actual
     })
     .select()
-    .single()
+    .single();
 
-  if (saleError) throw saleError
+  if (saleError) throw saleError;
 
-  // 3. Crear items
+  // 4. Crear items
   const itemsWithSaleId = items.map((item) => ({
     ...item,
     sale_id: sale.id,
-  }))
+  }));
 
   const { error: itemsError } = await supabase
     .from("sale_items")
-    .insert(itemsWithSaleId)
+    .insert(itemsWithSaleId);
 
-  if (itemsError) throw itemsError
+  if (itemsError) throw itemsError;
 
-  // 4. Crear pagos
+  // 5. Crear pagos
   if (payments.length > 0) {
     const paymentsWithSaleId = payments.map((payment) => ({
       ...payment,
       sale_id: sale.id,
-    }))
+    }));
 
     const { error: paymentsError } = await supabase
       .from("payments")
-      .insert(paymentsWithSaleId)
+      .insert(paymentsWithSaleId);
 
-    if (paymentsError) throw paymentsError
+    if (paymentsError) throw paymentsError;
   }
 
-  return sale
+  // 6. Descontar stock
+  for (const item of items) {
+    if (item.product_id) {
+      // Solo si es producto real (no ítem personalizado)
+      const { error: stockError } = await supabase.rpc("decrease_stock", {
+        p_product_id: item.product_id,
+        p_location_id: locationId,
+        p_quantity: item.quantity,
+      });
+
+      if (stockError) {
+        console.error("Error descontando stock:", stockError);
+        // Podrías hacer rollback o marcar la venta para revisión
+      }
+    }
+  }
+
+  return sale;
 }

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { applyPriceRounding, PriceRoundingType } from "../utils/currency";
 
 export const DISCOUNT_TYPES = ["percentage", "fixed"] as const;
 
@@ -108,7 +107,6 @@ export function calculateItemTotal(item: CartItem): number {
 export function calculateCartTotals(
   items: CartItem[],
   globalDiscount: GlobalDiscount | null,
-  roundingType: PriceRoundingType = "multiples_100",
 ): CartTotals {
   // Calculate subtotal (sum of all item subtotals before any discounts)
   const subtotal = items.reduce(
@@ -140,10 +138,7 @@ export function calculateCartTotals(
   // In a real implementation, you might want to calculate this based on each item's tax rate
   const taxes = 0;
 
-  const rawTotal = afterItemDiscounts - globalDiscountAmount + taxes;
-
-  // Aplicar redondeo al total final
-  const total = applyPriceRounding(rawTotal, roundingType);
+  const total = afterItemDiscounts - globalDiscountAmount + taxes;
 
   return {
     subtotal,
@@ -161,8 +156,8 @@ export function formatPrice(amount: number): string {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 

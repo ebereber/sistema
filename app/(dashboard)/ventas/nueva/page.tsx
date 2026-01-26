@@ -1,7 +1,7 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,11 @@ import {
 } from "@/components/ui/drawer";
 import { CartPanel } from "@/components/ventas/cart-panel";
 import { CheckoutDialog } from "@/components/ventas/checkout-dialog";
-import { ProductSearchPanel } from "@/components/ventas/product-search-panel";
 import {
-  type ProductForSale,
-  getAdjustedPrice,
-} from "@/lib/services/sales";
+  ProductSearchPanel,
+  ProductSearchPanelRef,
+} from "@/components/ventas/product-search-panel";
+import { type ProductForSale, getAdjustedPrice } from "@/lib/services/sales";
 import {
   type CartItem,
   type GlobalDiscount,
@@ -30,6 +30,7 @@ import {
 } from "@/lib/validations/sale";
 
 export default function NuevaVentaPage() {
+  const productSearchRef = useRef<ProductSearchPanelRef>(null);
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<SelectedCustomer>(DEFAULT_CUSTOMER);
@@ -220,20 +221,38 @@ export default function NuevaVentaPage() {
   }, [cartItems.length]);
 
   // Handle sale success - clean up after confirmed sale
-  const handleSaleSuccess = useCallback((saleNumber: string) => {
-    setCartItems([]);
-    setGlobalDiscount(null);
-    setNote("");
-    setCustomer(DEFAULT_CUSTOMER);
-    setCheckoutOpen(false);
-    toast.success(`Venta confirmada: ${saleNumber}`);
-  }, []);
+  const handleSaleSuccess = useCallback(
+    (saleNumber: string) => {
+      // Actualizar stock localmente ANTES de limpiar el carrito
+      if (productSearchRef.current && cartItems.length > 0) {
+        productSearchRef.current.updateStock(
+          cartItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+          })),
+        );
+      }
+
+      // Limpiar estado
+      setCartItems([]);
+      setGlobalDiscount(null);
+      setNote("");
+      setCustomer(DEFAULT_CUSTOMER);
+      setCheckoutOpen(false);
+
+      toast.success(`Venta confirmada: ${saleNumber}`);
+    },
+    [cartItems],
+  );
 
   return (
     <div className="flex h-[calc(100vh-5.5rem)] gap-4 lg:flex-row flex-col ">
       {/* Left panel - Product search */}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-4 px-0 pb-20 ">
-        <ProductSearchPanel onProductSelect={handleAddProduct} />
+        <ProductSearchPanel
+          ref={productSearchRef}
+          onProductSelect={handleAddProduct}
+        />
       </div>
 
       {/* Right panel - Cart */}

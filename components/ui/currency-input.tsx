@@ -26,8 +26,8 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         customInput={Input}
         thousandSeparator="."
         decimalSeparator=","
-        decimalScale={2}
-        fixedDecimalScale
+        decimalScale={0}
+        //fixedDecimalScale
         prefix="$ "
         allowNegative={false}
         // 'values' es de tipo NumberFormatValues (proviene de la librería)

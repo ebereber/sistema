@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Package, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,25 +12,50 @@ import {
   searchProductsForSale,
   type ProductForSale,
 } from "@/lib/services/sales";
+import { applyPriceRounding, PriceRoundingType } from "@/lib/utils/currency";
 import { ProductItem } from "./product-item";
+
+export interface ProductSearchPanelRef {
+  updateStock: (
+    soldItems: { productId: string | null; quantity: number }[],
+  ) => void;
+}
 
 interface ProductSearchPanelProps {
   onProductSelect: (product: ProductForSale) => void;
 }
 
-export function ProductSearchPanel({
-  onProductSelect,
-}: ProductSearchPanelProps) {
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [products, setProducts] = useState<ProductForSale[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
+export const ProductSearchPanel = forwardRef<ProductSearchPanelRef, ProductSearchPanelProps>(
+  ({ onProductSelect }, ref) => {
+    const [search, setSearch] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [products, setProducts] = useState<ProductForSale[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSearching, setIsSearching] = useState(false);
 
-  const debouncedSearch = useDebounce(search, 300);
+    const debouncedSearch = useDebounce(search, 300);
+    const roundingType: PriceRoundingType = "multiples_100";
 
-  // Load categories on mount
+    // Exponer función para actualizar stock
+    useImperativeHandle(ref, () => ({
+      updateStock: (soldItems) => {
+        setProducts((prev) =>
+          prev.map((product) => {
+            const soldItem = soldItems.find((item) => item.productId === product.id);
+            if (soldItem) {
+              return {
+                ...product,
+                stockQuantity: Math.max(0, product.stockQuantity - soldItem.quantity),
+              };
+            }
+            return product;
+          })
+        );
+      },
+    }));
+
+    // Load categories on mount
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -52,7 +77,11 @@ export function ProductSearchPanel({
           search: debouncedSearch || undefined,
           categoryId: selectedCategory || undefined,
         });
-        setProducts(data);
+        const productsWithRoundedPrices = data.map((product) => ({
+          ...product,
+          price: applyPriceRounding(product.price, roundingType),
+        }));
+        setProducts(productsWithRoundedPrices);
       } catch (error) {
         console.error("Error loading products:", error);
       } finally {
@@ -163,4 +192,7 @@ export function ProductSearchPanel({
       </ScrollArea>
     </div>
   );
-}
+  }
+);
+
+ProductSearchPanel.displayName = "ProductSearchPanel";

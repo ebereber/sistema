@@ -18,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { getMainLocation } from "@/lib/services/locations";
 import { getPaymentMethods } from "@/lib/services/payment-methods";
 import {
   createSale,
@@ -121,6 +122,9 @@ export function CheckoutDialog({
     string | null
   >(null);
   const [saleNumber, setSaleNumber] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ id: string; name: string } | null>(
+    null,
+  );
 
   // Split payment states
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([]);
@@ -136,6 +140,10 @@ export function CheckoutDialog({
   >([]);
 
   const [isLoadingMethods, setIsLoadingMethods] = useState(true);
+
+  // Check if there are any discounts
+  const hasItemDiscounts = totals.itemDiscounts > 0;
+  const hasGlobalDiscount = totals.globalDiscount > 0;
 
   useEffect(() => {
     async function loadPaymentMethods() {
@@ -170,6 +178,16 @@ export function CheckoutDialog({
 
     if (open) {
       loadPaymentMethods();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    async function loadLocation() {
+      const loc = await getMainLocation();
+      setLocation(loc);
+    }
+    if (open) {
+      loadLocation();
     }
   }, [open]);
 
@@ -270,6 +288,10 @@ export function CheckoutDialog({
   };
 
   const handleConfirm = async () => {
+    if (!location) {
+      toast.error("No se pudo obtener la ubicación");
+      return;
+    }
     try {
       setIsSubmitting(true);
 
@@ -327,11 +349,10 @@ export function CheckoutDialog({
             : [];
 
       // Guardar venta
-      const sale = await createSale(saleData, items, payments);
+      const sale = await createSale(saleData, items, payments, location.id);
 
       setSaleNumber(sale.sale_number);
       setCurrentView("confirmation");
-
     } catch (error: unknown) {
       console.error("Error al crear venta:", error);
       toast.error("Error al confirmar la venta");
@@ -827,11 +848,19 @@ export function CheckoutDialog({
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>{formatPrice(subtotal)}</span>
+                      <span>{formatPrice(totals.subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">IVA</span>
-                      <span>{formatPrice(tax)}</span>
+                      {hasGlobalDiscount && (
+                        <>
+                          <span>
+                            Descuento global
+                            {globalDiscount?.type === "percentage" &&
+                              ` (${globalDiscount.value}%)`}
+                          </span>
+                          <span>-{formatPrice(totals.globalDiscount)}</span>
+                        </>
+                      )}
                     </div>
                     <Separator />
                     <div className="flex justify-between text-lg font-semibold">

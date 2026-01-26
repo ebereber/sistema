@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 import { CurrencyInput } from "../ui/currency-input";
 
 interface CustomItemDialogProps {
@@ -32,27 +33,28 @@ interface CustomItemDialogProps {
   ) => void;
 }
 
-function parsePrice(value: string): number {
-  return parseFloat(value.replace(",", "."));
-}
-
 export function CustomItemDialog({
   open,
   onOpenChange,
   onAddItem,
 }: CustomItemDialogProps) {
   const [customItemName, setCustomItemName] = useState("");
-  const [customItemPrice, setCustomItemPrice] = useState("");
-  const [customItemQuantity, setCustomItemQuantity] = useState(1);
+  const [customItemPrice, setCustomItemPrice] = useState<number>(0);
+  const [customItemQuantity, setCustomItemQuantity] = useState<string>("1");
   const [customItemTaxRate, setCustomItemTaxRate] = useState("21%");
   const [customItemType, setCustomItemType] = useState("product");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const price = parsePrice(customItemPrice);
-    if (isNaN(price) || price <= 0) {
-      alert("Por favor, ingrese un precio válido");
+    if (customItemPrice <= 0) {
+      toast.error("Por favor, ingrese un precio válido");
+      return;
+    }
+
+    const quantity = parseInt(customItemQuantity) || 1;
+    if (quantity <= 0) {
+      toast.error("La cantidad debe ser mayor a 0");
       return;
     }
 
@@ -60,17 +62,17 @@ export function CustomItemDialog({
       customItemTaxRate === "exento" ? 0 : parseFloat(customItemTaxRate);
 
     onAddItem(
-      customItemName || `Ítem personalizado ${customItemTaxRate}`,
-      price,
-      customItemQuantity,
+      customItemName || `Concepto Adicional`,
+      customItemPrice,
+      quantity,
       taxRate,
       customItemType,
     );
 
     // Reset form
     setCustomItemName("");
-    setCustomItemPrice("");
-    setCustomItemQuantity(1);
+    setCustomItemPrice(0);
+    setCustomItemQuantity("1");
     setCustomItemTaxRate("21%");
     setCustomItemType("product");
     onOpenChange(false);
@@ -102,11 +104,9 @@ export function CustomItemDialog({
                 Precio unitario ($)
               </label>
               <CurrencyInput
-                placeholder="$"
-                value={customItemPrice}
-                onChange={(e) => setCustomItemPrice(e.target.value)}
-                required
-                inputMode="numeric"
+                placeholder="$ 0"
+                value={customItemPrice} // ← Número
+                onValueChange={(value) => setCustomItemPrice(value)}
               />
             </div>
 
@@ -115,14 +115,16 @@ export function CustomItemDialog({
                 Cantidad
               </label>
               <Input
-                type="number"
-                min="1"
+                type="text"
+                inputMode="numeric"
                 value={customItemQuantity}
-                onChange={(e) =>
-                  setCustomItemQuantity(parseInt(e.target.value) || 1)
-                }
+                onChange={(e) => {
+                  // Solo permitir números
+                  const value = e.target.value.replace(/\D/g, "");
+                  setCustomItemQuantity(value);
+                }}
+                onFocus={(e) => e.target.select()}
                 required
-                step="1"
                 className=" [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
               />
             </div>

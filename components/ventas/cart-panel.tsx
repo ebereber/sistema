@@ -1,5 +1,7 @@
 "use client";
 
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   CalendarDays,
   EllipsisVertical,
@@ -87,6 +89,7 @@ export function CartPanel({
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [saveQuoteDialogOpen, setSaveQuoteDialogOpen] = useState(false);
+
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
@@ -96,6 +99,20 @@ export function CartPanel({
   const hasAnyDiscounts = hasItemDiscounts || hasGlobalDiscount;
 
   const isEmpty = items.length === 0;
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // Formatear fecha corta
+  const formatShortDate = (date: Date) => {
+    return format(date, "d/M/yy", { locale: es });
+  };
 
   return (
     <div className="flex h-full flex-col rounded-lg mt-4 lg:mt-0 lg:border bg-sidebar">
@@ -124,7 +141,9 @@ export function CartPanel({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDateDialogOpen(true)}>
                 <CalendarDays className="mr-2 size-4" />
-                Cambiar fecha
+                {isToday(saleDate)
+                  ? "Cambiar fecha"
+                  : `Fecha: ${formatShortDate(saleDate)}`}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSaveQuoteDialogOpen(true)}>
@@ -278,11 +297,7 @@ export function CartPanel({
           </div>
 
           {/* Continue button */}
-          <Button
-            className="mt-4 w-full"
-            size="lg"
-            onClick={onContinue}
-          >
+          <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
             Continuar
           </Button>
         </div>
