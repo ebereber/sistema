@@ -707,3 +707,379 @@ export async function getSaleItemsForDuplicate(
       (item.product as { image_url: string | null } | null)?.image_url || null,
   }));
 }
+
+// =====================================================
+// Exchange (Cambio) functions
+// =====================================================
+
+import type {
+  ExchangeData,
+  ExchangeItem,
+  ExchangeResult,
+} from "@/lib/validations/sale";
+
+export interface ExchangeSaleData {
+  originalSaleId: string;
+  originalSaleNumber: string;
+  customerId: string | null;
+  customerName: string;
+  items: ExchangeItem[];
+}
+
+/**
+ * Get sale data for creating an exchange
+ */
+export async function getSaleForExchange(
+  saleId: string,
+): Promise<ExchangeSaleData | null> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("sales")
+    .select(
+      `
+      id,
+      sale_number,
+      customer_id,
+      customer:customers(id, name),
+      items:sale_items(
+        id,
+        product_id,
+        description,
+        sku,
+        unit_price,
+        quantity,
+        tax_rate,
+        product:products(image_url)
+      )
+    `,
+    )
+    .eq("id", saleId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null;
+    }
+    throw error;
+  }
+
+  // Handle Supabase relation format (may return array for single relations)
+  const customerData = data.customer;
+  const customer = Array.isArray(customerData) ? customerData[0] : customerData;
+
+  return {
+    originalSaleId: data.id,
+    originalSaleNumber: data.sale_number,
+    customerId: data.customer_id,
+    customerName:
+      (customer as { name: string } | undefined)?.name || "Consumidor Final",
+    items: (data.items || []).map((item) => {
+      const productData = item.product;
+      const product = Array.isArray(productData) ? productData[0] : productData;
+      return {
+        id: item.id,
+        productId: item.product_id,
+        name: item.description,
+        sku: item.sku,
+        price: item.unit_price,
+        quantity: item.quantity,
+        maxQuantity: item.quantity,
+        taxRate: item.tax_rate,
+        imageUrl:
+          (product as { image_url: string | null } | undefined)?.image_url ||
+          null,
+      };
+    }),
+  };
+}
+
+export interface CreateExchangeParams {
+  exchangeData: ExchangeData;
+  itemsToReturn: ExchangeItem[];
+  newCartItems: CartItem[];
+  payments: PaymentInsert[];
+  appliedCreditNotes: Array<{ creditNoteId: string; amount: number }>;
+  locationId: string;
+  saleDate: Date;
+  note?: string;
+  globalDiscount?: GlobalDiscount | null;
+}
+
+/**
+ * Create an exchange (cambio) - generates NC for returns and new sale for new products
+ */
+export async function createExchange(
+  params: CreateExchangeParams,
+): Promise<ExchangeResult> {
+  const {
+    exchangeData,
+    itemsToReturn,
+    newCartItems,
+    payments,
+    appliedCreditNotes,
+    locationId,
+    saleDate,
+    note,
+    globalDiscount,
+  } = params;
+
+  const supabase = createClient();
+
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuario no autenticado");
+
+  let creditNote: ExchangeResult["creditNote"] = null;
+  let sale: ExchangeResult["sale"] = null;
+
+  // Calculate totals
+  const returnTotal = itemsToReturn.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+
+  const newProductsSubtotal = newCartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+
+  // Calculate global discount if any
+  let globalDiscountAmount = 0;
+  if (globalDiscount) {
+    if (globalDiscount.type === "percentage") {
+      globalDiscountAmount = newProductsSubtotal * (globalDiscount.value / 100);
+    } else {
+      globalDiscountAmount = Math.min(
+        globalDiscount.value,
+        newProductsSubtotal,
+      );
+    }
+  }
+
+  const newProductsTotal = newProductsSubtotal - globalDiscountAmount;
+  const balance = newProductsTotal - returnTotal;
+
+  // 1. Create Credit Note if there are items to return
+  if (itemsToReturn.length > 0 && returnTotal > 0) {
+    // Generate NC number
+    const { data: ncNumber, error: ncNumberError } = await supabase.rpc(
+      "generate_sale_number",
+      { location_id_param: locationId, prefix_param: "NCX" },
+    );
+    if (ncNumberError) throw ncNumberError;
+
+    // Create NC
+    const { data: ncData, error: ncError } = await supabase
+      .from("sales")
+      .insert({
+        sale_number: ncNumber,
+        customer_id: exchangeData.customerId,
+        subtotal: returnTotal,
+        discount: 0,
+        tax: 0,
+        total: returnTotal,
+        notes: note
+          ? `Cambio - ${note}`
+          : `Cambio de venta ${exchangeData.originalSaleNumber}`,
+        status: "COMPLETED",
+        voucher_type: "NOTA_CREDITO_X",
+        sale_date: saleDate.toISOString(),
+        seller_id: user.id,
+        location_id: locationId,
+        created_by: user.id,
+        related_sale_id: exchangeData.originalSaleId,
+      })
+      .select()
+      .single();
+
+    if (ncError) throw ncError;
+
+    // Create NC items
+    const ncItems = itemsToReturn.map((item) => ({
+      sale_id: ncData.id,
+      product_id: item.productId,
+      description: item.name,
+      sku: item.sku,
+      quantity: item.quantity,
+      unit_price: item.price,
+      discount: 0,
+      tax_rate: item.taxRate,
+      total: item.price * item.quantity,
+    }));
+
+    const { error: ncItemsError } = await supabase
+      .from("sale_items")
+      .insert(ncItems);
+
+    if (ncItemsError) throw ncItemsError;
+
+    // Increment stock for returned items
+    for (const item of itemsToReturn) {
+      if (item.productId) {
+        const { error: stockError } = await supabase.rpc("increase_stock", {
+          p_product_id: item.productId,
+          p_location_id: locationId,
+          p_quantity: item.quantity,
+        });
+
+        if (stockError) {
+          console.error("Error incrementando stock:", stockError);
+        }
+      }
+    }
+
+    creditNote = {
+      id: ncData.id,
+      saleNumber: ncData.sale_number,
+      total: ncData.total,
+    };
+  }
+
+  // 2. Create new sale if there are new products AND balance > 0
+  if (newCartItems.length > 0 && newProductsTotal > 0) {
+    // Generate sale number
+    const { data: saleNumber, error: saleNumberError } = await supabase.rpc(
+      "generate_sale_number",
+      { location_id_param: locationId },
+    );
+    if (saleNumberError) throw saleNumberError;
+
+    // Calculate what needs to be paid (considering NC credits)
+    const totalCreditNoteAmount =
+      returnTotal + appliedCreditNotes.reduce((sum, nc) => sum + nc.amount, 0);
+    const amountToPay = Math.max(0, newProductsTotal - totalCreditNoteAmount);
+
+    // Create sale
+    const { data: saleData, error: saleError } = await supabase
+      .from("sales")
+      .insert({
+        sale_number: saleNumber,
+        customer_id: exchangeData.customerId,
+        subtotal: newProductsSubtotal,
+        discount: globalDiscountAmount,
+        tax: 0,
+        total: newProductsTotal,
+        notes: note
+          ? `Cambio - ${note}`
+          : `Cambio de venta ${exchangeData.originalSaleNumber}`,
+        status:
+          amountToPay > 0 && payments.length === 0 ? "PENDING" : "COMPLETED",
+        voucher_type: "COMPROBANTE_X",
+        sale_date: saleDate.toISOString(),
+        seller_id: user.id,
+        location_id: locationId,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (saleError) throw saleError;
+
+    // Create sale items
+    const saleItems = newCartItems.map((item) => ({
+      sale_id: saleData.id,
+      product_id: item.productId,
+      description: item.name,
+      sku: item.sku,
+      quantity: item.quantity,
+      unit_price: item.price,
+      discount:
+        item.discount?.type === "percentage"
+          ? (item.price * item.quantity * item.discount.value) / 100
+          : item.discount?.value || 0,
+      tax_rate: item.taxRate,
+      total:
+        item.price * item.quantity -
+        (item.discount?.type === "percentage"
+          ? (item.price * item.quantity * item.discount.value) / 100
+          : item.discount?.value || 0),
+    }));
+
+    const { error: saleItemsError } = await supabase
+      .from("sale_items")
+      .insert(saleItems);
+
+    if (saleItemsError) throw saleItemsError;
+
+    // Decrease stock for new products
+    for (const item of newCartItems) {
+      if (item.productId) {
+        const { error: stockError } = await supabase.rpc("decrease_stock", {
+          p_product_id: item.productId,
+          p_location_id: locationId,
+          p_quantity: item.quantity,
+        });
+
+        if (stockError) {
+          console.error("Error descontando stock:", stockError);
+        }
+      }
+    }
+
+    // Create payments if any
+    if (payments.length > 0 && amountToPay > 0) {
+      const paymentsWithSaleId = payments.map((payment) => ({
+        ...payment,
+        sale_id: saleData.id,
+      }));
+
+      const { error: paymentsError } = await supabase
+        .from("payments")
+        .insert(paymentsWithSaleId);
+
+      if (paymentsError) throw paymentsError;
+    }
+
+    // Track credit note applications
+    if (creditNote) {
+      // Apply the NC we just created
+      const { error: ncAppError } = await supabase
+        .from("credit_note_applications")
+        .insert({
+          credit_note_id: creditNote.id,
+          applied_to_sale_id: saleData.id,
+          amount: Math.min(returnTotal, newProductsTotal),
+        });
+
+      if (ncAppError) {
+        console.error("Error registrando aplicación de NC:", ncAppError);
+      }
+    }
+
+    // Track additional credit note applications
+    for (const nc of appliedCreditNotes) {
+      const { error: ncAppError } = await supabase
+        .from("credit_note_applications")
+        .insert({
+          credit_note_id: nc.creditNoteId,
+          applied_to_sale_id: saleData.id,
+          amount: nc.amount,
+        });
+
+      if (ncAppError) {
+        console.error(
+          "Error registrando aplicación de NC adicional:",
+          ncAppError,
+        );
+      }
+    }
+
+    sale = {
+      id: saleData.id,
+      saleNumber: saleData.sale_number,
+      total: saleData.total,
+    };
+  }
+
+  // Calculate credit balance (if customer has credit remaining)
+  const creditBalance = balance < 0 ? Math.abs(balance) : 0;
+
+  return {
+    creditNote,
+    sale,
+    creditBalance,
+  };
+}

@@ -61,9 +61,9 @@ export interface CartTotals {
 
 // Default customer for "Consumidor Final"
 export const DEFAULT_CUSTOMER: SelectedCustomer = {
-  id: null,
+  id: "1c7e2d2d-4ad8-48e3-bd11-f87cafaa2e6d",
   name: "Consumidor Final",
-  taxId: null,
+  taxId: "0",
   taxCategory: "Consumidor Final",
   priceListId: null,
   priceListName: null,
@@ -166,4 +166,49 @@ export function formatPrice(amount: number): string {
  */
 export function generateCartItemId(): string {
   return crypto.randomUUID();
+}
+
+// =====================================================
+// Exchange types (for "Crear Cambio" flow)
+// =====================================================
+
+export interface ExchangeItem {
+  id: string;
+  productId: string | null;
+  name: string;
+  sku: string | null;
+  price: number;
+  quantity: number; // Cantidad a devolver (editable)
+  maxQuantity: number; // Cantidad máxima (de venta original)
+  taxRate: number;
+  imageUrl: string | null;
+}
+
+export interface ExchangeData {
+  originalSaleId: string;
+  originalSaleNumber: string;
+  customerId: string | null;
+  customerName: string;
+  itemsToReturn: ExchangeItem[];
+}
+
+export interface ExchangeTotals {
+  returnTotal: number;
+  newProductsTotal: number;
+  balance: number;
+  isInFavorOfCustomer: boolean;
+}
+
+export interface ExchangeResult {
+  creditNote: {
+    id: string;
+    saleNumber: string;
+    total: number;
+  } | null;
+  sale: {
+    id: string;
+    saleNumber: string;
+    total: number;
+  } | null;
+  creditBalance: number;
 }

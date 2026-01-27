@@ -759,7 +759,14 @@ export default function VentasPage() {
                                 Crear nota de crédito
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(
+                                  `/ventas/nueva?exchangeId=${sale.id}`,
+                                );
+                              }}
+                            >
                               <ArrowLeftRight className="size-4" />
                               Crear cambio
                             </DropdownMenuItem>
@@ -850,7 +857,14 @@ export default function VentasPage() {
                               Crear nota de crédito
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(
+                                `/ventas/nueva?exchangeId=${sale.id}`,
+                              );
+                            }}
+                          >
                             <ArrowLeftRight className="size-4" />
                             Crear cambio
                           </DropdownMenuItem>

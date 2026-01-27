@@ -2,7 +2,7 @@
 
 import { ShoppingCart } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,15 @@ import {
 import {
   type ProductForSale,
   getAdjustedPrice,
+  getSaleForExchange,
   getSaleItemsForDuplicate,
 } from "@/lib/services/sales";
 import {
+  calculateCartTotals,
   type CartItem,
+  type ExchangeData,
+  type ExchangeItem,
+  type ExchangeTotals,
   type GlobalDiscount,
   type ItemDiscount,
   type SelectedCustomer,
@@ -38,6 +43,7 @@ export default function NuevaVentaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateProcessed = useRef(false);
+  const exchangeProcessed = useRef(false);
   const productSearchRef = useRef<ProductSearchPanelRef>(null);
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -52,6 +58,11 @@ export default function NuevaVentaPage() {
 
   // Checkout state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  // Exchange mode state
+  const [isExchangeMode, setIsExchangeMode] = useState(false);
+  const [exchangeData, setExchangeData] = useState<ExchangeData | null>(null);
+  const [itemsToReturn, setItemsToReturn] = useState<ExchangeItem[]>([]);
 
   // Load duplicate sale items if duplicateId is present
   useEffect(() => {
@@ -97,6 +108,109 @@ export default function NuevaVentaPage() {
       loadDuplicateItems();
     }
   }, [searchParams, router]);
+
+  // Load exchange data if exchangeId is present
+  useEffect(() => {
+    const exchangeId = searchParams.get("exchangeId");
+
+    if (exchangeId && !exchangeProcessed.current) {
+      exchangeProcessed.current = true;
+
+      async function loadExchangeData() {
+        try {
+          const data = await getSaleForExchange(exchangeId!);
+
+          if (data) {
+            // Set exchange mode
+            setIsExchangeMode(true);
+            setExchangeData({
+              originalSaleId: data.originalSaleId,
+              originalSaleNumber: data.originalSaleNumber,
+              customerId: data.customerId,
+              customerName: data.customerName,
+              itemsToReturn: data.items,
+            });
+            setItemsToReturn(data.items);
+
+            // Set customer from original sale
+            setCustomer({
+              id: data.customerId,
+              name: data.customerName,
+              taxId: null,
+              taxCategory: null,
+              priceListId: null,
+              priceListName: null,
+              priceListAdjustment: null,
+              priceListAdjustmentType: null,
+            });
+
+            toast.success(
+              `Modo cambio: ${data.items.length} producto(s) de la venta ${data.originalSaleNumber}`,
+            );
+          } else {
+            toast.error("No se encontró la venta para el cambio");
+            router.replace("/ventas/nueva", { scroll: false });
+          }
+        } catch (error) {
+          console.error("Error loading exchange data:", error);
+          toast.error("Error al cargar la venta para el cambio");
+          router.replace("/ventas/nueva", { scroll: false });
+        }
+      }
+
+      loadExchangeData();
+    }
+  }, [searchParams, router]);
+
+  // Calculate exchange totals
+  const exchangeTotals: ExchangeTotals = useMemo(() => {
+    const returnTotal = itemsToReturn.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+
+    const cartTotals = calculateCartTotals(cartItems, globalDiscount);
+    const newProductsTotal = cartTotals.total;
+
+    const balance = newProductsTotal - returnTotal;
+
+    return {
+      returnTotal,
+      newProductsTotal,
+      balance,
+      isInFavorOfCustomer: balance < 0,
+    };
+  }, [itemsToReturn, cartItems, globalDiscount]);
+
+  // Exchange handlers
+  const handleCancelExchange = useCallback(() => {
+    setIsExchangeMode(false);
+    setExchangeData(null);
+    setItemsToReturn([]);
+    setCartItems([]);
+    setCustomer(DEFAULT_CUSTOMER);
+    setGlobalDiscount(null);
+    setNote("");
+    router.replace("/ventas/nueva", { scroll: false });
+    toast.info("Modo cambio cancelado");
+  }, [router]);
+
+  const handleReturnQuantityChange = useCallback(
+    (id: string, quantity: number) => {
+      setItemsToReturn((items) =>
+        items.map((item) =>
+          item.id === id
+            ? { ...item, quantity: Math.min(quantity, item.maxQuantity) }
+            : item,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleRemoveReturnItem = useCallback((id: string) => {
+    setItemsToReturn((items) => items.filter((item) => item.id !== id));
+  }, []);
 
   // Add product to cart
   const handleAddProduct = useCallback(
@@ -326,6 +440,13 @@ export default function NuevaVentaPage() {
           onSaleDateChange={handleSaleDateChange}
           onContinue={handleContinue}
           onClearCart={handleClearCart}
+          isExchangeMode={isExchangeMode}
+          exchangeData={exchangeData}
+          itemsToReturn={itemsToReturn}
+          onReturnQuantityChange={handleReturnQuantityChange}
+          onRemoveReturnItem={handleRemoveReturnItem}
+          onCancelExchange={handleCancelExchange}
+          exchangeTotals={exchangeTotals}
         />
       </div>
 
@@ -365,6 +486,13 @@ export default function NuevaVentaPage() {
                   onSaleDateChange={handleSaleDateChange}
                   onContinue={handleContinue}
                   onClearCart={handleClearCart}
+                  isExchangeMode={isExchangeMode}
+                  exchangeData={exchangeData}
+                  itemsToReturn={itemsToReturn}
+                  onReturnQuantityChange={handleReturnQuantityChange}
+                  onRemoveReturnItem={handleRemoveReturnItem}
+                  onCancelExchange={handleCancelExchange}
+                  exchangeTotals={exchangeTotals}
                 />
               </div>
             </DrawerContent>
@@ -382,6 +510,10 @@ export default function NuevaVentaPage() {
         note={note}
         saleDate={saleDate}
         onSuccess={handleSaleSuccess}
+        isExchangeMode={isExchangeMode}
+        exchangeData={exchangeData}
+        itemsToReturn={itemsToReturn}
+        exchangeTotals={exchangeTotals}
       />
     </div>
   );

@@ -3,15 +3,19 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+  ArrowLeftRight,
   CalendarDays,
   EllipsisVertical,
+  Minus,
   PackagePlus,
+  Plus,
   Save,
   ShoppingCart,
   StickyNote,
   Tag,
   Trash2,
   User,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +31,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   type CartItem as CartItemType,
   type CartTotals,
+  type ExchangeData,
+  type ExchangeItem,
+  type ExchangeTotals,
   type GlobalDiscount,
   type ItemDiscount,
   type SelectedCustomer,
@@ -34,6 +41,7 @@ import {
   formatPrice,
 } from "@/lib/validations/sale";
 import { Kbd } from "../ui/kbd";
+import { Separator } from "../ui/separator";
 import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
 import { ChangeDateDialog } from "./change-date-dialog";
@@ -64,6 +72,14 @@ interface CartPanelProps {
   onSaleDateChange: (date: Date) => void;
   onContinue: () => void;
   onClearCart: () => void;
+  // Exchange mode props
+  isExchangeMode?: boolean;
+  exchangeData?: ExchangeData | null;
+  itemsToReturn?: ExchangeItem[];
+  onReturnQuantityChange?: (id: string, quantity: number) => void;
+  onRemoveReturnItem?: (id: string) => void;
+  onCancelExchange?: () => void;
+  exchangeTotals?: ExchangeTotals;
 }
 
 export function CartPanel({
@@ -82,6 +98,13 @@ export function CartPanel({
   onSaleDateChange,
   onContinue,
   onClearCart,
+  isExchangeMode = false,
+  exchangeData,
+  itemsToReturn = [],
+  onReturnQuantityChange,
+  onRemoveReturnItem,
+  onCancelExchange,
+  exchangeTotals,
 }: CartPanelProps) {
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
@@ -212,6 +235,116 @@ export function CartPanel({
         </div>
       )}
 
+      {/* Exchange mode header and items to return */}
+      {isExchangeMode && exchangeData && itemsToReturn.length > 0 && (
+        <div className="">
+          {/* Exchange header */}
+          <div className="flex items-center justify-between bg-orange-50 dark:bg-orange-950/30 px-4 py-2">
+            <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+              <ArrowLeftRight className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                {/*  Cambio de {exchangeData.originalSaleNumber} */}
+                Items a devolver
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCancelExchange}
+              className="h-6 text-xs text-muted-foreground hover:text-destructive"
+            >
+              <X className="mr-1 h-3 w-3" />
+              Cancelar
+            </Button>
+          </div>
+
+          {/* Items to return */}
+          <div className="px-4 py-2 space-y-3">
+            {/* <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Items a devolver
+            </p> */}
+            {itemsToReturn.map((item) => (
+              <div key={item.id} className="flex items-center gap-3 ">
+                {/* Item info */}
+                <div className="flex-1 min-w-0">
+                  <p className="line-clamp-2 md:text-sm text-xs font-medium leading-tight">
+                    {item.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{item.sku}</p>
+                </div>
+
+                {/* Quantity controls */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() =>
+                      onReturnQuantityChange?.(
+                        item.id,
+                        Math.max(1, item.quantity - 1),
+                      )
+                    }
+                    disabled={item.quantity <= 1}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="w-6 text-center text-sm font-medium">
+                    {item.quantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() =>
+                      onReturnQuantityChange?.(item.id, item.quantity + 1)
+                    }
+                    disabled={item.quantity >= item.maxQuantity}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+
+                {/* Price and remove */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                    -{formatPrice(item.price * item.quantity)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    onClick={() => onRemoveReturnItem?.(item.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {/* Return subtotal */}
+            {/*  {exchangeTotals && (
+              <div className="flex justify-between pt-2 border-t border-red-200 dark:border-red-900">
+                <span className="text-sm text-red-600 dark:text-red-400">
+                  Crédito por devolución
+                </span>
+                <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                  -{formatPrice(exchangeTotals.returnTotal)}
+                </span>
+              </div>
+            )} */}
+          </div>
+
+          {/* Separator before new products */}
+          <div className="px-4 pb-2">
+            <Separator className="my-2" />
+            <p className="text-sm font-medium text-muted-foreground tracking-wider">
+              Productos nuevos
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Cart items */}
       <ScrollArea className="flex-1 h-full pr-4 overflow-hidden">
         <div className="p-4">
@@ -241,65 +374,122 @@ export function CartPanel({
       </ScrollArea>
 
       {/* Footer with totals and actions */}
-      {!isEmpty && (
+      {(!isEmpty || isExchangeMode) && (
         <div className="border-t p-4">
-          {/* Discount button or discount lines */}
-          {!hasAnyDiscounts ? (
-            <div className="mb-4 w-fit">
+          {/* Exchange mode totals */}
+          {isExchangeMode && exchangeTotals ? (
+            <div className="space-y-3">
+              {/* New products total */}
+              {items.length > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Productos nuevos
+                  </span>
+                  <span>{formatPrice(exchangeTotals.newProductsTotal)}</span>
+                </div>
+              )}
+
+              {/* Return credit */}
+              <div className="flex justify-between text-sm">
+                <span className="text-red-600 dark:text-red-400">
+                  Crédito por devolución
+                </span>
+                <span className="text-red-600 dark:text-red-400">
+                  -{formatPrice(exchangeTotals.returnTotal)}
+                </span>
+              </div>
+
+              <Separator />
+
+              {/* Balance */}
+              <div className="flex items-center justify-between text-lg font-semibold">
+                <span>
+                  {exchangeTotals.isInFavorOfCustomer
+                    ? "Crédito a favor"
+                    : "A pagar"}
+                </span>
+                <span
+                  className={
+                    exchangeTotals.isInFavorOfCustomer
+                      ? "text-red-600 dark:text-red-400"
+                      : ""
+                  }
+                >
+                  {exchangeTotals.isInFavorOfCustomer ? "-" : ""}
+                  {formatPrice(Math.abs(exchangeTotals.balance))}
+                </span>
+              </div>
+
+              {/* Continue button */}
               <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setDiscountDialogOpen(true)}
+                className="mt-2 w-full"
+                size="lg"
+                onClick={onContinue}
+                disabled={itemsToReturn.length === 0}
               >
-                <span className="flex-1 text-left">+ Agregar descuento</span>
-                {/*  <kbd className="ml-2 hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
-                  {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}D
-                </kbd> */}
+                Continuar cambio
               </Button>
             </div>
           ) : (
-            <div className="mb-4 space-y-2 text-sm">
-              {/* Item discounts line */}
-              {hasItemDiscounts && (
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
-                  onClick={() => setDiscountDialogOpen(true)}
-                >
-                  <span>Descuentos por producto</span>
-                  <span>-{formatPrice(totals.itemDiscounts)}</span>
-                </button>
+            <>
+              {/* Discount button or discount lines */}
+              {!hasAnyDiscounts ? (
+                <div className="mb-4 w-fit">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setDiscountDialogOpen(true)}
+                  >
+                    <span className="flex-1 text-left">
+                      + Agregar descuento
+                    </span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="mb-4 space-y-2 text-sm">
+                  {/* Item discounts line */}
+                  {hasItemDiscounts && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
+                      onClick={() => setDiscountDialogOpen(true)}
+                    >
+                      <span>Descuentos por producto</span>
+                      <span>-{formatPrice(totals.itemDiscounts)}</span>
+                    </button>
+                  )}
+
+                  {/* Global discount line */}
+                  {hasGlobalDiscount && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
+                      onClick={() => setDiscountDialogOpen(true)}
+                    >
+                      <span>
+                        Descuento global
+                        {globalDiscount?.type === "percentage" &&
+                          ` (${globalDiscount.value}%)`}
+                      </span>
+                      <span>-{formatPrice(totals.globalDiscount)}</span>
+                    </button>
+                  )}
+                </div>
               )}
 
-              {/* Global discount line */}
-              {hasGlobalDiscount && (
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
-                  onClick={() => setDiscountDialogOpen(true)}
-                >
-                  <span>
-                    Descuento global
-                    {globalDiscount?.type === "percentage" &&
-                      ` (${globalDiscount.value}%)`}
-                  </span>
-                  <span>-{formatPrice(totals.globalDiscount)}</span>
-                </button>
-              )}
-            </div>
+              {/* Total */}
+              <div className="flex items-center justify-between text-lg font-semibold">
+                <span>Total</span>
+                <span>{formatPrice(totals.total)}</span>
+              </div>
+
+              {/* Continue button */}
+              <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
+                Continuar
+              </Button>
+            </>
           )}
-
-          {/* Total */}
-          <div className="flex items-center justify-between text-lg font-semibold">
-            <span>Total</span>
-            <span>{formatPrice(totals.total)}</span>
-          </div>
-
-          {/* Continue button */}
-          <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
-            Continuar
-          </Button>
         </div>
       )}
 

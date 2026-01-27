@@ -18,9 +18,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  getAvailableCreditNotes,
+  type AvailableCreditNote,
+} from "@/lib/services/credit-note-applications";
 import { getMainLocation } from "@/lib/services/locations";
 import { getPaymentMethods } from "@/lib/services/payment-methods";
 import {
+  createExchange,
   createSale,
   type PaymentInsert,
   type SaleItemInsert,
@@ -31,10 +36,15 @@ import {
   calculateItemTotal,
   formatPrice,
   type CartItem,
+  type ExchangeData,
+  type ExchangeItem,
+  type ExchangeResult,
+  type ExchangeTotals,
   type GlobalDiscount,
   type SelectedCustomer,
 } from "@/lib/validations/sale";
 import {
+  ArrowLeftRight,
   Banknote,
   Building2,
   Check,
@@ -77,6 +87,11 @@ interface CheckoutDialogProps {
   note: string;
   saleDate: Date;
   onSuccess: (saleNumber: string) => void;
+  // Exchange mode props
+  isExchangeMode?: boolean;
+  exchangeData?: ExchangeData | null;
+  itemsToReturn?: ExchangeItem[];
+  exchangeTotals?: ExchangeTotals;
 }
 
 type CheckoutView =
@@ -89,14 +104,62 @@ type CheckoutView =
   | "confirmation";
 
 const CARD_TYPES = [
-  { id: 'visa-debito', name: 'Visa Débito', brand: 'visa', type: 'DEBITO', icon: '/tarjetas/visa.svg' },
-  { id: 'visa-credito', name: 'Visa Crédito', brand: 'visa', type: 'CREDITO', icon: '/tarjetas/visa.svg' },
-  { id: 'master-debito', name: 'Mastercard Débito', brand: 'master', type: 'DEBITO', icon: '/tarjetas/master.svg' },
-  { id: 'master-credito', name: 'Mastercard Crédito', brand: 'master', type: 'CREDITO', icon: '/tarjetas/master.svg' },
-  { id: 'cabal-debito', name: 'Cabal Débito', brand: 'cabal', type: 'DEBITO', icon: '/tarjetas/cabal.svg' },
-  { id: 'cabal-credito', name: 'Cabal Crédito', brand: 'cabal', type: 'CREDITO', icon: '/tarjetas/cabal.svg' },
-  { id: 'naranja', name: 'Naranja', brand: 'naranja', type: 'CREDITO', icon: '/tarjetas/naranja.svg' },
-  { id: 'american', name: 'American Express', brand: 'american', type: 'CREDITO', icon: '/tarjetas/american.svg' },
+  {
+    id: "visa-debito",
+    name: "Visa Débito",
+    brand: "visa",
+    type: "DEBITO",
+    icon: "/tarjetas/visa.svg",
+  },
+  {
+    id: "visa-credito",
+    name: "Visa Crédito",
+    brand: "visa",
+    type: "CREDITO",
+    icon: "/tarjetas/visa.svg",
+  },
+  {
+    id: "master-debito",
+    name: "Mastercard Débito",
+    brand: "master",
+    type: "DEBITO",
+    icon: "/tarjetas/master.svg",
+  },
+  {
+    id: "master-credito",
+    name: "Mastercard Crédito",
+    brand: "master",
+    type: "CREDITO",
+    icon: "/tarjetas/master.svg",
+  },
+  {
+    id: "cabal-debito",
+    name: "Cabal Débito",
+    brand: "cabal",
+    type: "DEBITO",
+    icon: "/tarjetas/cabal.svg",
+  },
+  {
+    id: "cabal-credito",
+    name: "Cabal Crédito",
+    brand: "cabal",
+    type: "CREDITO",
+    icon: "/tarjetas/cabal.svg",
+  },
+  {
+    id: "naranja",
+    name: "Naranja",
+    brand: "naranja",
+    type: "CREDITO",
+    icon: "/tarjetas/naranja.svg",
+  },
+  {
+    id: "american",
+    name: "American Express",
+    brand: "american",
+    type: "CREDITO",
+    icon: "/tarjetas/american.svg",
+  },
 ] as const;
 
 interface SplitPayment {
@@ -124,10 +187,25 @@ export function CheckoutDialog({
   note,
   saleDate,
   onSuccess,
+  isExchangeMode = false,
+  exchangeData,
+  itemsToReturn = [],
+  exchangeTotals,
 }: CheckoutDialogProps) {
   // Calculate totals from cart
   const totals = calculateCartTotals(cartItems, globalDiscount);
   const { subtotal, taxes: tax, total } = totals;
+
+  // Exchange mode states
+  const [availableCreditNotes, setAvailableCreditNotes] = useState<
+    AvailableCreditNote[]
+  >([]);
+  const [selectedCreditNotes, setSelectedCreditNotes] = useState<
+    Map<string, number>
+  >(new Map());
+  const [exchangeResult, setExchangeResult] = useState<ExchangeResult | null>(
+    null,
+  );
 
   const [selectedVoucher, setSelectedVoucher] = useState("COMPROBANTE_X");
   const [isPending, setIsPending] = useState(false);
@@ -157,7 +235,9 @@ export function CheckoutDialog({
   >([]);
 
   // Card payment states
-  const [selectedCardType, setSelectedCardType] = useState<typeof CARD_TYPES[number] | null>(null);
+  const [selectedCardType, setSelectedCardType] = useState<
+    (typeof CARD_TYPES)[number] | null
+  >(null);
   const [cardLote, setCardLote] = useState("");
   const [cardCupon, setCardCupon] = useState("");
 
@@ -241,8 +321,29 @@ export function CheckoutDialog({
       // Reset split payment with reference states
       setPendingSplitAmount(0);
       setIsFromSplitPayment(false);
+      // Reset exchange states
+      setSelectedCreditNotes(new Map());
+      setExchangeResult(null);
     }
   }, [open]);
+
+  // Load available credit notes for exchange mode
+  useEffect(() => {
+    async function loadCreditNotes() {
+      if (open && customer.id) {
+        try {
+          const notes = await getAvailableCreditNotes(customer.id);
+          setAvailableCreditNotes(notes);
+        } catch (error) {
+          console.error("Error loading credit notes:", error);
+        }
+      } else {
+        setAvailableCreditNotes([]);
+      }
+    }
+
+    loadCreditNotes();
+  }, [open, customer.id]);
 
   const handlePaymentMethodClick = (methodId: string) => {
     if (currentView === "split-payment") {
@@ -442,6 +543,39 @@ export function CheckoutDialog({
     }
   };
 
+  // Credit note selection helpers
+  const toggleCreditNote = (noteId: string, availableBalance: number) => {
+    setSelectedCreditNotes((prev) => {
+      const newMap = new Map(prev);
+      if (newMap.has(noteId)) {
+        newMap.delete(noteId);
+      } else {
+        // Calculate how much of this NC to apply
+        const currentTotal = Array.from(newMap.values()).reduce(
+          (sum, amt) => sum + amt,
+          0,
+        );
+        const remainingToPay = exchangeTotals
+          ? Math.max(0, exchangeTotals.balance - currentTotal)
+          : 0;
+        const amountToApply = Math.min(availableBalance, remainingToPay);
+        if (amountToApply > 0) {
+          newMap.set(noteId, amountToApply);
+        }
+      }
+      return newMap;
+    });
+  };
+
+  const totalSelectedCreditNotes = Array.from(
+    selectedCreditNotes.values(),
+  ).reduce((sum, amount) => sum + amount, 0);
+
+  // Final amount to pay in exchange mode
+  const exchangeAmountToPay = exchangeTotals
+    ? Math.max(0, exchangeTotals.balance - totalSelectedCreditNotes)
+    : 0;
+
   const handleConfirm = async () => {
     if (!location) {
       toast.error("No se pudo obtener la ubicación");
@@ -450,7 +584,83 @@ export function CheckoutDialog({
     try {
       setIsSubmitting(true);
 
-      // Preparar datos de la venta
+      // Build payment reference
+      const buildPaymentReference = (): string | null => {
+        if (selectedCardType) {
+          return `${selectedCardType.name} - Lote: ${cardLote}, Cupón: ${cardCupon}`;
+        }
+        if (paymentReference) {
+          return paymentReference;
+        }
+        return null;
+      };
+
+      // Preparar pagos
+      const payments: PaymentInsert[] =
+        currentView === "split-payment"
+          ? splitPayments.map((p) => ({
+              payment_method_id: p.methodId,
+              method_name: p.methodName,
+              amount: p.amount,
+              reference: p.reference || null,
+            }))
+          : selectedPaymentMethod
+            ? [
+                {
+                  payment_method_id: selectedPaymentMethod,
+                  method_name:
+                    paymentMethods.find((m) => m.id === selectedPaymentMethod)
+                      ?.name || "",
+                  amount: exchangeTotals
+                    ? Math.max(
+                        0,
+                        exchangeTotals.balance - totalSelectedCreditNotes,
+                      )
+                    : total,
+                  reference: buildPaymentReference(),
+                },
+              ]
+            : [];
+
+      // Handle exchange mode
+      if (isExchangeMode && exchangeData && exchangeTotals) {
+        const appliedCreditNotes = Array.from(
+          selectedCreditNotes.entries(),
+        ).map(([creditNoteId, amount]) => ({
+          creditNoteId,
+          amount,
+        }));
+
+        const result = await createExchange({
+          exchangeData,
+          itemsToReturn,
+          newCartItems: cartItems,
+          payments:
+            exchangeTotals.balance > 0 &&
+            exchangeTotals.balance - totalSelectedCreditNotes > 0
+              ? payments
+              : [],
+          appliedCreditNotes,
+          locationId: location.id,
+          saleDate,
+          note: note || undefined,
+          globalDiscount,
+        });
+
+        setExchangeResult(result);
+
+        // Set sale number for display (prefer the new sale, fallback to NC)
+        if (result.sale) {
+          setSaleNumber(result.sale.saleNumber);
+        } else if (result.creditNote) {
+          setSaleNumber(result.creditNote.saleNumber);
+        }
+
+        setCurrentView("confirmation");
+        return;
+      }
+
+      // Standard sale flow
       const saleData = {
         customer_id: customer.id || null,
         subtotal,
@@ -480,39 +690,6 @@ export function CheckoutDialog({
         tax_rate: item.taxRate,
         total: calculateItemTotal(item),
       }));
-
-      // Build payment reference
-      const buildPaymentReference = (): string | null => {
-        if (selectedCardType) {
-          return `${selectedCardType.name} - Lote: ${cardLote}, Cupón: ${cardCupon}`;
-        }
-        if (paymentReference) {
-          return paymentReference;
-        }
-        return null;
-      };
-
-      // Preparar pagos
-      const payments: PaymentInsert[] =
-        currentView === "split-payment"
-          ? splitPayments.map((p) => ({
-              payment_method_id: p.methodId,
-              method_name: p.methodName,
-              amount: p.amount,
-              reference: p.reference || null,
-            }))
-          : selectedPaymentMethod
-            ? [
-                {
-                  payment_method_id: selectedPaymentMethod,
-                  method_name:
-                    paymentMethods.find((m) => m.id === selectedPaymentMethod)
-                      ?.name || "",
-                  amount: total,
-                  reference: buildPaymentReference(),
-                },
-              ]
-            : [];
 
       // Guardar venta
       const sale = await createSale(saleData, items, payments, location.id);
@@ -570,11 +747,58 @@ export function CheckoutDialog({
                 </div>
 
                 <div className="fade-in slide-in-from-bottom-2 animate-in space-y-2 fill-mode-both delay-100 duration-300">
-                  <h2 className="text-2xl font-semibold">¡Venta confirmada!</h2>
-                  <p className="text-lg font-medium text-muted-foreground">
-                    {saleNumber}
-                  </p>
-                  <p className="text-3xl font-bold">{formatPrice(total)}</p>
+                  <h2 className="text-2xl font-semibold">
+                    {isExchangeMode
+                      ? "¡Cambio confirmado!"
+                      : "¡Venta confirmada!"}
+                  </h2>
+
+                  {/* Exchange result details */}
+                  {isExchangeMode && exchangeResult ? (
+                    <div className="space-y-3">
+                      {exchangeResult.creditNote && (
+                        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3">
+                          <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                            Nota de Crédito
+                          </p>
+                          <p className="text-lg font-bold text-red-700 dark:text-red-300">
+                            {exchangeResult.creditNote.saleNumber}
+                          </p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            -{formatPrice(exchangeResult.creditNote.total)}
+                          </p>
+                        </div>
+                      )}
+
+                      {exchangeResult.sale && (
+                        <div className="rounded-lg border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 p-3">
+                          <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                            Nueva Venta
+                          </p>
+                          <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                            {exchangeResult.sale.saleNumber}
+                          </p>
+                          <p className="text-sm text-green-600 dark:text-green-400">
+                            {formatPrice(exchangeResult.sale.total)}
+                          </p>
+                        </div>
+                      )}
+
+                      {exchangeResult.creditBalance > 0 && (
+                        <p className="text-sm text-orange-600 dark:text-orange-400">
+                          Crédito a favor del cliente:{" "}
+                          {formatPrice(exchangeResult.creditBalance)}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-lg font-medium text-muted-foreground">
+                        {saleNumber}
+                      </p>
+                      <p className="text-3xl font-bold">{formatPrice(total)}</p>
+                    </>
+                  )}
                 </div>
 
                 <div className="fade-in slide-in-from-bottom-2 flex w-full max-w-sm animate-in flex-col gap-4 fill-mode-both pt-2 delay-200 duration-300">
@@ -618,16 +842,20 @@ export function CheckoutDialog({
                       <Gift className="mr-1.5 h-4 w-4" />
                       Ticket de cambio
                     </Button>
-                    <Link href="/ventas/348758734">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground"
+                    {(exchangeResult?.sale || saleNumber) && (
+                      <Link
+                        href={`/ventas/${exchangeResult?.sale?.id || saleNumber}`}
                       >
-                        <ExternalLink className="mr-1.5 h-4 w-4" />
-                        Ver detalles
-                      </Button>
-                    </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground"
+                        >
+                          <ExternalLink className="mr-1.5 h-4 w-4" />
+                          Ver detalles
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -647,8 +875,13 @@ export function CheckoutDialog({
         ) : (
           <>
             <SheetHeader className="gap-0.5 p-4">
-              <SheetTitle className="text-base">
-                Confirmar venta a {customer.name}
+              <SheetTitle className="text-base flex items-center gap-2">
+                {isExchangeMode && (
+                  <ArrowLeftRight className="h-4 w-4 text-orange-500" />
+                )}
+                {isExchangeMode
+                  ? `Confirmar cambio - ${exchangeData?.originalSaleNumber}`
+                  : `Confirmar venta a ${customer.name}`}
               </SheetTitle>
             </SheetHeader>
 
@@ -986,7 +1219,7 @@ export function CheckoutDialog({
                               onClick={() => {
                                 // Find the transfer payment method and switch to it
                                 const transferMethod = paymentMethods.find(
-                                  (m) => m.type === "TRANSFERENCIA"
+                                  (m) => m.type === "TRANSFERENCIA",
                                 );
                                 if (transferMethod) {
                                   setSelectedPaymentMethod(transferMethod.id);
@@ -1062,7 +1295,10 @@ export function CheckoutDialog({
                                     .slice(0, 4);
                                   setCardCupon(value);
                                   // Auto-advance cuando ambos tienen 4 dígitos
-                                  if (value.length === 4 && cardLote.length === 4) {
+                                  if (
+                                    value.length === 4 &&
+                                    cardLote.length === 4
+                                  ) {
                                     setTimeout(() => {
                                       if (isFromSplitPayment) {
                                         handleCompleteSplitPaymentWithReference();
@@ -1126,13 +1362,16 @@ export function CheckoutDialog({
                               id="paymentReference"
                               type="text"
                               value={paymentReference}
-                              onChange={(e) => setPaymentReference(e.target.value)}
+                              onChange={(e) =>
+                                setPaymentReference(e.target.value)
+                              }
                               placeholder="Ej: CBU, número de operación..."
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                               autoFocus
                             />
                             <p className="text-xs text-muted-foreground">
-                              Opcional: ingresá un dato para identificar la transferencia
+                              Opcional: ingresá un dato para identificar la
+                              transferencia
                             </p>
                           </div>
 
@@ -1260,29 +1499,149 @@ export function CheckoutDialog({
 
                   <Separator />
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>{formatPrice(totals.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      {hasGlobalDiscount && (
-                        <>
-                          <span>
-                            Descuento global
-                            {globalDiscount?.type === "percentage" &&
-                              ` (${globalDiscount.value}%)`}
+                  {/* Exchange mode totals */}
+                  {isExchangeMode && exchangeTotals ? (
+                    <div className="space-y-3">
+                      {/* New products */}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Productos nuevos
+                        </span>
+                        <span>
+                          {formatPrice(exchangeTotals.newProductsTotal)}
+                        </span>
+                      </div>
+
+                      {/* Return credit */}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-red-600 dark:text-red-400">
+                          Crédito por devolución
+                        </span>
+                        <span className="text-red-600 dark:text-red-400">
+                          -{formatPrice(exchangeTotals.returnTotal)}
+                        </span>
+                      </div>
+
+                      <Separator />
+
+                      {/* Balance before NC */}
+                      <div className="flex justify-between text-sm font-medium">
+                        <span>
+                          {exchangeTotals.isInFavorOfCustomer
+                            ? "Crédito a favor"
+                            : "Subtotal a pagar"}
+                        </span>
+                        <span
+                          className={
+                            exchangeTotals.isInFavorOfCustomer
+                              ? "text-red-600 dark:text-red-400"
+                              : ""
+                          }
+                        >
+                          {exchangeTotals.isInFavorOfCustomer ? "-" : ""}
+                          {formatPrice(Math.abs(exchangeTotals.balance))}
+                        </span>
+                      </div>
+
+                      {/* Available credit notes (only if customer has to pay) */}
+                      {!exchangeTotals.isInFavorOfCustomer &&
+                        availableCreditNotes.length > 0 && (
+                          <div className="space-y-2 rounded-lg border p-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                              Notas de crédito disponibles
+                            </p>
+                            {availableCreditNotes.map((nc) => (
+                              <div
+                                key={nc.id}
+                                className="flex items-center gap-2"
+                              >
+                                <Checkbox
+                                  id={`nc-${nc.id}`}
+                                  checked={selectedCreditNotes.has(nc.id)}
+                                  onCheckedChange={() =>
+                                    toggleCreditNote(nc.id, nc.availableBalance)
+                                  }
+                                  disabled={
+                                    !selectedCreditNotes.has(nc.id) &&
+                                    exchangeAmountToPay <= 0
+                                  }
+                                />
+                                <Label
+                                  htmlFor={`nc-${nc.id}`}
+                                  className="flex flex-1 cursor-pointer items-center justify-between text-sm"
+                                >
+                                  <span className="text-red-600 dark:text-red-400">
+                                    {nc.saleNumber}
+                                  </span>
+                                  <span className="text-red-600 dark:text-red-400">
+                                    -{formatPrice(nc.availableBalance)}
+                                  </span>
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      {/* Applied NC total */}
+                      {totalSelectedCreditNotes > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-red-600 dark:text-red-400">
+                            NC aplicadas
                           </span>
-                          <span>-{formatPrice(totals.globalDiscount)}</span>
-                        </>
+                          <span className="text-red-600 dark:text-red-400">
+                            -{formatPrice(totalSelectedCreditNotes)}
+                          </span>
+                        </div>
                       )}
+
+                      <Separator />
+
+                      {/* Final amount to pay */}
+                      <div className="flex justify-between text-lg font-semibold">
+                        <span>
+                          {exchangeTotals.isInFavorOfCustomer
+                            ? "Crédito final"
+                            : "Total a pagar"}
+                        </span>
+                        <span
+                          className={
+                            exchangeTotals.isInFavorOfCustomer ||
+                            exchangeAmountToPay === 0
+                              ? "text-green-600 dark:text-green-400"
+                              : ""
+                          }
+                        >
+                          {exchangeTotals.isInFavorOfCustomer
+                            ? formatPrice(Math.abs(exchangeTotals.balance))
+                            : formatPrice(exchangeAmountToPay)}
+                        </span>
+                      </div>
                     </div>
-                    <Separator />
-                    <div className="flex justify-between text-lg font-semibold">
-                      <span>Total</span>
-                      <span>{formatPrice(total)}</span>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>{formatPrice(totals.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        {hasGlobalDiscount && (
+                          <>
+                            <span>
+                              Descuento global
+                              {globalDiscount?.type === "percentage" &&
+                                ` (${globalDiscount.value}%)`}
+                            </span>
+                            <span>-{formatPrice(totals.globalDiscount)}</span>
+                          </>
+                        )}
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-lg font-semibold">
+                        <span>Total</span>
+                        <span>{formatPrice(total)}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2 pb-2">
                     <Button
@@ -1291,19 +1650,31 @@ export function CheckoutDialog({
                       className="h-12 w-full text-base font-medium"
                       disabled={
                         isSubmitting ||
-                        currentView === "payment-list" ||
-                        currentView === "card-select" ||
-                        currentView === "card-form" ||
-                        currentView === "reference-form" ||
-                        (currentView === "payment-form" &&
-                          !selectedPaymentMethod) ||
-                        (currentView === "split-payment" && !isPaymentComplete)
+                        (isExchangeMode
+                          ? // Exchange mode: allow if balance <= 0 OR if there's a payment method selected
+                            exchangeTotals?.isInFavorOfCustomer
+                            ? false
+                            : exchangeAmountToPay > 0 &&
+                              currentView === "payment-list"
+                          : // Normal sale mode
+                            currentView === "payment-list" ||
+                            currentView === "card-select" ||
+                            currentView === "card-form" ||
+                            currentView === "reference-form" ||
+                            (currentView === "payment-form" &&
+                              !selectedPaymentMethod) ||
+                            (currentView === "split-payment" &&
+                              !isPaymentComplete))
                       }
                     >
                       {isSubmitting && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       )}
-                      {isSubmitting ? "Confirmando..." : "Confirmar venta"}
+                      {isSubmitting
+                        ? "Confirmando..."
+                        : isExchangeMode
+                          ? "Confirmar cambio"
+                          : "Confirmar venta"}
                     </Button>
                   </div>
                 </div>
