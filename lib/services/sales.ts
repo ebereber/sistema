@@ -436,6 +436,13 @@ export interface SaleWithDetails {
       fee_fixed: number;
     } | null;
   }[];
+  credit_notes: {
+    id: string;
+    sale_number: string;
+    total: number;
+    created_at: string;
+  }[];
+  related_sale_id: string | null;
 }
 
 /**
@@ -459,7 +466,8 @@ export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
       payments(
         *,
         payment_method:payment_methods(id, name, type, fee_percentage, fee_fixed)
-      )
+      ),
+      credit_notes:sales!related_sale_id(id, sale_number, total, created_at)
     `,
     )
     .eq("id", id)
@@ -500,6 +508,7 @@ export interface SaleListItem {
   status: "COMPLETED" | "PENDING" | "CANCELLED";
   voucher_type: string;
   total: number;
+  related_sale_id: string | null; // Si es NC, apunta a la venta original
   customer: {
     id: string;
     name: string;
@@ -508,6 +517,11 @@ export interface SaleListItem {
     id: string;
     name: string | null;
   } | null;
+  credit_notes: {
+    id: string;
+    sale_number: string;
+    total: number;
+  }[];
 }
 
 export interface GetSalesParams {
@@ -563,7 +577,8 @@ export async function getSales(
       voucher_type,
       total,
       customer:customers(id, name),
-      seller:users!sales_seller_id_fkey(id, name)
+      seller:users!sales_seller_id_fkey(id, name),
+       credit_notes:sales(id, sale_number, total)
     `,
       { count: "exact" },
     )
@@ -627,8 +642,10 @@ export async function getSales(
     status: item.status,
     voucher_type: item.voucher_type,
     total: item.total,
+    related_sale_id: item.related_sale_id,
     customer: item.customer as SaleListItem["customer"],
     seller: item.seller as SaleListItem["seller"],
+    credit_notes: (item.credit_notes || []) as SaleListItem["credit_notes"],
   }));
 
   return {
@@ -686,6 +703,7 @@ export async function getSaleItemsForDuplicate(
     price: item.unit_price,
     quantity: item.quantity,
     taxRate: item.tax_rate,
-    imageUrl: (item.product as { image_url: string | null } | null)?.image_url || null,
+    imageUrl:
+      (item.product as { image_url: string | null } | null)?.image_url || null,
   }));
 }

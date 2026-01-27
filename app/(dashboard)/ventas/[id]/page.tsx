@@ -8,7 +8,7 @@ import {
   CreditCard,
   Download,
   File,
-  Loader2,
+  FileText,
   Mail,
   MapPin,
   Package,
@@ -23,7 +23,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { AddNoteDialog } from "@/components/ventas/add-note-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -35,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AddNoteDialog } from "@/components/ventas/add-note-dialog";
 import {
   getSaleById,
   updateSaleNotes,
@@ -465,9 +465,7 @@ export default function VentasDetailPage() {
                         </div>
                         <div className="mt-2">
                           <div className="flex items-center justify-between text-sm">
-                            <div>
-                              {payment.payment_method?.type || "Otro"}
-                            </div>
+                            <div>{payment.payment_method?.type || "Otro"}</div>
                             <div>{formatCurrency(payment.amount)}</div>
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">
@@ -480,6 +478,53 @@ export default function VentasDetailPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Credit Notes */}
+              {sale.credit_notes && sale.credit_notes.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <FileText className="size-4" />
+                      Notas de crédito asociadas
+                    </div>
+                    <div className="space-y-0">
+                      {sale.credit_notes.map((nc) => (
+                        <div
+                          key={nc.id}
+                          className="border-b py-3 last:border-b-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                href={`/ventas/${nc.id}`}
+                                className="text-sm font-medium text-primary hover:underline"
+                              >
+                                {nc.sale_number}
+                              </Link>
+                              <span className="text-xs text-muted-foreground">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      {formatRelativeDate(nc.created_at)}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {formatFullDate(nc.created_at)}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium text-destructive">
+                              -{formatCurrency(nc.total)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -504,7 +549,9 @@ export default function VentasDetailPage() {
                     {sale.customer.name}
                   </Link>
                 ) : (
-                  <span className="text-lg font-semibold">Consumidor Final</span>
+                  <span className="text-lg font-semibold">
+                    Consumidor Final
+                  </span>
                 )}
               </div>
 
@@ -561,76 +608,78 @@ export default function VentasDetailPage() {
           </Card>
 
           {/* Profitability Card */}
-          <Card className="py-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="size-4 text-muted-foreground" />
-                Rentabilidad
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableBody className="text-muted-foreground">
-                  <TableRow>
-                    <TableCell className="font-medium">
-                      Total Facturado
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(sale.total)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div className="flex items-center gap-1">
-                              Comision por cobro
-                              <CircleHelp className="size-3" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Comision aplicada por el metodo de pago
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      -{formatCurrency(paymentFee)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <div className="flex items-center gap-1">
-                              CMV
-                              <CircleHelp className="size-3" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Costo de Mercaderia Vendida
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      -{formatCurrency(cmv)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow className="border-t-2 text-primary">
-                    <TableCell className="text-lg font-semibold">
-                      Ganancia Bruta
-                    </TableCell>
-                    <TableCell className="text-right text-lg font-bold">
-                      {formatCurrency(grossProfit)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {!sale.voucher_type.startsWith("NOTA_CREDITO") && (
+            <Card className="py-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="size-4 text-muted-foreground" />
+                  Rentabilidad
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableBody className="text-muted-foreground">
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        Total Facturado
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(sale.total)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className="flex items-center gap-1">
+                                Comision por cobro
+                                <CircleHelp className="size-3" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Comision aplicada por el metodo de pago
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        -{formatCurrency(paymentFee)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className="flex items-center gap-1">
+                                CMV
+                                <CircleHelp className="size-3" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Costo de Mercaderia Vendida
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        -{formatCurrency(cmv)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="border-t-2 text-primary">
+                      <TableCell className="text-lg font-semibold">
+                        Ganancia Bruta
+                      </TableCell>
+                      <TableCell className="text-right text-lg font-bold">
+                        {formatCurrency(grossProfit)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

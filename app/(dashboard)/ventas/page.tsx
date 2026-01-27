@@ -72,6 +72,7 @@ import {
   type GetSalesParams,
   type SaleListItem,
 } from "@/lib/services/sales";
+import { cn } from "@/lib/utils";
 
 export default function VentasPage() {
   const router = useRouter();
@@ -354,9 +355,7 @@ export default function VentasPage() {
                     <Select
                       value={datePeriod}
                       onValueChange={(v) =>
-                        setDatePeriod(
-                          v as "last" | "next" | "before" | "after",
-                        )
+                        setDatePeriod(v as "last" | "next" | "before" | "after")
                       }
                     >
                       <SelectTrigger>
@@ -675,14 +674,47 @@ export default function VentasPage() {
                   {sales.map((sale) => (
                     <TableRow
                       key={sale.id}
-                      className="cursor-pointer"
+                      className={cn(
+                        "cursor-pointer",
+                        sale.voucher_type.startsWith("NOTA_CREDITO") &&
+                          "bg-red-50 dark:bg-red-950/20",
+                      )}
                       onClick={() => handleRowClick(sale.id)}
                     >
                       <TableCell className="text-left">
-                        <div className="flex items-center gap-2">
-                          <div className="font-mono text-sm text-blue-500">
+                        <div className="flex flex-col">
+                          <span
+                            className={cn(
+                              "font-mono text-sm",
+                              sale.voucher_type.startsWith("NOTA_CREDITO")
+                                ? "text-red-500"
+                                : "text-blue-500",
+                            )}
+                          >
                             {sale.sale_number}
-                          </div>
+                          </span>
+
+                          {/* Mostrar si tiene NC asociada */}
+                          {sale.credit_notes &&
+                            sale.credit_notes.length > 0 && (
+                              <span className="text-xs text-red-500">
+                                Anulada:{" "}
+                                {sale.credit_notes
+                                  .map((nc) => nc.sale_number)
+                                  .join(", ")}
+                              </span>
+                            )}
+
+                          {/* Si ES una NC, mostrar link a la original */}
+                          {sale.related_sale_id && (
+                            <Link
+                              href={`/ventas/${sale.related_sale_id}`}
+                              className="text-xs text-muted-foreground hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              NC de venta original
+                            </Link>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-left">
@@ -734,7 +766,9 @@ export default function VentasPage() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/ventas/nueva?duplicateId=${sale.id}`);
+                                router.push(
+                                  `/ventas/nueva?duplicateId=${sale.id}`,
+                                );
                               }}
                             >
                               <Copy className="size-4" />
@@ -823,7 +857,9 @@ export default function VentasPage() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/ventas/nueva?duplicateId=${sale.id}`);
+                              router.push(
+                                `/ventas/nueva?duplicateId=${sale.id}`,
+                              );
                             }}
                           >
                             <Copy className="size-4" />
