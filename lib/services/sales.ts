@@ -443,6 +443,35 @@ export interface SaleWithDetails {
     created_at: string;
   }[];
   related_sale_id: string | null;
+  // NC que anulan esta venta (ya existe)
+  credit_notes: {
+    id: string;
+    sale_number: string;
+    total: number;
+    created_at: string;
+  }[];
+
+  // Para NC: ventas donde se aplicó esta NC
+  applied_to_sales: {
+    id: string;
+    amount: number;
+    created_at: string;
+    applied_to_sale: {
+      id: string;
+      sale_number: string;
+    };
+  }[];
+
+  // Para ventas: NC que se usaron como pago
+  applied_credit_notes: {
+    id: string;
+    amount: number;
+    created_at: string;
+    credit_note: {
+      id: string;
+      sale_number: string;
+    };
+  }[];
 }
 
 /**
@@ -467,7 +496,19 @@ export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
         *,
         payment_method:payment_methods(id, name, type, fee_percentage, fee_fixed)
       ),
-      credit_notes:sales!related_sale_id(id, sale_number, total, created_at)
+      credit_notes:sales!related_sale_id(id, sale_number, total, created_at),
+      applied_to_sales:credit_note_applications!credit_note_applications_credit_note_id_fkey(
+        id,
+        amount,
+        created_at,
+        applied_to_sale:sales!credit_note_applications_applied_to_sale_id_fkey(id, sale_number)
+      ),
+      applied_credit_notes:credit_note_applications!credit_note_applications_applied_to_sale_id_fkey(
+        id,
+        amount,
+        created_at,
+        credit_note:sales!credit_note_applications_credit_note_id_fkey(id, sale_number)
+      )
     `,
     )
     .eq("id", id)
@@ -509,6 +550,7 @@ export interface SaleListItem {
   voucher_type: string;
   total: number;
   related_sale_id: string | null; // Si es NC, apunta a la venta original
+  availableBalance: number | null; // Solo para NC: saldo disponible
   customer: {
     id: string;
     name: string;
@@ -576,9 +618,10 @@ export async function getSales(
       status,
       voucher_type,
       total,
+      related_sale_id,
       customer:customers(id, name),
       seller:users!sales_seller_id_fkey(id, name),
-       credit_notes:sales(id, sale_number, total)
+      credit_notes:sales(id, sale_number, total)
     `,
       { count: "exact" },
     )
@@ -635,18 +678,44 @@ export async function getSales(
   if (error) throw error;
 
   // Map data to handle Supabase relation arrays
-  const mappedData: SaleListItem[] = (data || []).map((item) => ({
-    id: item.id,
-    sale_number: item.sale_number,
-    sale_date: item.sale_date,
-    status: item.status,
-    voucher_type: item.voucher_type,
-    total: item.total,
-    related_sale_id: item.related_sale_id,
-    customer: item.customer as SaleListItem["customer"],
-    seller: item.seller as SaleListItem["seller"],
-    credit_notes: (item.credit_notes || []) as SaleListItem["credit_notes"],
-  }));
+  const mappedData: SaleListItem[] = await Promise.all(
+    (data || []).map(async (item) => {
+      let availableBalance: number | null = null;
+
+      // Si es NC, calcular saldo disponible
+      if (item.voucher_type?.startsWith("NOTA_CREDITO")) {
+        const { data: apps } = await supabase
+          .from("credit_note_applications")
+          .select("amount")
+          .eq("credit_note_id", item.id);
+
+        const used = apps?.reduce((sum, a) => sum + Number(a.amount), 0) || 0;
+        availableBalance = item.total - used;
+      }
+
+      // Handle Supabase relation format (may return array for single relations)
+      const customerData = item.customer;
+      const customer = Array.isArray(customerData)
+        ? customerData[0]
+        : customerData;
+      const sellerData = item.seller;
+      const seller = Array.isArray(sellerData) ? sellerData[0] : sellerData;
+
+      return {
+        id: item.id,
+        sale_number: item.sale_number,
+        sale_date: item.sale_date,
+        status: item.status,
+        voucher_type: item.voucher_type,
+        total: item.total,
+        related_sale_id: item.related_sale_id,
+        availableBalance,
+        customer: (customer as SaleListItem["customer"]) || null,
+        seller: (seller as SaleListItem["seller"]) || null,
+        credit_notes: (item.credit_notes || []) as SaleListItem["credit_notes"],
+      };
+    }),
+  );
 
   return {
     data: mappedData,
@@ -668,7 +737,6 @@ export interface DuplicateSaleItem {
   price: number;
   quantity: number;
   taxRate: number;
-  imageUrl: string | null;
 }
 
 /**
@@ -703,8 +771,6 @@ export async function getSaleItemsForDuplicate(
     price: item.unit_price,
     quantity: item.quantity,
     taxRate: item.tax_rate,
-    imageUrl:
-      (item.product as { image_url: string | null } | null)?.image_url || null,
   }));
 }
 
@@ -1082,4 +1148,80 @@ export async function createExchange(
     sale,
     creditBalance,
   };
+}
+
+export async function cancelCreditNote(
+  creditNoteId: string,
+  revertStock: boolean,
+): Promise<void> {
+  const supabase = createClient();
+
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuario no autenticado");
+
+  // Get the credit note with its items
+  const { data: creditNote, error: ncError } = await supabase
+    .from("sales")
+    .select(
+      `
+      *,
+      items:sale_items(*)
+    `,
+    )
+    .eq("id", creditNoteId)
+    .single();
+
+  if (ncError) throw ncError;
+  if (!creditNote) throw new Error("Nota de crédito no encontrada");
+
+  // Verify it's a credit note
+  if (!creditNote.voucher_type.startsWith("NOTA_CREDITO")) {
+    throw new Error("El comprobante no es una nota de crédito");
+  }
+
+  // Check if NC has been applied to any sale
+  const { data: applications } = await supabase
+    .from("credit_note_applications")
+    .select("id, amount")
+    .eq("credit_note_id", creditNoteId);
+
+  if (applications && applications.length > 0) {
+    throw new Error(
+      "No se puede anular una nota de crédito que ya fue aplicada a una venta",
+    );
+  }
+
+  // Revert stock if requested
+  if (revertStock && creditNote.items) {
+    for (const item of creditNote.items) {
+      if (item.product_id) {
+        // NC increased stock, so we decrease it to revert
+        const { error: stockError } = await supabase.rpc("decrease_stock", {
+          p_product_id: item.product_id,
+          p_location_id: creditNote.location_id,
+          p_quantity: item.quantity,
+        });
+
+        if (stockError) {
+          console.error("Error revirtiendo stock:", stockError);
+        }
+      }
+    }
+  }
+
+  // Update the credit note status to CANCELLED
+  const { error: updateError } = await supabase
+    .from("sales")
+    .update({
+      status: "CANCELLED",
+      notes: creditNote.notes
+        ? `${creditNote.notes} | ANULADA el ${new Date().toLocaleDateString("es-AR")}`
+        : `ANULADA el ${new Date().toLocaleDateString("es-AR")}`,
+    })
+    .eq("id", creditNoteId);
+
+  if (updateError) throw updateError;
 }

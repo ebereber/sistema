@@ -19,6 +19,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  applyCreditNoteToSale,
   getAvailableCreditNotes,
   type AvailableCreditNote,
 } from "@/lib/services/credit-note-applications";
@@ -30,6 +31,7 @@ import {
   type PaymentInsert,
   type SaleItemInsert,
 } from "@/lib/services/sales";
+import { cn } from "@/lib/utils";
 import { parseArgentineCurrency } from "@/lib/utils/currency";
 import {
   calculateCartTotals,
@@ -43,6 +45,8 @@ import {
   type GlobalDiscount,
   type SelectedCustomer,
 } from "@/lib/validations/sale";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   ArrowLeftRight,
   Banknote,
@@ -330,9 +334,11 @@ export function CheckoutDialog({
   // Load available credit notes for exchange mode
   useEffect(() => {
     async function loadCreditNotes() {
+      console.log("Loading NC for customer:", customer.id);
       if (open && customer.id) {
         try {
           const notes = await getAvailableCreditNotes(customer.id);
+          console.log("NC loaded:", notes); // ← Agregá esto
           setAvailableCreditNotes(notes);
         } catch (error) {
           console.error("Error loading credit notes:", error);
@@ -555,9 +561,11 @@ export function CheckoutDialog({
           (sum, amt) => sum + amt,
           0,
         );
-        const remainingToPay = exchangeTotals
-          ? Math.max(0, exchangeTotals.balance - currentTotal)
-          : 0;
+        // Usar total de exchange o total normal
+        const totalToPay = exchangeTotals
+          ? Math.max(0, exchangeTotals.balance)
+          : total;
+        const remainingToPay = Math.max(0, totalToPay - currentTotal);
         const amountToApply = Math.min(availableBalance, remainingToPay);
         if (amountToApply > 0) {
           newMap.set(noteId, amountToApply);
@@ -595,35 +603,33 @@ export function CheckoutDialog({
         return null;
       };
 
-      // Preparar pagos
-      const payments: PaymentInsert[] =
-        currentView === "split-payment"
-          ? splitPayments.map((p) => ({
-              payment_method_id: p.methodId,
-              method_name: p.methodName,
-              amount: p.amount,
-              reference: p.reference || null,
-            }))
-          : selectedPaymentMethod
-            ? [
-                {
-                  payment_method_id: selectedPaymentMethod,
-                  method_name:
-                    paymentMethods.find((m) => m.id === selectedPaymentMethod)
-                      ?.name || "",
-                  amount: exchangeTotals
-                    ? Math.max(
-                        0,
-                        exchangeTotals.balance - totalSelectedCreditNotes,
-                      )
-                    : total,
-                  reference: buildPaymentReference(),
-                },
-              ]
-            : [];
-
       // Handle exchange mode
       if (isExchangeMode && exchangeData && exchangeTotals) {
+        // Preparar pagos para exchange
+        const exchangePayments: PaymentInsert[] =
+          currentView === "split-payment"
+            ? splitPayments.map((p) => ({
+                payment_method_id: p.methodId,
+                method_name: p.methodName,
+                amount: p.amount,
+                reference: p.reference || null,
+              }))
+            : selectedPaymentMethod
+              ? [
+                  {
+                    payment_method_id: selectedPaymentMethod,
+                    method_name:
+                      paymentMethods.find((m) => m.id === selectedPaymentMethod)
+                        ?.name || "",
+                    amount: Math.max(
+                      0,
+                      exchangeTotals.balance - totalSelectedCreditNotes,
+                    ),
+                    reference: buildPaymentReference(),
+                  },
+                ]
+              : [];
+
         const appliedCreditNotes = Array.from(
           selectedCreditNotes.entries(),
         ).map(([creditNoteId, amount]) => ({
@@ -638,7 +644,7 @@ export function CheckoutDialog({
           payments:
             exchangeTotals.balance > 0 &&
             exchangeTotals.balance - totalSelectedCreditNotes > 0
-              ? payments
+              ? exchangePayments
               : [],
           appliedCreditNotes,
           locationId: location.id,
@@ -660,7 +666,36 @@ export function CheckoutDialog({
         return;
       }
 
-      // Standard sale flow
+      // ✅ Standard sale flow (con soporte para NC)
+
+      // Calcular monto real a pagar (total - NC aplicadas)
+      const amountAfterCreditNotes = Math.max(
+        0,
+        total - totalSelectedCreditNotes,
+      );
+
+      // Preparar pagos - usar monto reducido si hay NC aplicadas
+      const payments: PaymentInsert[] =
+        currentView === "split-payment"
+          ? splitPayments.map((p) => ({
+              payment_method_id: p.methodId,
+              method_name: p.methodName,
+              amount: p.amount,
+              reference: p.reference || null,
+            }))
+          : selectedPaymentMethod && amountAfterCreditNotes > 0
+            ? [
+                {
+                  payment_method_id: selectedPaymentMethod,
+                  method_name:
+                    paymentMethods.find((m) => m.id === selectedPaymentMethod)
+                      ?.name || "",
+                  amount: amountAfterCreditNotes,
+                  reference: buildPaymentReference(),
+                },
+              ]
+            : [];
+
       const saleData = {
         customer_id: customer.id || null,
         subtotal,
@@ -693,6 +728,13 @@ export function CheckoutDialog({
 
       // Guardar venta
       const sale = await createSale(saleData, items, payments, location.id);
+
+      // ✅ Registrar aplicación de NC (si hay)
+      if (totalSelectedCreditNotes > 0 && selectedCreditNotes.size > 0) {
+        for (const [creditNoteId, amount] of selectedCreditNotes.entries()) {
+          await applyCreditNoteToSale(creditNoteId, sale.id, amount);
+        }
+      }
 
       setSaleNumber(sale.sale_number);
       setCurrentView("confirmation");
@@ -731,9 +773,20 @@ export function CheckoutDialog({
   const isAmountValid = currentAmount > 0 && currentAmount <= remaining;
   const isPaymentComplete = Math.abs(remaining) < 0.1; // Usar tolerancia para decimales
 
+  const finalAmountToPay = isExchangeMode
+    ? exchangeAmountToPay
+    : Math.max(0, total - totalSelectedCreditNotes);
+
+  const needsPayment = finalAmountToPay > 0 && !isPending;
+
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="h-[95vh] w-full">
+      <SheetContent
+        side={needsPayment ? "bottom" : "right"}
+        className={cn(
+          needsPayment ? "h-[95vh] w-full" : "h-full w-full max-w-md",
+        )}
+      >
         <SheetDescription className="hidden"></SheetDescription>
         {currentView === "confirmation" ? (
           <>
@@ -886,575 +939,593 @@ export function CheckoutDialog({
             </SheetHeader>
 
             <form
-              className="flex flex-1 flex-col overflow-hidden px-4"
+              className={cn(
+                needsPayment
+                  ? "flex flex-1 flex-col overflow-hidden px-4"
+                  : "flex  flex-col overflow-hidden px-4",
+              )}
               onSubmit={async (e) => {
                 e.preventDefault();
                 await handleConfirm();
               }}
             >
-              <div className="flex flex-1 flex-col gap-6 overflow-y-auto pt-0.5 lg:flex-row">
-                {/* Panel izquierdo */}
-                <div className="flex-1 px-0.5">
-                  <Card className="gap-0 py-4">
-                    {/* Vista: Lista de medios de pago */}
-                    {currentView === "payment-list" && (
-                      <>
-                        <CardHeader className="px-4">
-                          <CardDescription>
-                            Seleccioná el medio de pago
-                          </CardDescription>
-                          <div className="col-start-2 row-span-2 row-start-1 mr-2 flex items-center gap-2 self-start justify-self-end">
-                            <Checkbox
-                              id="fullAmountPending"
-                              checked={isPending}
-                              onCheckedChange={(checked) =>
-                                setIsPending(checked === true)
-                              }
-                            />
-                            <Label
-                              htmlFor="fullAmountPending"
-                              className="cursor-pointer text-sm leading-none"
-                            >
-                              Pendiente de pago
-                            </Label>
-                          </div>
-                        </CardHeader>
-
-                        <CardContent className="p-2">
-                          <ItemGroup role="list">
-                            {paymentMethods.map((method) => (
-                              <Item
-                                variant="default"
-                                key={method.id}
-                                onClick={() =>
-                                  handlePaymentMethodClick(method.id)
+              <div
+                className={cn(
+                  "flex flex-1 flex-col gap-6 overflow-y-auto pt-0.5",
+                  needsPayment ? "lg:flex-row" : "items-center justify-center",
+                )}
+              >
+                {/* Panel izquierdo - Solo mostrar si necesita pago */}
+                {needsPayment && (
+                  <div className="flex-1 px-0.5">
+                    <Card className="gap-0 py-4">
+                      {/* Vista: Lista de medios de pago */}
+                      {currentView === "payment-list" && (
+                        <>
+                          <CardHeader className="px-4">
+                            <CardDescription>
+                              Seleccioná el medio de pago
+                            </CardDescription>
+                            <div className="col-start-2 row-span-2 row-start-1 mr-2 flex items-center gap-2 self-start justify-self-end">
+                              <Checkbox
+                                id="fullAmountPending"
+                                checked={isPending}
+                                onCheckedChange={(checked) =>
+                                  setIsPending(checked === true)
                                 }
+                              />
+                              <Label
+                                htmlFor="fullAmountPending"
+                                className="cursor-pointer text-sm leading-none"
                               >
-                                <ItemMedia variant="icon">
-                                  <method.icon className="size-4" />
-                                </ItemMedia>
-                                <ItemContent>
-                                  <ItemTitle>{method.name}</ItemTitle>
-                                </ItemContent>
-                                <ItemActions>
-                                  <ChevronRight className="size-4 text-muted-foreground" />
-                                </ItemActions>
-                              </Item>
-                            ))}
+                                Pendiente de pago
+                              </Label>
+                            </div>
+                          </CardHeader>
 
-                            <Item
-                              className="mt-2"
-                              variant="outline"
-                              onClick={handleSplitPayment}
-                            >
-                              <ItemMedia>
-                                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted">
-                                  <ListTodo className="size-5" />
-                                </div>
-                              </ItemMedia>
-                              <ItemContent>
-                                <ItemTitle>Dividir pago</ItemTitle>
-                              </ItemContent>
-                              <ItemActions>
-                                <kbd className="pointer-events-none hidden h-5 min-w-5 select-none items-center justify-center gap-1 rounded-sm border border-muted-foreground/30 px-1 font-sans text-xs font-medium text-muted-foreground md:block">
-                                  0
-                                </kbd>
-                                <ChevronRight className="size-4 text-muted-foreground" />
-                              </ItemActions>
-                            </Item>
-                          </ItemGroup>
-                        </CardContent>
-                      </>
-                    )}
-
-                    {/* Vista: Pago dividido */}
-                    {currentView === "split-payment" && (
-                      <>
-                        <CardHeader className="flex flex-row items-center justify-between px-4">
-                          <CardDescription className="flex items-center gap-1">
-                            Pago {splitPayments.length + 1}
-                          </CardDescription>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleBack}
-                          >
-                            <ChevronLeft className="mr-1 h-4 w-4" />
-                            {isPaymentComplete
-                              ? "Editar"
-                              : splitPayments.length === 0
-                                ? "Atrás"
-                                : "Atrás"}
-                          </Button>
-                        </CardHeader>
-
-                        <CardContent className="space-y-4 px-4">
-                          {/* Mostrar pagos anteriores */}
-                          {!isPaymentComplete && splitPayments.length > 0 && (
-                            <div className="space-y-2">
-                              {splitPayments.map((payment, index) => (
+                          <CardContent className="p-2">
+                            <ItemGroup role="list">
+                              {paymentMethods.map((method) => (
                                 <Item
-                                  key={payment.id}
-                                  variant="muted"
-                                  className="bg-muted/50"
+                                  variant="default"
+                                  key={method.id}
+                                  onClick={() =>
+                                    handlePaymentMethodClick(method.id)
+                                  }
                                 >
                                   <ItemMedia variant="icon">
-                                    {(() => {
-                                      const method = paymentMethods.find(
-                                        (m) => m.id === payment.methodId,
-                                      );
-                                      const Icon = method?.icon || DollarSign;
-                                      return <Icon className="h-4 w-4" />;
-                                    })()}
+                                    <method.icon className="size-4" />
                                   </ItemMedia>
                                   <ItemContent>
-                                    <ItemTitle>
-                                      <span className="text-muted-foreground">
-                                        Pago {index + 1}
-                                      </span>{" "}
-                                      {payment.methodName}
-                                    </ItemTitle>
+                                    <ItemTitle>{method.name}</ItemTitle>
                                   </ItemContent>
                                   <ItemActions>
-                                    <span className="font-medium">
-                                      {formatPrice(payment.amount)}
-                                    </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="size-6 text-muted-foreground hover:text-destructive"
-                                      onClick={() =>
-                                        handleRemoveSplitPayment(payment.id)
-                                      }
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
+                                    <ChevronRight className="size-4 text-muted-foreground" />
                                   </ItemActions>
                                 </Item>
                               ))}
 
-                              <div className="mt-2 flex justify-between border-t pt-2">
-                                <span className="text-muted-foreground">
-                                  Restante:
-                                </span>
-                                <span className="text-lg font-bold">
-                                  {formatPrice(remaining)}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Formulario de nuevo pago */}
-                          {!isPaymentComplete && (
-                            <div className="fade-in animate-in space-y-6 duration-300">
-                              <div className="space-y-2">
-                                <Label>Monto a pagar</Label>
-                                <CurrencyInput
-                                  value={currentSplitAmount}
-                                  onValueChange={(value) =>
-                                    setCurrentSplitAmount(value.toFixed(2))
-                                  }
-                                  placeholder="$"
-                                  className="h-10 font-medium md:text-lg"
-                                  isAllowed={(values) =>
-                                    values.floatValue == null ||
-                                    values.floatValue <= remaining
-                                  }
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                  Total restante: {formatPrice(remaining)}
-                                </p>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label>Seleccionar método</Label>
-                                <fieldset
-                                  className="m-0 border-0 p-0"
-                                  disabled={!isAmountValid}
-                                  style={
-                                    !isAmountValid
-                                      ? {
-                                          pointerEvents: "none",
-                                          opacity: 0.5,
-                                          filter: "grayscale(1)",
-                                        }
-                                      : {}
-                                  }
-                                >
-                                  <ItemGroup role="list">
-                                    {paymentMethods.map((method) => (
-                                      <Item
-                                        variant="default"
-                                        key={method.id}
-                                        onClick={() =>
-                                          handlePaymentMethodClick(method.id)
-                                        }
-                                      >
-                                        <ItemMedia variant="icon">
-                                          <method.icon className="size-4" />
-                                        </ItemMedia>
-                                        <ItemContent>
-                                          <ItemTitle>{method.name}</ItemTitle>
-                                        </ItemContent>
-                                        <ItemActions>
-                                          <ChevronRight className="size-4 text-muted-foreground" />
-                                        </ItemActions>
-                                      </Item>
-                                    ))}
-                                  </ItemGroup>
-                                </fieldset>
-                              </div>
-
-                              {splitPayments.length > 0 && (
-                                <div className="pt-4">
-                                  <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    type="button"
-                                    onClick={() =>
-                                      setIsAddingPartialPayment(true)
-                                    }
-                                  >
-                                    Marcar como pago parcial
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Vista final de resumen */}
-                          {isPaymentComplete && splitPayments.length > 0 && (
-                            <div className="space-y-2">
-                              <ItemGroup role="list" className="space-y-2">
-                                {splitPayments.map((payment) => {
-                                  const method = paymentMethods.find(
-                                    (m) => m.id === payment.methodId,
-                                  );
-                                  const Icon = method?.icon || DollarSign;
-                                  return (
-                                    <Item
-                                      key={payment.id}
-                                      variant="muted"
-                                      className="bg-muted/50"
-                                    >
-                                      <ItemMedia variant="icon">
-                                        <Icon className="h-4 w-4" />
-                                      </ItemMedia>
-                                      <ItemContent>
-                                        <ItemTitle>
-                                          {payment.methodName}
-                                        </ItemTitle>
-                                      </ItemContent>
-                                      <ItemActions>
-                                        <span className="font-medium">
-                                          {formatPrice(payment.amount)}
-                                        </span>
-                                      </ItemActions>
-                                    </Item>
-                                  );
-                                })}
-                              </ItemGroup>
-                            </div>
-                          )}
-                        </CardContent>
-                      </>
-                    )}
-
-                    {/* Vista: Selección de tipo de tarjeta */}
-                    {currentView === "card-select" && (
-                      <>
-                        <CardHeader className="flex flex-row items-center justify-between px-4">
-                          <CardDescription>
-                            Seleccioná el tipo de tarjeta
-                          </CardDescription>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleBack}
-                          >
-                            <ChevronLeft className="mr-1 h-4 w-4" />
-                            Atrás
-                          </Button>
-                        </CardHeader>
-
-                        <CardContent className="space-y-4 px-4">
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            {CARD_TYPES.map((card) => (
-                              <button
-                                key={card.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCardType(card);
-                                  setCurrentView("card-form");
-                                }}
-                                className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-muted/50"
+                              <Item
+                                className="mt-2"
+                                variant="outline"
+                                onClick={handleSplitPayment}
                               >
-                                <Image
-                                  src={card.icon}
-                                  alt={card.name}
-                                  width={48}
-                                  height={32}
-                                  className="h-8 w-auto object-contain"
-                                />
-                                <span className="text-center text-xs font-medium">
-                                  {card.name}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
+                                <ItemMedia>
+                                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted">
+                                    <ListTodo className="size-5" />
+                                  </div>
+                                </ItemMedia>
+                                <ItemContent>
+                                  <ItemTitle>Dividir pago</ItemTitle>
+                                </ItemContent>
+                                <ItemActions>
+                                  <kbd className="pointer-events-none hidden h-5 min-w-5 select-none items-center justify-center gap-1 rounded-sm border border-muted-foreground/30 px-1 font-sans text-xs font-medium text-muted-foreground md:block">
+                                    0
+                                  </kbd>
+                                  <ChevronRight className="size-4 text-muted-foreground" />
+                                </ItemActions>
+                              </Item>
+                            </ItemGroup>
+                          </CardContent>
+                        </>
+                      )}
 
-                          <Separator />
+                      {/* Vista: Pago dividido */}
+                      {currentView === "split-payment" && (
+                        <>
+                          <CardHeader className="flex flex-row items-center justify-between px-4">
+                            <CardDescription className="flex items-center gap-1">
+                              Pago {splitPayments.length + 1}
+                            </CardDescription>
 
-                          <div>
-                            <p className="mb-3 text-sm text-muted-foreground">
-                              O pagar con QR / Transferencia
-                            </p>
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleBack}
+                            >
+                              <ChevronLeft className="mr-1 h-4 w-4" />
+                              {isPaymentComplete
+                                ? "Editar"
+                                : splitPayments.length === 0
+                                  ? "Atrás"
+                                  : "Atrás"}
+                            </Button>
+                          </CardHeader>
+
+                          <CardContent className="space-y-4 px-4">
+                            {/* Mostrar pagos anteriores */}
+                            {!isPaymentComplete && splitPayments.length > 0 && (
+                              <div className="space-y-2">
+                                {splitPayments.map((payment, index) => (
+                                  <Item
+                                    key={payment.id}
+                                    variant="muted"
+                                    className="bg-muted/50"
+                                  >
+                                    <ItemMedia variant="icon">
+                                      {(() => {
+                                        const method = paymentMethods.find(
+                                          (m) => m.id === payment.methodId,
+                                        );
+                                        const Icon = method?.icon || DollarSign;
+                                        return <Icon className="h-4 w-4" />;
+                                      })()}
+                                    </ItemMedia>
+                                    <ItemContent>
+                                      <ItemTitle>
+                                        <span className="text-muted-foreground">
+                                          Pago {index + 1}
+                                        </span>{" "}
+                                        {payment.methodName}
+                                      </ItemTitle>
+                                    </ItemContent>
+                                    <ItemActions>
+                                      <span className="font-medium">
+                                        {formatPrice(payment.amount)}
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6 text-muted-foreground hover:text-destructive"
+                                        onClick={() =>
+                                          handleRemoveSplitPayment(payment.id)
+                                        }
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </ItemActions>
+                                  </Item>
+                                ))}
+
+                                <div className="mt-2 flex justify-between border-t pt-2">
+                                  <span className="text-muted-foreground">
+                                    Restante:
+                                  </span>
+                                  <span className="text-lg font-bold">
+                                    {formatPrice(remaining)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Formulario de nuevo pago */}
+                            {!isPaymentComplete && (
+                              <div className="fade-in animate-in space-y-6 duration-300">
+                                <div className="space-y-2">
+                                  <Label>Monto a pagar</Label>
+                                  <CurrencyInput
+                                    value={currentSplitAmount}
+                                    onValueChange={(value) =>
+                                      setCurrentSplitAmount(value.toFixed(2))
+                                    }
+                                    placeholder="$"
+                                    className="h-10 font-medium md:text-lg"
+                                    isAllowed={(values) =>
+                                      values.floatValue == null ||
+                                      values.floatValue <= remaining
+                                    }
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    Total restante: {formatPrice(remaining)}
+                                  </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label>Seleccionar método</Label>
+                                  <fieldset
+                                    className="m-0 border-0 p-0"
+                                    disabled={!isAmountValid}
+                                    style={
+                                      !isAmountValid
+                                        ? {
+                                            pointerEvents: "none",
+                                            opacity: 0.5,
+                                            filter: "grayscale(1)",
+                                          }
+                                        : {}
+                                    }
+                                  >
+                                    <ItemGroup role="list">
+                                      {paymentMethods.map((method) => (
+                                        <Item
+                                          variant="default"
+                                          key={method.id}
+                                          onClick={() =>
+                                            handlePaymentMethodClick(method.id)
+                                          }
+                                        >
+                                          <ItemMedia variant="icon">
+                                            <method.icon className="size-4" />
+                                          </ItemMedia>
+                                          <ItemContent>
+                                            <ItemTitle>{method.name}</ItemTitle>
+                                          </ItemContent>
+                                          <ItemActions>
+                                            <ChevronRight className="size-4 text-muted-foreground" />
+                                          </ItemActions>
+                                        </Item>
+                                      ))}
+                                    </ItemGroup>
+                                  </fieldset>
+                                </div>
+
+                                {splitPayments.length > 0 && (
+                                  <div className="pt-4">
+                                    <Button
+                                      variant="outline"
+                                      className="w-full"
+                                      type="button"
+                                      onClick={() =>
+                                        setIsAddingPartialPayment(true)
+                                      }
+                                    >
+                                      Marcar como pago parcial
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Vista final de resumen */}
+                            {isPaymentComplete && splitPayments.length > 0 && (
+                              <div className="space-y-2">
+                                <ItemGroup role="list" className="space-y-2">
+                                  {splitPayments.map((payment) => {
+                                    const method = paymentMethods.find(
+                                      (m) => m.id === payment.methodId,
+                                    );
+                                    const Icon = method?.icon || DollarSign;
+                                    return (
+                                      <Item
+                                        key={payment.id}
+                                        variant="muted"
+                                        className="bg-muted/50"
+                                      >
+                                        <ItemMedia variant="icon">
+                                          <Icon className="h-4 w-4" />
+                                        </ItemMedia>
+                                        <ItemContent>
+                                          <ItemTitle>
+                                            {payment.methodName}
+                                          </ItemTitle>
+                                        </ItemContent>
+                                        <ItemActions>
+                                          <span className="font-medium">
+                                            {formatPrice(payment.amount)}
+                                          </span>
+                                        </ItemActions>
+                                      </Item>
+                                    );
+                                  })}
+                                </ItemGroup>
+                              </div>
+                            )}
+                          </CardContent>
+                        </>
+                      )}
+
+                      {/* Vista: Selección de tipo de tarjeta */}
+                      {currentView === "card-select" && (
+                        <>
+                          <CardHeader className="flex flex-row items-center justify-between px-4">
+                            <CardDescription>
+                              Seleccioná el tipo de tarjeta
+                            </CardDescription>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleBack}
+                            >
+                              <ChevronLeft className="mr-1 h-4 w-4" />
+                              Atrás
+                            </Button>
+                          </CardHeader>
+
+                          <CardContent className="space-y-4 px-4">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                              {CARD_TYPES.map((card) => (
+                                <button
+                                  key={card.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCardType(card);
+                                    setCurrentView("card-form");
+                                  }}
+                                  className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-muted/50"
+                                >
+                                  <Image
+                                    src={card.icon}
+                                    alt={card.name}
+                                    width={48}
+                                    height={32}
+                                    className="h-8 w-auto object-contain"
+                                  />
+                                  <span className="text-center text-xs font-medium">
+                                    {card.name}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                              <p className="mb-3 text-sm text-muted-foreground">
+                                O pagar con QR / Transferencia
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
+                                  // Find the transfer payment method and switch to it
+                                  const transferMethod = paymentMethods.find(
+                                    (m) => m.type === "TRANSFERENCIA",
+                                  );
+                                  if (transferMethod) {
+                                    setSelectedPaymentMethod(transferMethod.id);
+                                    setCurrentView("reference-form");
+                                  }
+                                }}
+                              >
+                                <Smartphone className="mr-2 h-4 w-4" />
+                                QR / Transferencia
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </>
+                      )}
+
+                      {/* Vista: Formulario de tarjeta (lote y cupón) */}
+                      {currentView === "card-form" && selectedCardType && (
+                        <>
+                          <CardHeader className="flex flex-row items-center justify-between px-4">
+                            <CardDescription className="flex items-center gap-2">
+                              <Image
+                                src={selectedCardType.icon}
+                                alt={selectedCardType.name}
+                                width={32}
+                                height={20}
+                                className="h-5 w-auto object-contain"
+                              />
+                              {selectedCardType.name}
+                            </CardDescription>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleBack}
+                            >
+                              <ChevronLeft className="mr-1 h-4 w-4" />
+                              Cambiar
+                            </Button>
+                          </CardHeader>
+
+                          <CardContent className="space-y-4 px-4">
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="cardLote">Lote</Label>
+                                <input
+                                  id="cardLote"
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  value={cardLote}
+                                  onChange={(e) => {
+                                    const value = e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 4);
+                                    setCardLote(value);
+                                  }}
+                                  placeholder="0001"
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-center font-mono text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="cardCupon">Cupón</Label>
+                                <input
+                                  id="cardCupon"
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  value={cardCupon}
+                                  onChange={(e) => {
+                                    const value = e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 4);
+                                    setCardCupon(value);
+                                    // Auto-advance cuando ambos tienen 4 dígitos
+                                    if (
+                                      value.length === 4 &&
+                                      cardLote.length === 4
+                                    ) {
+                                      setTimeout(() => {
+                                        if (isFromSplitPayment) {
+                                          handleCompleteSplitPaymentWithReference();
+                                        } else {
+                                          setCurrentView("payment-form");
+                                        }
+                                      }, 300);
+                                    }
+                                  }}
+                                  placeholder="0001"
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-center font-mono text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                              </div>
+                            </div>
+
+                            <Button
+                              type="button"
                               className="w-full"
+                              disabled={
+                                cardLote.length !== 4 || cardCupon.length !== 4
+                              }
                               onClick={() => {
-                                // Find the transfer payment method and switch to it
-                                const transferMethod = paymentMethods.find(
-                                  (m) => m.type === "TRANSFERENCIA",
-                                );
-                                if (transferMethod) {
-                                  setSelectedPaymentMethod(transferMethod.id);
-                                  setCurrentView("reference-form");
+                                if (isFromSplitPayment) {
+                                  handleCompleteSplitPaymentWithReference();
+                                } else {
+                                  setCurrentView("payment-form");
                                 }
                               }}
                             >
-                              <Smartphone className="mr-2 h-4 w-4" />
-                              QR / Transferencia
+                              {isFromSplitPayment
+                                ? "Agregar pago"
+                                : "Continuar"}
+                              <ChevronRight className="ml-2 h-4 w-4" />
                             </Button>
-                          </div>
-                        </CardContent>
-                      </>
-                    )}
+                          </CardContent>
+                        </>
+                      )}
 
-                    {/* Vista: Formulario de tarjeta (lote y cupón) */}
-                    {currentView === "card-form" && selectedCardType && (
-                      <>
-                        <CardHeader className="flex flex-row items-center justify-between px-4">
-                          <CardDescription className="flex items-center gap-2">
-                            <Image
-                              src={selectedCardType.icon}
-                              alt={selectedCardType.name}
-                              width={32}
-                              height={20}
-                              className="h-5 w-auto object-contain"
-                            />
-                            {selectedCardType.name}
-                          </CardDescription>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleBack}
-                          >
-                            <ChevronLeft className="mr-1 h-4 w-4" />
-                            Cambiar
-                          </Button>
-                        </CardHeader>
+                      {/* Vista: Formulario de referencia (transferencia) */}
+                      {currentView === "reference-form" && (
+                        <>
+                          <CardHeader className="flex flex-row items-center justify-between px-4">
+                            <CardDescription>
+                              Referencia de la transferencia
+                            </CardDescription>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleBack}
+                            >
+                              <ChevronLeft className="mr-1 h-4 w-4" />
+                              Atrás
+                            </Button>
+                          </CardHeader>
 
-                        <CardContent className="space-y-4 px-4">
-                          <div className="space-y-4">
+                          <CardContent className="space-y-4 px-4">
                             <div className="space-y-2">
-                              <Label htmlFor="cardLote">Lote</Label>
+                              <Label htmlFor="paymentReference">
+                                Comprobante / Referencia
+                              </Label>
                               <input
-                                id="cardLote"
+                                id="paymentReference"
                                 type="text"
-                                inputMode="numeric"
-                                maxLength={4}
-                                value={cardLote}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 4);
-                                  setCardLote(value);
-                                }}
-                                placeholder="0001"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-center font-mono text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                value={paymentReference}
+                                onChange={(e) =>
+                                  setPaymentReference(e.target.value)
+                                }
+                                placeholder="Ej: CBU, número de operación..."
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 autoFocus
                               />
+                              <p className="text-xs text-muted-foreground">
+                                Opcional: ingresá un dato para identificar la
+                                transferencia
+                              </p>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="cardCupon">Cupón</Label>
-                              <input
-                                id="cardCupon"
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={4}
-                                value={cardCupon}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 4);
-                                  setCardCupon(value);
-                                  // Auto-advance cuando ambos tienen 4 dígitos
-                                  if (
-                                    value.length === 4 &&
-                                    cardLote.length === 4
-                                  ) {
-                                    setTimeout(() => {
-                                      if (isFromSplitPayment) {
-                                        handleCompleteSplitPaymentWithReference();
-                                      } else {
-                                        setCurrentView("payment-form");
-                                      }
-                                    }, 300);
-                                  }
-                                }}
-                                placeholder="0001"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-center font-mono text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              />
-                            </div>
-                          </div>
 
-                          <Button
-                            type="button"
-                            className="w-full"
-                            disabled={
-                              cardLote.length !== 4 || cardCupon.length !== 4
-                            }
-                            onClick={() => {
-                              if (isFromSplitPayment) {
-                                handleCompleteSplitPaymentWithReference();
-                              } else {
-                                setCurrentView("payment-form");
-                              }
-                            }}
-                          >
-                            {isFromSplitPayment ? "Agregar pago" : "Continuar"}
-                            <ChevronRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </>
-                    )}
+                            <Button
+                              type="button"
+                              className="w-full"
+                              onClick={() => {
+                                if (isFromSplitPayment) {
+                                  handleCompleteSplitPaymentWithReference();
+                                } else {
+                                  setCurrentView("payment-form");
+                                }
+                              }}
+                            >
+                              {isFromSplitPayment ? "Agregar pago" : "Aceptar"}
+                              <ChevronRight className="ml-2 h-4 w-4" />
+                            </Button>
+                          </CardContent>
+                        </>
+                      )}
 
-                    {/* Vista: Formulario de referencia (transferencia) */}
-                    {currentView === "reference-form" && (
-                      <>
-                        <CardHeader className="flex flex-row items-center justify-between px-4">
-                          <CardDescription>
-                            Referencia de la transferencia
-                          </CardDescription>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleBack}
-                          >
-                            <ChevronLeft className="mr-1 h-4 w-4" />
-                            Atrás
-                          </Button>
-                        </CardHeader>
+                      {/* Vista: Formulario de pago único */}
+                      {currentView === "payment-form" && selectedMethod && (
+                        <>
+                          <CardHeader className="flex flex-row items-center justify-between px-4">
+                            <CardDescription>
+                              {selectedMethod.name}
+                            </CardDescription>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleBack}
+                            >
+                              <ChevronLeft className="size-4" />
+                              Editar
+                            </Button>
+                          </CardHeader>
 
-                        <CardContent className="space-y-4 px-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="paymentReference">
-                              Comprobante / Referencia
-                            </Label>
-                            <input
-                              id="paymentReference"
-                              type="text"
-                              value={paymentReference}
-                              onChange={(e) =>
-                                setPaymentReference(e.target.value)
-                              }
-                              placeholder="Ej: CBU, número de operación..."
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                              autoFocus
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Opcional: ingresá un dato para identificar la
-                              transferencia
-                            </p>
-                          </div>
-
-                          <Button
-                            type="button"
-                            className="w-full"
-                            onClick={() => {
-                              if (isFromSplitPayment) {
-                                handleCompleteSplitPaymentWithReference();
-                              } else {
-                                setCurrentView("payment-form");
-                              }
-                            }}
-                          >
-                            {isFromSplitPayment ? "Agregar pago" : "Aceptar"}
-                            <ChevronRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </>
-                    )}
-
-                    {/* Vista: Formulario de pago único */}
-                    {currentView === "payment-form" && selectedMethod && (
-                      <>
-                        <CardHeader className="flex flex-row items-center justify-between px-4">
-                          <CardDescription>
-                            {selectedMethod.name}
-                          </CardDescription>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleBack}
-                          >
-                            <ChevronLeft className="size-4" />
-                            Editar
-                          </Button>
-                        </CardHeader>
-
-                        <CardContent className="space-y-4 px-4">
-                          <div className="rounded-lg border p-2">
-                            <div className="flex items-center gap-3">
-                              {selectedCardType ? (
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted p-2">
-                                  <Image
-                                    src={selectedCardType.icon}
-                                    alt={selectedCardType.name}
-                                    width={32}
-                                    height={20}
-                                    className="h-5 w-auto object-contain"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted">
-                                  <selectedMethod.icon className="size-5" />
-                                </div>
-                              )}
-                              <div className="flex-1">
-                                <h3 className="flex w-fit items-center gap-2 text-sm font-medium leading-snug">
-                                  {selectedCardType
-                                    ? selectedCardType.name
-                                    : selectedMethod.name}
-                                </h3>
-                                {selectedCardType && (
-                                  <p className="text-xs text-muted-foreground">
-                                    Lote: {cardLote} | Cupón: {cardCupon}
-                                  </p>
+                          <CardContent className="space-y-4 px-4">
+                            <div className="rounded-lg border p-2">
+                              <div className="flex items-center gap-3">
+                                {selectedCardType ? (
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted p-2">
+                                    <Image
+                                      src={selectedCardType.icon}
+                                      alt={selectedCardType.name}
+                                      width={32}
+                                      height={20}
+                                      className="h-5 w-auto object-contain"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted">
+                                    <selectedMethod.icon className="size-5" />
+                                  </div>
                                 )}
-                                {paymentReference && !selectedCardType && (
-                                  <p className="text-xs text-muted-foreground">
-                                    Ref: {paymentReference}
-                                  </p>
-                                )}
+                                <div className="flex-1">
+                                  <h3 className="flex w-fit items-center gap-2 text-sm font-medium leading-snug">
+                                    {selectedCardType
+                                      ? selectedCardType.name
+                                      : selectedMethod.name}
+                                  </h3>
+                                  {selectedCardType && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Lote: {cardLote} | Cupón: {cardCupon}
+                                    </p>
+                                  )}
+                                  {paymentReference && !selectedCardType && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Ref: {paymentReference}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </>
-                    )}
-                  </Card>
-                </div>
+                          </CardContent>
+                        </>
+                      )}
+                    </Card>
+                  </div>
+                )}
 
                 {/* Panel derecho - Resumen */}
-                <div className="sticky top-0 flex w-full shrink-0 flex-col space-y-6 self-start lg:max-w-md">
+                <div
+                  className={cn(
+                    "sticky top-0 flex shrink-0 flex-col space-y-6 self-start",
+                    needsPayment ? "w-full lg:max-w-md" : "w-full max-w-md",
+                  )}
+                >
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Principal</span>
                     <Button
@@ -1623,22 +1694,80 @@ export function CheckoutDialog({
                         <span className="text-muted-foreground">Subtotal</span>
                         <span>{formatPrice(totals.subtotal)}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        {hasGlobalDiscount && (
-                          <>
-                            <span>
-                              Descuento global
-                              {globalDiscount?.type === "percentage" &&
-                                ` (${globalDiscount.value}%)`}
-                            </span>
-                            <span>-{formatPrice(totals.globalDiscount)}</span>
-                          </>
-                        )}
-                      </div>
+
+                      {hasGlobalDiscount && (
+                        <div className="flex justify-between text-sm">
+                          <span>
+                            Descuento global
+                            {globalDiscount?.type === "percentage" &&
+                              ` (${globalDiscount.value}%)`}
+                          </span>
+                          <span>-{formatPrice(totals.globalDiscount)}</span>
+                        </div>
+                      )}
+
+                      {/* ✅ NC disponibles para ventas normales */}
+                      {availableCreditNotes.length > 0 && (
+                        <div className="space-y-2 rounded-lg border p-3">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Notas de crédito disponibles
+                          </p>
+                          {availableCreditNotes.map((nc) => (
+                            <div
+                              key={nc.id}
+                              className="flex items-center gap-2"
+                            >
+                              <Checkbox
+                                id={`nc-${nc.id}`}
+                                checked={selectedCreditNotes.has(nc.id)}
+                                onCheckedChange={() =>
+                                  toggleCreditNote(nc.id, nc.availableBalance)
+                                }
+                              />
+                              <Label
+                                htmlFor={`nc-${nc.id}`}
+                                className="flex flex-1 cursor-pointer items-center justify-between text-sm"
+                              >
+                                <div>
+                                  <span className="text-red-600 dark:text-red-400">
+                                    {nc.saleNumber}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {format(
+                                      new Date(nc.createdAt),
+                                      "dd/MM/yy",
+                                      { locale: es },
+                                    )}
+                                  </span>
+                                </div>
+                                <span className="text-red-600 dark:text-red-400">
+                                  -{formatPrice(nc.availableBalance)}
+                                </span>
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ✅ Mostrar NC aplicadas */}
+                      {totalSelectedCreditNotes > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-red-600 dark:text-red-400">
+                            NC aplicadas
+                          </span>
+                          <span className="text-red-600 dark:text-red-400">
+                            -{formatPrice(totalSelectedCreditNotes)}
+                          </span>
+                        </div>
+                      )}
+
                       <Separator />
+
                       <div className="flex justify-between text-lg font-semibold">
                         <span>Total</span>
-                        <span>{formatPrice(total)}</span>
+                        <span>
+                          {formatPrice(total - totalSelectedCreditNotes)}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -1651,20 +1780,22 @@ export function CheckoutDialog({
                       disabled={
                         isSubmitting ||
                         (isExchangeMode
-                          ? // Exchange mode: allow if balance <= 0 OR if there's a payment method selected
+                          ? // Exchange mode
                             exchangeTotals?.isInFavorOfCustomer
-                            ? false
+                            ? false // Puede confirmar si es a favor del cliente
                             : exchangeAmountToPay > 0 &&
+                              !isPending &&
                               currentView === "payment-list"
                           : // Normal sale mode
-                            currentView === "payment-list" ||
-                            currentView === "card-select" ||
-                            currentView === "card-form" ||
-                            currentView === "reference-form" ||
-                            (currentView === "payment-form" &&
-                              !selectedPaymentMethod) ||
-                            (currentView === "split-payment" &&
-                              !isPaymentComplete))
+                            needsPayment &&
+                            (currentView === "payment-list" ||
+                              currentView === "card-select" ||
+                              currentView === "card-form" ||
+                              currentView === "reference-form" ||
+                              (currentView === "payment-form" &&
+                                !selectedPaymentMethod) ||
+                              (currentView === "split-payment" &&
+                                !isPaymentComplete)))
                       }
                     >
                       {isSubmitting && (

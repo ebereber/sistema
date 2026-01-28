@@ -6,9 +6,7 @@ import {
   ArrowLeftRight,
   CalendarDays,
   EllipsisVertical,
-  Minus,
   PackagePlus,
-  Plus,
   Save,
   ShoppingCart,
   StickyNote,
@@ -48,6 +46,7 @@ import { ChangeDateDialog } from "./change-date-dialog";
 import { CustomItemDialog } from "./custom-item-dialog";
 import { CustomerSelectDialog } from "./customer-select-dialog";
 import { DiscountDialog } from "./discount-dialog";
+import { ReturnItem } from "./return-item";
 import { SaveQuoteDialog } from "./save-quote-dialog";
 
 interface CartPanelProps {
@@ -259,80 +258,21 @@ export function CartPanel({
           </div>
 
           {/* Items to return */}
-          <div className="px-4 py-2 space-y-3">
-            {/* <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Items a devolver
-            </p> */}
+
+          <div className="px-4 py-2 space-y-1">
             {itemsToReturn.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 ">
-                {/* Item info */}
-                <div className="flex-1 min-w-0">
-                  <p className="line-clamp-2 md:text-sm text-xs font-medium leading-tight">
-                    {item.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{item.sku}</p>
-                </div>
-
-                {/* Quantity controls */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() =>
-                      onReturnQuantityChange?.(
-                        item.id,
-                        Math.max(1, item.quantity - 1),
-                      )
-                    }
-                    disabled={item.quantity <= 1}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {item.quantity}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() =>
-                      onReturnQuantityChange?.(item.id, item.quantity + 1)
-                    }
-                    disabled={item.quantity >= item.maxQuantity}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
-
-                {/* Price and remove */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-red-600 dark:text-red-400">
-                    -{formatPrice(item.price * item.quantity)}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={() => onRemoveReturnItem?.(item.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+              <ReturnItem
+                key={item.id}
+                id={item.id}
+                name={item.name}
+                sku={item.sku}
+                price={item.price}
+                quantity={item.quantity}
+                maxQuantity={item.maxQuantity}
+                onQuantityChange={onReturnQuantityChange!}
+                onRemove={onRemoveReturnItem!}
+              />
             ))}
-
-            {/* Return subtotal */}
-            {/*  {exchangeTotals && (
-              <div className="flex justify-between pt-2 border-t border-red-200 dark:border-red-900">
-                <span className="text-sm text-red-600 dark:text-red-400">
-                  Crédito por devolución
-                </span>
-                <span className="text-sm font-medium text-red-600 dark:text-red-400">
-                  -{formatPrice(exchangeTotals.returnTotal)}
-                </span>
-              </div>
-            )} */}
           </div>
 
           {/* Separator before new products */}
@@ -379,6 +319,21 @@ export function CartPanel({
           {/* Exchange mode totals */}
           {isExchangeMode && exchangeTotals ? (
             <div className="space-y-3">
+              {/* ✅ Botón de descuento para productos nuevos */}
+              {items.length > 0 && (
+                <div className="mb-2 w-fit">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscountDialogOpen(true)}
+                  >
+                    <span className="flex-1 text-left">
+                      + Agregar descuento
+                    </span>
+                  </Button>
+                </div>
+              )}
+
               {/* New products total */}
               {items.length > 0 && (
                 <div className="flex justify-between text-sm">
@@ -386,6 +341,36 @@ export function CartPanel({
                     Productos nuevos
                   </span>
                   <span>{formatPrice(exchangeTotals.newProductsTotal)}</span>
+                </div>
+              )}
+
+              {/* ✅ Mostrar descuentos aplicados */}
+              {(hasItemDiscounts || hasGlobalDiscount) && (
+                <div className="space-y-1 text-sm">
+                  {hasItemDiscounts && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
+                      onClick={() => setDiscountDialogOpen(true)}
+                    >
+                      <span>Descuentos por producto</span>
+                      <span>-{formatPrice(totals.itemDiscounts)}</span>
+                    </button>
+                  )}
+                  {hasGlobalDiscount && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between text-green-600 hover:text-green-700 transition-colors"
+                      onClick={() => setDiscountDialogOpen(true)}
+                    >
+                      <span>
+                        Descuento global
+                        {globalDiscount?.type === "percentage" &&
+                          ` (${globalDiscount.value}%)`}
+                      </span>
+                      <span>-{formatPrice(totals.globalDiscount)}</span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -425,7 +410,9 @@ export function CartPanel({
                 className="mt-2 w-full"
                 size="lg"
                 onClick={onContinue}
-                disabled={itemsToReturn.length === 0}
+                disabled={
+                  itemsToReturn.filter((i) => i.quantity > 0).length === 0
+                }
               >
                 Continuar cambio
               </Button>

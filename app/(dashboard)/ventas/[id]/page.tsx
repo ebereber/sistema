@@ -7,8 +7,8 @@ import {
   CircleHelp,
   CreditCard,
   Download,
+  ExternalLink,
   File,
-  FileText,
   Mail,
   MapPin,
   Package,
@@ -413,6 +413,7 @@ export default function VentasDetailPage() {
           </Card>
 
           {/* Payments Card */}
+          {/* Payments Card */}
           <Card className="py-4">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -423,48 +424,134 @@ export default function VentasDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between gap-2 text-sm font-medium">
-                <span>
-                  {sale.status === "COMPLETED"
-                    ? "Pagado"
-                    : sale.status === "PENDING"
-                      ? "Pendiente"
-                      : "Cancelado"}
-                </span>
-                <span>{formatCurrency(totalPaid)}</span>
-              </div>
+              {/* Para NC: Mostrar crédito disponible y aplicaciones */}
+              {sale.voucher_type.startsWith("NOTA_CREDITO") ? (
+                <div className="space-y-4">
+                  {/* Crédito disponible */}
+                  <div className="flex items-center justify-between text-sm font-medium">
+                    <span>Crédito disponible</span>
+                    <span>
+                      {formatCurrency(
+                        sale.total -
+                          (sale.applied_to_sales?.reduce(
+                            (sum, app) => sum + Number(app.amount),
+                            0,
+                          ) || 0),
+                      )}
+                    </span>
+                  </div>
 
-              <Separator className="my-4" />
-
-              <div className="space-y-0">
-                {sale.payments.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="border-b py-4 pt-0 last:border-b-0"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              RCB-{payment.id.slice(0, 8).toUpperCase()}
+                  {/* Aplicaciones de esta NC */}
+                  {sale.applied_to_sales &&
+                    sale.applied_to_sales.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm text-muted-foreground">
+                            <span>Aplicado</span>
+                            <span>
+                              {formatCurrency(
+                                sale.applied_to_sales.reduce(
+                                  (sum, app) => sum + Number(app.amount),
+                                  0,
+                                ),
+                              )}
                             </span>
-                            <div className="text-sm text-muted-foreground">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    {formatRelativeDate(payment.payment_date)}
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {formatFullDate(payment.payment_date)}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                          </div>
+                          {sale.applied_to_sales.map((app) => (
+                            <Link
+                              key={app.id}
+                              href={`/ventas/${app.applied_to_sale.id}`}
+                              className="flex items-center justify-between py-2 hover:bg-muted/50 rounded -mx-2 px-2"
+                            >
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {app.applied_to_sale.sale_number}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Aplicado a factura
+                                </p>
+                              </div>
+                              <span className="text-sm font-medium">
+                                {formatCurrency(app.amount)}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Total pagado (solo pagos reales, NO incluye NC) */}
+                  <div className="flex items-center justify-between text-sm font-medium">
+                    <span>Pagado</span>
+                    <span>
+                      {formatCurrency(
+                        sale.payments?.reduce(
+                          (sum, p) => sum + Number(p.amount),
+                          0,
+                        ) || 0,
+                      )}
+                    </span>
+                  </div>
+
+                  {/* NC aplicadas a esta venta */}
+                  {sale.applied_credit_notes &&
+                    sale.applied_credit_notes.length > 0 && (
+                      <>
+                        <Separator />
+                        {sale.applied_credit_notes.map((app) => (
+                          <Link
+                            key={app.id}
+                            href={`/ventas/${app.credit_note.id}`}
+                            className="flex items-center justify-between py-2 hover:bg-muted/50 rounded -mx-2 px-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">
+                                {app.credit_note.sale_number}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Nota de crédito aplicada
+                              </p>
+                            </div>
+                            <span className="text-sm font-medium">
+                              {formatCurrency(app.amount)}
+                            </span>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+
+                  {/* Pagos normales (efectivo, tarjeta, etc) */}
+                  {sale.payments && sale.payments.length > 0 && (
+                    <>
+                      <Separator />
+                      {sale.payments.map((payment) => (
+                        <div
+                          key={payment.id}
+                          className="py-3 border-b last:border-b-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                RCB-{payment.id.slice(0, 8).toUpperCase()}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      {formatRelativeDate(payment.payment_date)}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {formatFullDate(payment.payment_date)}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </span>
                             </div>
                           </div>
-                        </div>
-                        <div className="mt-2">
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="mt-2 flex items-center justify-between text-sm">
                             <div>{payment.payment_method?.type || "Otro"}</div>
                             <div>{formatCurrency(payment.amount)}</div>
                           </div>
@@ -473,57 +560,46 @@ export default function VentasDetailPage() {
                             {payment.reference && ` · ${payment.reference}`}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      ))}
+                    </>
+                  )}
 
-              {/* Credit Notes */}
-              {sale.credit_notes && sale.credit_notes.length > 0 && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <FileText className="size-4" />
-                      Notas de crédito asociadas
-                    </div>
-                    <div className="space-y-0">
+                  {/* NC que anulan esta venta */}
+                  {sale.credit_notes && sale.credit_notes.length > 0 && (
+                    <>
+                      <Separator />
                       {sale.credit_notes.map((nc) => (
-                        <div
+                        <Link
                           key={nc.id}
-                          className="border-b py-3 last:border-b-0"
+                          href={`/ventas/${nc.id}`}
+                          className="flex items-center justify-between py-2 hover:bg-muted/50 rounded -mx-2 px-2"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Link
-                                href={`/ventas/${nc.id}`}
-                                className="text-sm font-medium text-primary hover:underline"
-                              >
-                                {nc.sale_number}
-                              </Link>
-                              <span className="text-xs text-muted-foreground">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      {formatRelativeDate(nc.created_at)}
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {formatFullDate(nc.created_at)}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </span>
-                            </div>
-                            <span className="text-sm font-medium text-destructive">
-                              -{formatCurrency(nc.total)}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              Nota de Crédito
+                            </span>
+                            <ExternalLink className="size-3" />
+                            <span className="text-xs text-muted-foreground">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    {formatRelativeDate(nc.created_at)}
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {formatFullDate(nc.created_at)}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </span>
                           </div>
-                        </div>
+                          <span className="text-sm font-medium text-destructive">
+                            -{formatCurrency(nc.total)}
+                          </span>
+                        </Link>
                       ))}
-                    </div>
-                  </div>
-                </>
+                    </>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

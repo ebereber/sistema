@@ -2,6 +2,7 @@
 
 import {
   ArrowLeftRight,
+  Ban,
   Calendar,
   ChevronDown,
   ChevronLeft,
@@ -11,6 +12,7 @@ import {
   Copy,
   DollarSign,
   Download,
+  FileText,
   FileX,
   Funnel,
   MoreHorizontal,
@@ -66,6 +68,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { CancelNCDialog } from "@/components/ventas/cancel-nc-dialog";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
   getSales,
@@ -109,6 +112,11 @@ export default function VentasPage() {
   >("greaterThan");
   const [amountValue, setAmountValue] = useState("");
   const [amountPopoverOpen, setAmountPopoverOpen] = useState(false);
+
+  // Cancel NC dialog states
+  const [cancelNCDialogOpen, setCancelNCDialogOpen] = useState(false);
+  const [selectedNCToCancel, setSelectedNCToCancel] =
+    useState<SaleListItem | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -590,7 +598,8 @@ export default function VentasPage() {
                     Tipo de comprobante
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
-                    <DropdownMenuItem>Todos</DropdownMenuItem>
+                    <DropdownMenuItem>COM - Comprobante</DropdownMenuItem>
+                    <DropdownMenuItem>NCX - Nota de crédito</DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               </DropdownMenuContent>
@@ -738,6 +747,12 @@ export default function VentasPage() {
                         <div className="font-medium">
                           {formatCurrency(sale.total)}
                         </div>
+                        {sale.availableBalance !== null &&
+                          sale.availableBalance > 0 && (
+                            <div className="text-xs text-red-500">
+                              Saldo: {formatCurrency(sale.availableBalance)}
+                            </div>
+                          )}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -753,34 +768,66 @@ export default function VentasPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/ventas/nueva-nc?saleId=${sale.id}`}>
-                                <Undo2 className="size-4" />
-                                Crear nota de crédito
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(
-                                  `/ventas/nueva?exchangeId=${sale.id}`,
-                                );
-                              }}
-                            >
-                              <ArrowLeftRight className="size-4" />
-                              Crear cambio
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(
-                                  `/ventas/nueva?duplicateId=${sale.id}`,
-                                );
-                              }}
-                            >
-                              <Copy className="size-4" />
-                              Duplicar venta
-                            </DropdownMenuItem>
+                            {sale.voucher_type.startsWith("NOTA_CREDITO") ? (
+                              <>
+                                {/* Menú para Notas de Crédito */}
+                                {sale.related_sale_id && (
+                                  <DropdownMenuItem asChild>
+                                    <Link
+                                      href={`/ventas/${sale.related_sale_id}`}
+                                    >
+                                      <FileText className="size-4" />
+                                      Ver venta original
+                                    </Link>
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedNCToCancel(sale);
+                                    setCancelNCDialogOpen(true);
+                                  }}
+                                  className=""
+                                >
+                                  <Ban className="size-4" />
+                                  Anular nota de crédito
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              <>
+                                {/* Menú para Ventas normales */}
+                                <DropdownMenuItem asChild>
+                                  <Link
+                                    href={`/ventas/nueva-nc?saleId=${sale.id}`}
+                                  >
+                                    <Undo2 className="size-4" />
+                                    Crear nota de crédito
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(
+                                      `/ventas/nueva?exchangeId=${sale.id}`,
+                                    );
+                                  }}
+                                >
+                                  <ArrowLeftRight className="size-4" />
+                                  Crear cambio
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(
+                                      `/ventas/nueva?duplicateId=${sale.id}`,
+                                    );
+                                  }}
+                                >
+                                  <Copy className="size-4" />
+                                  Duplicar venta
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>
                               <Printer className="size-4" />
@@ -979,6 +1026,17 @@ export default function VentasPage() {
           </div>
         </div>
       </div>
+      {/* Cancel NC Dialog */}
+      <CancelNCDialog
+        open={cancelNCDialogOpen}
+        onOpenChange={setCancelNCDialogOpen}
+        creditNote={selectedNCToCancel}
+        onSuccess={() => {
+          setCancelNCDialogOpen(false);
+          setSelectedNCToCancel(null);
+          loadSales(); // Recargar la lista
+        }}
+      />
     </div>
   );
 }

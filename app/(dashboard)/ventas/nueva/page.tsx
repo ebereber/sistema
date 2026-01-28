@@ -27,7 +27,6 @@ import {
   getSaleItemsForDuplicate,
 } from "@/lib/services/sales";
 import {
-  calculateCartTotals,
   type CartItem,
   type ExchangeData,
   type ExchangeItem,
@@ -35,6 +34,7 @@ import {
   type GlobalDiscount,
   type ItemDiscount,
   type SelectedCustomer,
+  calculateCartTotals,
   DEFAULT_CUSTOMER,
   generateCartItemId,
 } from "@/lib/validations/sale";
@@ -87,7 +87,6 @@ export default function NuevaVentaPage() {
               quantity: item.quantity,
               taxRate: item.taxRate,
               discount: null,
-              imageUrl: item.imageUrl,
             }));
 
             setCartItems(newCartItems);
@@ -147,6 +146,7 @@ export default function NuevaVentaPage() {
             toast.success(
               `Modo cambio: ${data.items.length} producto(s) de la venta ${data.originalSaleNumber}`,
             );
+            router.replace("/ventas/nueva", { scroll: false });
           } else {
             toast.error("No se encontró la venta para el cambio");
             router.replace("/ventas/nueva", { scroll: false });
@@ -400,12 +400,17 @@ export default function NuevaVentaPage() {
         );
       }
 
-      // Limpiar estado
+      // Limpiar estado de venta normal
       setCartItems([]);
       setGlobalDiscount(null);
       setNote("");
       setCustomer(DEFAULT_CUSTOMER);
       setCheckoutOpen(false);
+
+      // Limpiar estado de exchange
+      setIsExchangeMode(false);
+      setExchangeData(null);
+      setItemsToReturn([]);
 
       toast.success(`Venta confirmada: ${saleNumber}`);
     },
