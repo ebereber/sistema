@@ -15,7 +15,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { CartPanel } from "@/components/ventas/cart-panel";
-import { CheckoutDialog } from "@/components/ventas/checkout-dialog";
+import { CheckoutDialog } from "@/components/ventas/checkout";
 import {
   ProductSearchPanel,
   ProductSearchPanelRef,
