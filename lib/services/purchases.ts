@@ -480,3 +480,43 @@ export async function checkDuplicatePurchase(
 
   return data !== null;
 }
+
+// Delete purchase
+export async function deletePurchase(id: string): Promise<void> {
+  const supabase = createClient();
+
+  // Get purchase with items
+  const purchase = await getPurchaseById(id);
+  if (!purchase) throw new Error("Compra no encontrada");
+
+  // TODO: When payments are implemented, check here
+  // const { count } = await supabase
+  //   .from("supplier_payments")
+  //   .select("id", { count: "exact", head: true })
+  //   .eq("purchase_id", id);
+  // if (count && count > 0) {
+  //   throw new Error("No se puede eliminar esta compra porque tiene pagos asociados");
+  // }
+
+  // If products were received, revert stock
+  if (purchase.products_received && purchase.location_id && purchase.items) {
+    for (const item of purchase.items) {
+      if (item.product_id && item.type === "product") {
+        const { error: stockError } = await supabase.rpc("decrease_stock", {
+          p_product_id: item.product_id,
+          p_location_id: purchase.location_id,
+          p_quantity: item.quantity,
+        });
+
+        if (stockError) {
+          console.error("Error decreasing stock:", stockError);
+        }
+      }
+    }
+  }
+
+  // Delete purchase (items will cascade)
+  const { error } = await supabase.from("purchases").delete().eq("id", id);
+
+  if (error) throw error;
+}

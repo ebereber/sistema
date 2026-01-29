@@ -66,6 +66,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
+import { DeletePurchaseDialog } from "@/components/compras/delete-purchase-dialog";
 import { getPurchases, type Purchase } from "@/lib/services/purchases";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
 
@@ -80,6 +81,10 @@ export default function ComprasPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [purchaseToDelete, setPurchaseToDelete] = useState<Purchase | null>(
+    null,
+  );
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -183,6 +188,16 @@ export default function ComprasPage() {
   // Handlers
   const handleRowClick = (purchase: Purchase) => {
     router.push(`/compras/${purchase.id}`);
+  };
+
+  const handleDeleteClick = (purchase: Purchase) => {
+    setPurchaseToDelete(purchase);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteSuccess = () => {
+    setPurchaseToDelete(null);
+    loadData();
   };
 
   const toggleStatus = (value: string) => {
@@ -664,21 +679,17 @@ export default function ComprasPage() {
                               <Copy className="mr-2 h-4 w-4" />
                               Duplicar
                             </DropdownMenuItem>
-                            {purchase.status !== "cancelled" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toast.info("Funcionalidad próximamente");
-                                  }}
-                                  className=""
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </>
-                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(purchase);
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -744,6 +755,17 @@ export default function ComprasPage() {
           </div>
         </div>
       </div>
+      {/* Delete Dialog */}
+      {purchaseToDelete && (
+        <DeletePurchaseDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          purchaseId={purchaseToDelete.id}
+          voucherNumber={purchaseToDelete.voucher_number}
+          hasReceivedProducts={purchaseToDelete.products_received}
+          onSuccess={handleDeleteSuccess}
+        />
+      )}
     </div>
   );
 }

@@ -1,13 +1,11 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ChevronRight,
   CreditCard,
+  ExternalLink,
   File,
   Package,
   Plus,
@@ -16,78 +14,49 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-// Tipos
-interface ProductoCompra {
-  id: string;
-  nombre: string;
-  sku: string;
-  cantidad: number;
-  costoUnitario: number;
-  cuenta: string;
-}
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface DetalleCompra {
-  id: string;
-  numeroFactura: string;
-  proveedor: {
-    id: string;
-    nombre: string;
-  };
-  fechaFactura: Date;
-  fechaVencimiento: Date;
-  productos: ProductoCompra[];
-  subtotal: number;
-  impuestos: number;
-  total: number;
-  saldoPendiente: number;
-  netoGravado: number;
-  iva: number;
-  totalFacturado: number;
-  rubroIva: string;
-  notas?: string;
-}
+import { getPurchaseById, type Purchase } from "@/lib/services/purchases";
 
 export default function CompraDetallePage() {
-  const [compra] = useState<DetalleCompra>({
-    id: "576fc786-f674-4fc3-acbb-4b501b8ad993",
-    numeroFactura: "COM - 00001-53453245",
-    proveedor: {
-      id: "cd5d9f5b-bf19-4cbc-86f9-72d85cba6db7",
-      nombre: "Moda Chic",
-    },
-    fechaFactura: new Date(),
-    fechaVencimiento: new Date(2026, 0, 28),
-    productos: [
-      {
-        id: "1",
-        nombre: "Buzo Hoodie con Capucha",
-        sku: "BZ-009",
-        cantidad: 1,
-        costoUnitario: 14,
-        cuenta: "Mercaderías",
-      },
-      {
-        id: "2",
-        nombre: "Campera de Abrigo Puffer",
-        sku: "CP-007",
-        cantidad: 1,
-        costoUnitario: 40,
-        cuenta: "Mercaderías",
-      },
-    ],
-    subtotal: 54,
-    impuestos: 0,
-    total: 54,
-    saldoPendiente: 54,
-    netoGravado: 54,
-    iva: 0,
-    totalFacturado: 54,
-    rubroIva: "Por ítem",
-  });
+  const params = useParams();
+  const router = useRouter();
+  const purchaseId = params.id as string;
 
-  const formatCurrency = (value: number) => {
+  const [purchase, setPurchase] = useState<Purchase | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadPurchase = useCallback(async () => {
+    try {
+      const data = await getPurchaseById(purchaseId);
+      if (data) {
+        setPurchase(data);
+      } else {
+        toast.error("Compra no encontrada");
+        router.push("/compras");
+      }
+    } catch (error) {
+      console.error("Error loading purchase:", error);
+      toast.error("Error al cargar la compra");
+      router.push("/compras");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [purchaseId, router]);
+
+  useEffect(() => {
+    loadPurchase();
+  }, [loadPurchase]);
+
+  const formatCurrency = (value: number | null) => {
+    if (value === null) return "$0,00";
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
@@ -95,9 +64,54 @@ export default function CompraDetallePage() {
     }).format(value);
   };
 
-  const formatFecha = (fecha: Date) => {
-    return format(fecha, "d/M/yyyy", { locale: es });
+  const formatFecha = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    return format(new Date(dateStr), "d/M/yyyy", { locale: es });
   };
+
+  const formatRelativeDate = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (diffDays === 0) return "hoy";
+    if (diffDays === 1) return "ayer";
+    if (diffDays < 7) {
+      return formatDistanceToNow(date, { addSuffix: true, locale: es });
+    }
+    return format(date, "d 'de' MMMM", { locale: es });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto space-y-6 p-6">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-6 w-64" />
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="space-y-6 lg:col-span-3">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-64" />
+          </div>
+          <div className="col-span-2 space-y-6">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-24" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!purchase) return null;
+
+  const totalUnits =
+    purchase.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   return (
     <div className="container mx-auto space-y-6 p-6">
@@ -114,19 +128,33 @@ export default function CompraDetallePage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-3xl font-bold">
-                {formatCurrency(compra.total)}
+                {formatCurrency(Number(purchase.total))}
               </h1>
+              {purchase.products_received && (
+                <Badge
+                  variant="outline"
+                  className="bg-green-50 text-green-700 border-green-200"
+                >
+                  Recibido
+                </Badge>
+              )}
             </div>
             <p className="text-lg text-muted-foreground">
-              Comprado a {compra.proveedor.nombre}{" "}
+              Comprado a{" "}
+              <Link
+                href={`/proveedores/${purchase.supplier?.id}`}
+                className="font-semibold text-primary hover:underline"
+              >
+                {purchase.supplier?.name}
+              </Link>{" "}
               <span className="font-semibold text-primary">
-                <button className="font-semibold text-primary">hoy</button>
+                {formatRelativeDate(purchase.created_at)}
               </span>
             </p>
           </div>
         </div>
         <div>
-          <Link href={`/compras/${compra.id}/editar`}>
+          <Link href={`/compras/${purchase.id}/editar`}>
             <Button>
               <SquarePen className="mr-2 h-4 w-4" />
               Editar
@@ -143,24 +171,42 @@ export default function CompraDetallePage() {
           <Card className="bg-muted p-4">
             <div className="flex flex-col items-center justify-between gap-2 md:flex-row">
               <div className="flex w-full items-center justify-between gap-2 md:w-auto">
-                <button className="mx-auto flex items-center gap-2">
+                <div className="mx-auto flex items-center gap-2">
                   <File className="h-4 w-4 text-muted-foreground" />
-                  {compra.numeroFactura}
-                </button>
+                  <span className="font-mono">{purchase.voucher_number}</span>
+                </div>
               </div>
-              <div className="flex w-full flex-col items-center gap-2 md:w-auto md:flex-row"></div>
+              {purchase.attachment_url && (
+                <a
+                  href={purchase.attachment_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ver comprobante
+                </a>
+              )}
             </div>
           </Card>
 
-          {/* Card de fecha de vencimiento */}
+          {/* Card de fechas */}
           <Card>
             <CardContent className="grid grid-cols-2 gap-4 px-4 py-4 text-sm md:grid-cols-4">
               <div>
-                <p className="text-muted-foreground">Vencimiento</p>
+                <p className="text-muted-foreground">Fecha factura</p>
                 <p className="font-medium">
-                  {formatFecha(compra.fechaVencimiento)}
+                  {formatFecha(purchase.invoice_date)}
                 </p>
               </div>
+              {purchase.due_date && (
+                <div>
+                  <p className="text-muted-foreground">Vencimiento</p>
+                  <p className="font-medium">
+                    {formatFecha(purchase.due_date)}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -173,58 +219,61 @@ export default function CompraDetallePage() {
                   Productos
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {compra.productos.reduce((sum, p) => sum + p.cantidad, 0)}{" "}
-                  unidades
+                  {totalUnits} {totalUnits === 1 ? "unidad" : "unidades"}
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div>
-                <div className="">
-                  {compra.productos.map((producto, index) => (
-                    <div
-                      key={producto.id}
-                      className={`py-4 ${
-                        index !== compra.productos.length - 1 ? "border-b" : ""
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="mb-1 flex items-center gap-2">
+                {purchase.items?.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`py-4 ${
+                      index !== (purchase.items?.length || 0) - 1
+                        ? "border-b"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                          {item.product_id ? (
                             <Link
-                              href={`/productos/${producto.id}`}
+                              href={`/productos/${item.product_id}`}
                               className="text-base font-medium underline decoration-muted-foreground underline-offset-4 transition-colors hover:underline"
                             >
-                              {producto.nombre}
+                              {item.name}
                             </Link>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            SKU: {producto.sku}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Cuenta: {producto.cuenta}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-base font-semibold">
-                            {formatCurrency(
-                              producto.cantidad * producto.costoUnitario,
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>
-                              {formatCurrency(producto.costoUnitario)}
+                          ) : (
+                            <span className="text-base font-medium">
+                              {item.name}
                             </span>
-                            <span>×</span>
-                            <Badge className="font-mono text-sm">
-                              {producto.cantidad}
-                            </Badge>
+                          )}
+                          {item.type === "custom" && (
+                            <Badge variant="outline">Personalizado</Badge>
+                          )}
+                        </div>
+                        {item.sku && (
+                          <div className="text-sm text-muted-foreground">
+                            SKU: {item.sku}
                           </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-base font-semibold">
+                          {formatCurrency(Number(item.subtotal))}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{formatCurrency(Number(item.unit_cost))}</span>
+                          <span>×</span>
+                          <Badge className="font-mono text-sm">
+                            {item.quantity}
+                          </Badge>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
 
                 {/* Totales */}
                 <div className="space-y-2 border-t pt-4">
@@ -233,21 +282,31 @@ export default function CompraDetallePage() {
                       Subtotal
                     </span>
                     <span className="text-sm">
-                      {formatCurrency(compra.subtotal)}
+                      {formatCurrency(Number(purchase.subtotal))}
                     </span>
                   </div>
+                  {Number(purchase.discount) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Descuento
+                      </span>
+                      <span className="text-sm text-green-600">
+                        -{formatCurrency(Number(purchase.discount))}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
                       Impuestos
                     </span>
                     <span className="text-sm">
-                      {formatCurrency(compra.impuestos)}
+                      {formatCurrency(Number(purchase.tax))}
                     </span>
                   </div>
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-sm font-medium">Total</span>
                     <span className="text-base font-bold">
-                      {formatCurrency(compra.total)}
+                      {formatCurrency(Number(purchase.total))}
                     </span>
                   </div>
                 </div>
@@ -263,12 +322,10 @@ export default function CompraDetallePage() {
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
                   Pagos
                 </div>
-                <Link href={`/pagos/nuevo?purchaseId=${compra.id}`}>
-                  <Button size="sm">
-                    <Plus />
-                    Nuevo pago
-                  </Button>
-                </Link>
+                <Button size="sm" disabled>
+                  <Plus className="mr-1 h-4 w-4" />
+                  Nuevo pago
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -277,26 +334,30 @@ export default function CompraDetallePage() {
                   <span className="text-sm text-muted-foreground">
                     Neto gravado
                   </span>
-                  <span className="text-sm">${compra.netoGravado}</span>
+                  <span className="text-sm">
+                    {formatCurrency(Number(purchase.subtotal))}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">IVA</span>
-                  <span className="text-sm">${compra.iva}</span>
+                  <span className="text-sm">
+                    {formatCurrency(Number(purchase.tax))}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-sm font-medium text-primary">
                     Total facturado
                   </span>
                   <span className="text-base font-bold">
-                    ${compra.totalFacturado}
+                    {formatCurrency(Number(purchase.total))}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-negative">
+                  <span className="text-sm font-medium text-destructive">
                     Saldo pendiente
                   </span>
-                  <span className="text-sm font-medium text-negative">
-                    ${compra.saldoPendiente}
+                  <span className="text-sm font-medium text-destructive">
+                    {formatCurrency(Number(purchase.total))}
                   </span>
                 </div>
               </div>
@@ -323,36 +384,61 @@ export default function CompraDetallePage() {
             <CardContent className="space-y-4">
               <div>
                 <Link
-                  href={`/proveedores/${compra.proveedor.id}`}
-                  className="px-0 text-lg font-semibold text-primary underline-offset-4 hover:underline"
+                  href={`/proveedores/${purchase.supplier?.id}`}
+                  className="text-lg font-semibold text-primary underline-offset-4 hover:underline"
                 >
-                  {compra.proveedor.nombre}
+                  {purchase.supplier?.name}
                 </Link>
-                <p> </p>
+                {purchase.supplier?.tax_id && (
+                  <p className="text-sm text-muted-foreground">
+                    CUIT: {purchase.supplier.tax_id}
+                  </p>
+                )}
               </div>
-              <div className="space-y-2"></div>
             </CardContent>
           </Card>
 
           {/* Card de Notas */}
           <Card>
-            <CardHeader className="flex items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <StickyNote className="h-4 w-4 text-muted-foreground" />
                 Notas
               </CardTitle>
-              <Button
-                variant="link"
-                size="sm"
-                className="h-6 py-0 text-muted-foreground"
-              >
-                Editar
-              </Button>
+              <Link href={`/compras/${purchase.id}/editar`}>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-6 py-0 text-muted-foreground"
+                >
+                  Editar
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">-</p>
+              <p className="text-muted-foreground">{purchase.notes || "-"}</p>
             </CardContent>
           </Card>
+
+          {/* Card de Ubicación (si hay) */}
+          {purchase.location && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  Ubicación
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="font-medium">{purchase.location.name}</p>
+                {purchase.products_received && (
+                  <p className="text-sm text-green-600">
+                    Productos recibidos en esta ubicación
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
