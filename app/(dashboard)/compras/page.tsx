@@ -35,6 +35,13 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -57,13 +64,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 import { getPurchases, type Purchase } from "@/lib/services/purchases";
@@ -672,10 +672,10 @@ export default function ComprasPage() {
                                     e.stopPropagation();
                                     toast.info("Funcionalidad próximamente");
                                   }}
-                                  className="text-red-600"
+                                  className=""
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Cancelar
+                                  Eliminar
                                 </DropdownMenuItem>
                               </>
                             )}
