@@ -86,6 +86,7 @@ import {
   type Purchase,
 } from "@/lib/services/purchases";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
+import { SupplierDialog } from "../proveedores/supplier-dialog";
 import { FileUpload } from "../ui/file-upload";
 
 // Types
@@ -321,15 +322,15 @@ export function PurchaseForm({
     );
   };
 
-  // Handlers (agregar junto a los otros handlers)
   const handleSupplierCreated = (supplier: Supplier) => {
-    // Agregar el nuevo proveedor a la lista
+    // Agregar a la lista y ordenar
     setSuppliers((prev) =>
       [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)),
     );
-    // Seleccionarlo automáticamente
+    // Seleccionarlo
     setSelectedSupplierId(supplier.id);
-    setSupplierDialogOpen(false);
+    // Cerrar el popover de proveedores
+    setOpenSupplier(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -489,17 +490,18 @@ export function PurchaseForm({
                             No se encontraron proveedores
                           </CommandEmpty>
                           <CommandGroup>
-                            <CommandItem
-                              onSelect={() => {
-                                setOpenSupplier(false);
-                                setSupplierDialogOpen(true);
-                              }}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              <span className="font-medium">
-                                Crear nuevo proveedor
-                              </span>
-                            </CommandItem>
+                            <SupplierDialog
+                              mode="create"
+                              onSuccess={handleSupplierCreated}
+                              trigger={
+                                <div className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground">
+                                  <Plus className="h-4 w-4" />
+                                  <span className="font-medium">
+                                    Crear nuevo proveedor
+                                  </span>
+                                </div>
+                              }
+                            />
                           </CommandGroup>
                           <CommandGroup heading="Proveedores">
                             {suppliers.map((supplier) => (
