@@ -12,7 +12,6 @@ import {
   Plus,
   Search,
   Trash2,
-  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -82,10 +81,12 @@ import {
   checkDuplicatePurchase,
   createPurchase,
   updatePurchase,
+  uploadPurchaseAttachment,
   type CreatePurchaseItemData,
   type Purchase,
 } from "@/lib/services/purchases";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
+import { FileUpload } from "../ui/file-upload";
 
 // Types
 interface PurchaseItem {
@@ -129,6 +130,7 @@ export function PurchaseForm({
   const [notes, setNotes] = useState("");
   const [accountingDate, setAccountingDate] = useState<Date>(new Date());
   const [taxCategory, setTaxCategory] = useState("");
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
 
   // UI state
   const [openSupplier, setOpenSupplier] = useState(false);
@@ -138,6 +140,7 @@ export function PurchaseForm({
     new Set(),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
 
   // Populate form with initial data (edit mode) or duplicate data
   const populateForm = useCallback(
@@ -154,6 +157,7 @@ export function PurchaseForm({
         data.accounting_date ? new Date(data.accounting_date) : new Date(),
       );
       setTaxCategory(data.tax_category || "");
+      setAttachmentUrl(data.attachment_url || null);
 
       // Populate items
       if (data.items && data.items.length > 0) {
@@ -317,6 +321,17 @@ export function PurchaseForm({
     );
   };
 
+  // Handlers (agregar junto a los otros handlers)
+  const handleSupplierCreated = (supplier: Supplier) => {
+    // Agregar el nuevo proveedor a la lista
+    setSuppliers((prev) =>
+      [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    // Seleccionarlo automáticamente
+    setSelectedSupplierId(supplier.id);
+    setSupplierDialogOpen(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -392,6 +407,7 @@ export function PurchaseForm({
         products_received: productsReceived,
         notes: notes || null,
         tax_category: taxCategory || null,
+        attachment_url: attachmentUrl,
       };
 
       if (mode === "edit" && initialData) {
@@ -475,7 +491,8 @@ export function PurchaseForm({
                           <CommandGroup>
                             <CommandItem
                               onSelect={() => {
-                                router.push("/compras/proveedores/nuevo");
+                                setOpenSupplier(false);
+                                setSupplierDialogOpen(true);
                               }}
                             >
                               <Plus className="mr-2 h-4 w-4" />
@@ -940,18 +957,12 @@ export function PurchaseForm({
                         </div>
 
                         <div className="pt-4">
-                          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-card p-6 text-center">
-                            <div className="flex flex-col items-center gap-y-2">
-                              <Upload className="h-5 w-5 text-muted-foreground" />
-                              <p className="text-sm">Subir archivo</p>
-                              <p className="text-xs text-muted-foreground">
-                                Arrastrá y soltá o seleccioná archivo
-                              </p>
-                            </div>
-                          </div>
-                          <p className="mt-2 text-center text-xs text-muted-foreground">
-                            Subí el PDF o imagen del comprobante. Máximo 5MB.
-                          </p>
+                          <FileUpload
+                            value={attachmentUrl}
+                            onChange={setAttachmentUrl}
+                            onUpload={uploadPurchaseAttachment}
+                            maxSize={5}
+                          />
                         </div>
                       </div>
 

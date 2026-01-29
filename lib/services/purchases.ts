@@ -430,30 +430,25 @@ export async function markProductsReceived(
 }
 
 // Upload attachment
-export async function uploadPurchaseAttachment(
-  purchaseId: string,
-  file: File,
-): Promise<string> {
+// Subir archivo
+export async function uploadPurchaseAttachment(file: File): Promise<string> {
   const supabase = createClient();
 
   const fileExt = file.name.split(".").pop();
-  const fileName = `purchases/${purchaseId}/${Date.now()}.${fileExt}`;
+  const fileName = `purchases/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
   const { error: uploadError } = await supabase.storage
     .from("product-images")
-    .upload(fileName, file);
+    .upload(fileName, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
 
   if (uploadError) throw uploadError;
 
   const {
     data: { publicUrl },
   } = supabase.storage.from("product-images").getPublicUrl(fileName);
-
-  // Update purchase with attachment URL
-  await supabase
-    .from("purchases")
-    .update({ attachment_url: publicUrl })
-    .eq("id", purchaseId);
 
   return publicUrl;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Loader2, RotateCcw } from "lucide-react";
+import { Archive, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -142,7 +142,8 @@ export function ProductForm({
   }, [initialData, form]);
 
   // Stock state - managed internally, initialized from props
-  const [internalStock, setInternalStock] = useState<StockByLocationData[]>(stockData);
+  const [internalStock, setInternalStock] =
+    useState<StockByLocationData[]>(stockData);
 
   // Sync internal stock with props when they change
   useEffect(() => {
@@ -338,7 +339,9 @@ export function ProductForm({
                             value={field.value || ""}
                             onChange={(e) => {
                               const val = e.target.value;
-                              field.onChange(val === "" ? undefined : parseFloat(val));
+                              field.onChange(
+                                val === "" ? undefined : parseFloat(val),
+                              );
                             }}
                             disabled={isLoading}
                             className="[&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
@@ -365,7 +368,9 @@ export function ProductForm({
                               value={field.value || ""}
                               onChange={(e) => {
                                 const val = e.target.value;
-                                field.onChange(val === "" ? undefined : parseFloat(val));
+                                field.onChange(
+                                  val === "" ? undefined : parseFloat(val),
+                                );
                               }}
                               disabled={isLoading}
                               className="pr-8 [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"

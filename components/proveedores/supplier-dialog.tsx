@@ -207,7 +207,7 @@ export function SupplierDialog({
           : "Error al actualizar el proveedor",
         {
           description: errorMessage,
-        }
+        },
       );
     } finally {
       setIsLoading(false);
