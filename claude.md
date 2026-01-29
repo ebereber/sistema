@@ -57,14 +57,21 @@ app/
 ├── (auth)/                    # Autenticación (se asume por componentes de auth)
 ├── (dashboard)/               # Route group - Dashboard principal
 │   ├── clientes/
+│   │   ├── [id]/             # Detalle de cliente
 │   │   └── page.tsx          # Listado de clientes
+│   ├── compras/
+│   │   ├── [id]/
+│   │   │   ├── editar/       # Editar compra
+│   │   │   └── page.tsx      # Detalle compra
+│   │   ├── nueva/            # Nueva compra
+│   │   └── page.tsx          # Listado de compras
 │   ├── configuracion/
 │   │   ├── categorias/       # Gestión de categorías
 │   │   ├── colaboradores/    # Gestión de personal
 │   │   ├── listas-precios/   # Gestión de listas
 │   │   ├── medios-de-pago/   # Métodos de pago
 │   │   ├── puntos-de-venta/  # POS config
-│   │   ├── ubicaciones/      # Sucursales/Depósitos
+│   │   ├── ubicaciones/      # Sucursales/Depósitos + Cajas registradoras
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── presupuestos/
@@ -77,6 +84,9 @@ app/
 │   ├── proveedores/
 │   │   ├── [id]/             # Detalle proveedor
 │   │   └── page.tsx          # Listado
+│   ├── turnos/
+│   │   ├── [id]/             # Detalle de turno
+│   │   └── page.tsx          # Listado de turnos
 │   ├── ventas/
 │   │   ├── [id]/             # Detalle venta
 │   │   ├── nueva/            # Nueva venta (POS)
@@ -91,6 +101,9 @@ components/
 │   ├── commercial-info-dialog.tsx
 │   ├── customer-dialog.tsx
 │   └── customer-table.tsx
+├── compras/                  # Componentes de compras
+│   ├── delete-purchase-dialog.tsx
+│   └── purchase-form.tsx
 ├── configuracion/            # Componentes de administración
 │   ├── assign-pos-dialog.tsx
 │   ├── category-form-sheet.tsx
@@ -106,7 +119,9 @@ components/
 │   └── ... (otros componentes de productos)
 ├── proveedores/             # Gestión de proveedores
 │   ├── address-dialog.tsx
+│   ├── commercial-info-dialog.tsx
 │   ├── fiscal-info-dialog.tsx
+│   ├── supplier-dialog.tsx
 │   └── supplier-table.tsx
 ├── sidebar/                 # Estructura de navegación
 │   ├── app-header.tsx
@@ -114,17 +129,26 @@ components/
 │   ├── command-menu.tsx
 │   ├── nav-main.tsx
 │   └── user-menu.tsx
+├── ui/                      # Componentes base shadcn/ui
+│   ├── file-upload.tsx      # Upload de archivos/imágenes
+│   └── ... (otros componentes shadcn)
 ├── ventas/                  # Componentes del punto de venta
+│   ├── active-shift-dialog.tsx
 │   ├── add-note-dialog.tsx
 │   ├── cart-panel.tsx
+│   ├── cash-in-dialog.tsx
+│   ├── cash-out-dialog.tsx
 │   ├── checkout-dialog.tsx
+│   ├── close-shift-dialog.tsx
 │   ├── customer-select-dialog.tsx
+│   ├── open-shift-dialog.tsx
 │   └── product-search-panel.tsx
 ├── auth-button.tsx          # Componentes de sesión
 ├── login-form.tsx
 └── theme-switcher.tsx
 
 hooks/
+├── use-active-shift.ts       # Hook para gestión de turnos de caja
 ├── use-debounce.ts           # Hook para optimizar búsquedas
 └── use-mobile.ts             # Detección de dispositivos
 
@@ -134,8 +158,13 @@ lib/
 ├── services/                 # Lógica de API/Supabase
 │   ├── categories.ts
 │   ├── customers.ts
+│   ├── locations.ts
 │   ├── payment-methods.ts
+│   ├── products.ts
+│   ├── purchases.ts          # Servicio de compras
 │   ├── sales.ts
+│   ├── shifts.ts             # Servicio de turnos de caja
+│   ├── suppliers.ts
 │   └── ...
 ├── supabase/                 # Configuración de cliente/servidor
 │   ├── client.ts
@@ -147,6 +176,7 @@ lib/
 │   ├── category.ts
 │   ├── customer.ts
 │   ├── sale.ts
+│   ├── supplier.ts
 │   └── ...
 └── utils.ts                 # Utilidades generales
 ```
@@ -288,18 +318,20 @@ font-bold:      700
    ├─ Cobranzas        → /cobranzas
    └─ Presupuestos     → /presupuestos
 
+💰 Turnos              → /turnos
+
 📦 Productos           → /productos
    └─ Transferencias   → /transferencias
 
 🛍️ Compras            → /compras
-   ├─ Órdenes          → /ordenes
+   ├─ Órdenes          → /compras/ordenes
    ├─ Proveedores      → /proveedores
-   └─ Pagos            → /pagos
+   └─ Pagos            → /compras/pagos
 ```
 
 ### Rutas Implementadas
 
-**✅ Con página creada:**
+**✅ Completadas:**
 
 **Autenticación (Route group: `(auth)`):**
 
@@ -326,14 +358,20 @@ font-bold:      700
 - `/presupuestos/[id]` - Detalle de presupuesto
 - `/proveedores` - Listado de proveedores
 - `/proveedores/[id]` - Detalle de proveedor
+- `/turnos` - Listado de turnos de caja
+- `/turnos/[id]` - Detalle de turno
+- `/compras` - Listado de compras
+- `/compras/nueva` - Nueva compra
+- `/compras/[id]` - Detalle de compra
+- `/compras/[id]/editar` - Editar compra
+- `/configuracion/ubicaciones` - Ubicaciones + Cajas registradoras
 
-**📋 Pendientes de crear:**
+**📋 Pendientes:**
 
 - `/cobranzas` - Gestión de cobranzas
 - `/transferencias` - Transferencias de stock
-- `/compras` - Listado de compras
-- `/ordenes` - Órdenes de compra
-- `/pagos` - Pagos a proveedores
+- `/compras/ordenes` - Órdenes de compra
+- `/compras/pagos` - Pagos a proveedores
 
 ---
 
@@ -384,7 +422,44 @@ public.point_of_sale (
   enabled_for_arca boolean,
   active boolean,
   created_at, updated_at
-  -- Constraint: si no es digital, debe tener location_id
+)
+
+-- Cajas Registradoras
+public.cash_registers (
+  id uuid,
+  name text,
+  location_id uuid references locations(id),
+  is_default boolean default false,
+  active boolean default true,
+  created_at, updated_at
+)
+
+-- Turnos de Caja
+public.cash_register_shifts (
+  id uuid,
+  cash_register_id uuid references cash_registers(id),
+  opened_by uuid references auth.users(id),
+  closed_by uuid references auth.users(id),
+  opening_amount numeric(12,2) default 0,
+  closing_amount numeric(12,2),
+  expected_amount numeric(12,2),
+  discrepancy numeric(12,2),
+  previous_counted_amount numeric(12,2), -- Monto contado del turno anterior
+  left_in_cash numeric(12,2), -- Monto que queda en caja al cerrar
+  status text default 'open', -- 'open' | 'closed'
+  opened_at timestamptz default now(),
+  closed_at timestamptz
+)
+
+-- Movimientos de Caja
+public.cash_register_movements (
+  id uuid,
+  shift_id uuid references cash_register_shifts(id),
+  type text, -- 'cash_in' | 'cash_out'
+  amount numeric(12,2),
+  notes text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now()
 )
 
 -- Categorías (jerárquicas)
@@ -440,7 +515,7 @@ public.products (
   track_stock boolean default false,
   stock_quantity integer default 0, -- Stock total (suma de todas ubicaciones)
   min_stock integer,
-  visibility text default 'SALES_AND_PURCHASES', -- 'SALES_AND_PURCHASES' | 'SALES_ONLY' | 'PURCHASES_ONLY'
+  visibility text default 'SALES_AND_PURCHASES',
   image_url text,
   active boolean,
   created_at, updated_at
@@ -460,12 +535,12 @@ public.stock (
 public.stock_movements (
   id uuid,
   product_id uuid,
-  location_from_id uuid, -- null si es entrada inicial
-  location_to_id uuid, -- null si es salida/venta
-  quantity integer, -- Puede ser negativo
-  reason text, -- 'Stock inicial', 'Venta', 'Compra', 'Transferencia', 'Ajuste manual'
+  location_from_id uuid,
+  location_to_id uuid,
+  quantity integer,
+  reason text,
   reference_type text, -- 'SALE' | 'PURCHASE' | 'TRANSFER' | 'ADJUSTMENT'
-  reference_id uuid, -- ID de la venta/compra/transferencia
+  reference_id uuid,
   created_by uuid,
   created_at
 )
@@ -478,7 +553,7 @@ public.price_history (
   price numeric(10,2),
   margin_percentage numeric(5,2),
   tax_rate numeric(5,2),
-  reason text, -- 'Creación inicial', 'Compra X', 'Actualización manual', 'Actualización masiva'
+  reason text,
   created_by uuid,
   created_at
 )
@@ -489,7 +564,7 @@ public.price_lists (
   name text,
   description text,
   is_automatic boolean default true,
-  adjustment_type text default 'AUMENTO', -- 'AUMENTO' | 'DESCUENTO'
+  adjustment_type text default 'AUMENTO',
   adjustment_percentage numeric(5,2) default 0,
   includes_tax boolean default true,
   active boolean,
@@ -502,8 +577,8 @@ public.customers (
   name text,
   trade_name text,
   tax_id text,
-  tax_id_type text default 'DNI', -- 'CUIT' | 'CUIL' | 'DNI'
-  legal_entity_type text default 'Física', -- 'Física' | 'Jurídica'
+  tax_id_type text default 'DNI',
+  legal_entity_type text default 'Física',
   tax_category text default 'Consumidor Final',
   email text,
   phone text,
@@ -519,6 +594,106 @@ public.customers (
   active boolean,
   created_at, updated_at
 )
+
+-- Ventas
+public.sales (
+  id uuid,
+  sale_number text unique, -- Formato: XXX-XXXXX-XXXXXXXX
+  customer_id uuid,
+  seller_id uuid,
+  shift_id uuid references cash_register_shifts(id), -- Turno de caja asociado
+  subtotal numeric(12,2),
+  discount numeric(12,2),
+  tax numeric(12,2),
+  total numeric(12,2),
+  status text, -- 'completed' | 'cancelled' | 'refunded'
+  notes text,
+  -- Campos para notas de crédito y devoluciones
+  credit_note_id uuid, -- Si es una venta con NC aplicada
+  exchange_sale_id uuid, -- Si es un cambio, referencia a la venta original
+  is_exchange boolean default false,
+  created_at, updated_at
+)
+
+-- Items de Venta
+public.sale_items (
+  id uuid,
+  sale_id uuid,
+  product_id uuid,
+  quantity integer,
+  unit_price numeric(10,2),
+  discount numeric(10,2),
+  subtotal numeric(12,2),
+  created_at
+)
+
+-- Pagos de Venta
+public.sale_payments (
+  id uuid,
+  sale_id uuid,
+  payment_method_id uuid,
+  amount numeric(12,2),
+  created_at
+)
+
+-- Compras
+public.purchases (
+  id uuid,
+  purchase_number text unique, -- Formato: CPR-XXXXX-XXXXXXXX (generado automático)
+  supplier_id uuid references suppliers(id),
+  location_id uuid references locations(id),
+  voucher_type text, -- '90' = Comprobante X, '95' = NC X, etc.
+  voucher_number text, -- Número de factura del proveedor
+  invoice_date date,
+  due_date date,
+  accounting_date date,
+  subtotal numeric(12,2) default 0,
+  discount numeric(12,2) default 0,
+  tax numeric(12,2) default 0,
+  total numeric(12,2) default 0,
+  status text default 'completed', -- 'draft' | 'completed' | 'cancelled'
+  products_received boolean default false,
+  notes text,
+  attachment_url text, -- URL del PDF/imagen de factura
+  tax_category text,
+  created_by uuid,
+  created_at, updated_at,
+  -- Constraint único para evitar duplicados
+  unique(supplier_id, voucher_type, voucher_number) where status != 'cancelled'
+)
+
+-- Items de Compra
+public.purchase_items (
+  id uuid,
+  purchase_id uuid references purchases(id) on delete cascade,
+  product_id uuid references products(id),
+  name text,
+  sku text,
+  quantity integer default 1,
+  unit_cost numeric(12,2) default 0,
+  subtotal numeric(12,2) default 0,
+  type text default 'product', -- 'product' | 'custom'
+  created_at
+)
+```
+
+### Funciones SQL Importantes
+
+```sql
+-- Generar número de compra automático
+generate_purchase_number(location_id_param uuid) RETURNS text
+-- Formato: CPR-XXXXX-XXXXXXXX
+
+-- Aumentar stock desde compra
+increase_stock_from_purchase(p_product_id uuid, p_location_id uuid, p_quantity integer)
+-- Inserta o actualiza stock en la ubicación
+
+-- Disminuir stock
+decrease_stock(p_product_id uuid, p_location_id uuid, p_quantity integer)
+-- Reduce stock (usado al eliminar compras)
+
+-- Verificar duplicados de compra
+-- Se usa índice único: (supplier_id, voucher_type, voucher_number) WHERE status != 'cancelled'
 ```
 
 ### Tipos TypeScript
@@ -561,7 +736,7 @@ type EntityUpdate = Database["public"]["Tables"]["entities"]["Update"];
 /**
  * Obtener todas las entidades
  */
-export async function getEntities(filters?: { // filtros opcionales }) {
+export async function getEntities(filters?: { /* filtros opcionales */ }) {
   let query = supabase
     .from("entities")
     .select("*")
@@ -665,7 +840,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Form, FormField, ... } from '@/components/ui/form'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 
 import { createEntity, updateEntity } from '@/lib/services/entities'
 import { entitySchema, type EntityFormData } from '@/lib/validations/entity'
@@ -677,7 +852,6 @@ interface EntityFormProps {
 
 export function EntityForm({ initialData, mode }: EntityFormProps) {
   const router = useRouter()
-  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<EntityFormData>({
@@ -693,24 +867,16 @@ export function EntityForm({ initialData, mode }: EntityFormProps) {
     try {
       if (mode === 'create') {
         await createEntity(data)
-        toast({
-          title: '✅ Creado correctamente',
-        })
+        toast.success('Creado correctamente')
       } else {
         await updateEntity(initialData!.id!, data)
-        toast({
-          title: '✅ Actualizado correctamente',
-        })
+        toast.success('Actualizado correctamente')
       }
 
       router.push('/entities')
       router.refresh()
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: '❌ Error',
-        description: error.message,
-      })
+      toast.error(error.message || 'Error al guardar')
     } finally {
       setIsLoading(false)
     }
@@ -914,35 +1080,34 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Siempre mostrar loading states
 - Siempre manejar empty states
 - Siempre capturar errores con try-catch
-- Usar toasts para feedback
+- Usar toasts para feedback (sonner)
 
 ---
 
-## 🎯 Prioridades de Desarrollo
+## 🎯 Estado de Desarrollo
 
-### Fase Actual: Módulos Base
+### ✅ Módulos Completados
 
-1. ✅ Autenticación (Completado)
-2. 🔨 Productos (En desarrollo)
-3. 📋 Clientes (Pendiente)
-4. 📋 Ventas - Listado (Pendiente)
-5. 📋 POS - Nueva Venta (Pendiente)
-6. 📋 Presupuestos (Pendiente)
+1. **Autenticación** - Login, registro, recuperación
+2. **Productos** - CRUD, stock por ubicación, precios
+3. **Clientes** - CRUD, info fiscal, direcciones
+4. **Proveedores** - CRUD, info fiscal, comercial
+5. **Ventas** - POS, listado, detalle, notas de crédito, cambios
+6. **Turnos de Caja** - Apertura, cierre, arqueo, movimientos
+7. **Compras** - CRUD, stock, duplicar, eliminar, adjuntos
 
-### Fase 2: Features Avanzadas
+### 🔨 En Desarrollo
 
-- Proveedores y Compras
-- Sistema de Cajas (apertura/cierre)
-- Descuentos
-- Múltiples métodos de pago
+- Pagos a proveedores
+- Órdenes de compra
+
+### 📋 Pendientes
+
+- Cobranzas
+- Transferencias de stock
 - Reportes
-
-### Fase 3: Optimizaciones
-
+- Facturación ARCA/AFIP
 - Dashboard con métricas
-- Reportes avanzados
-- Exportaciones
-- Mejoras de UX
 
 ---
 
@@ -975,6 +1140,16 @@ pnpm supabase gen types typescript --project-id "ref" > lib/supabase/database.ty
 # Base color debe ser "zinc"
 ```
 
+**Error de relaciones en Supabase (406):**
+
+```typescript
+// ❌ Evitar relaciones anidadas en queries
+.select(`*, relation(*, nested_relation(*))`)
+
+// ✅ Usar relaciones planas
+.select(`*, relation(id, name, other_field)`)
+```
+
 ---
 
 ## 📚 Referencias
@@ -988,5 +1163,5 @@ pnpm supabase gen types typescript --project-id "ref" > lib/supabase/database.ty
 
 ---
 
-**Última actualización:** [Fecha actual]
-**Versión:** 0.1.0 (MVP en desarrollo)
+**Última actualización:** Enero 2026
+**Versión:** 0.2.0 (MVP con Compras)

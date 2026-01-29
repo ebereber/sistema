@@ -23,7 +23,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { getPurchaseById, type Purchase } from "@/lib/services/purchases";
+import { AddNoteDialog } from "@/components/ventas/add-note-dialog";
+import {
+  getPurchaseById,
+  updatePurchase,
+  type Purchase,
+} from "@/lib/services/purchases";
 
 export default function CompraDetallePage() {
   const params = useParams();
@@ -32,6 +37,10 @@ export default function CompraDetallePage() {
 
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [tempNote, setTempNote] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const loadPurchase = useCallback(async () => {
     try {
@@ -62,6 +71,28 @@ export default function CompraDetallePage() {
       currency: "ARS",
       minimumFractionDigits: 2,
     }).format(value);
+  };
+
+  const handleOpenNoteDialog = () => {
+    setTempNote(purchase?.notes || "");
+    setNoteDialogOpen(true);
+  };
+
+  const handleSaveNote = async () => {
+    if (!purchase) return;
+
+    setIsSavingNote(true);
+    try {
+      await updatePurchase(purchase.id, { notes: tempNote || null });
+      setPurchase({ ...purchase, notes: tempNote || null });
+      toast.success(tempNote ? "Nota guardada" : "Nota eliminada");
+      setNoteDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving note:", error);
+      toast.error("Error al guardar la nota");
+    } finally {
+      setIsSavingNote(false);
+    }
   };
 
   const formatFecha = (dateStr: string | null) => {
@@ -173,11 +204,11 @@ export default function CompraDetallePage() {
               <div className="flex w-full items-center justify-between gap-2 md:w-auto">
                 <div className="mx-auto flex items-center gap-2">
                   <File className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-mono">{purchase.voucher_number}</span>
+                  <span className="font-mono">{purchase.purchase_number}</span>
                 </div>
               </div>
               {purchase.attachment_url && (
-                <a
+                <Link
                   href={purchase.attachment_url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -185,7 +216,7 @@ export default function CompraDetallePage() {
                 >
                   <ExternalLink className="h-4 w-4" />
                   Ver comprobante
-                </a>
+                </Link>
               )}
             </div>
           </Card>
@@ -193,6 +224,12 @@ export default function CompraDetallePage() {
           {/* Card de fechas */}
           <Card>
             <CardContent className="grid grid-cols-2 gap-4 px-4 py-4 text-sm md:grid-cols-4">
+              <div>
+                <p className="text-muted-foreground">Nº Factura Proveedor</p>
+                <p className="font-medium font-mono">
+                  {purchase.voucher_number}
+                </p>
+              </div>
               <div>
                 <p className="text-muted-foreground">Fecha factura</p>
                 <p className="font-medium">
@@ -399,24 +436,26 @@ export default function CompraDetallePage() {
           </Card>
 
           {/* Card de Notas */}
+          {/* Card de Notas */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <StickyNote className="h-4 w-4 text-muted-foreground" />
                 Notas
               </CardTitle>
-              <Link href={`/compras/${purchase.id}/editar`}>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="h-6 py-0 text-muted-foreground"
-                >
-                  Editar
-                </Button>
-              </Link>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-6 py-0 text-muted-foreground"
+                onClick={handleOpenNoteDialog}
+              >
+                {purchase.notes ? "Editar" : "Agregar"}
+              </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">{purchase.notes || "-"}</p>
+              <p className={purchase.notes ? "" : "text-muted-foreground"}>
+                {purchase.notes || "-"}
+              </p>
             </CardContent>
           </Card>
 
@@ -441,6 +480,14 @@ export default function CompraDetallePage() {
           )}
         </div>
       </div>
+      {/* Note Dialog */}
+      <AddNoteDialog
+        open={noteDialogOpen}
+        onOpenChange={setNoteDialogOpen}
+        note={tempNote}
+        onNoteChange={setTempNote}
+        onSave={handleSaveNote}
+      />
     </div>
   );
 }
