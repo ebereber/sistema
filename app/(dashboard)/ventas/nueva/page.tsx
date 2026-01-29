@@ -20,6 +20,7 @@ import {
   ProductSearchPanel,
   ProductSearchPanelRef,
 } from "@/components/ventas/product-search-panel";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import {
   type ProductForSale,
   getAdjustedPrice,
@@ -51,7 +52,7 @@ export default function NuevaVentaPage() {
   const [globalDiscount, setGlobalDiscount] = useState<GlobalDiscount | null>(
     null,
   );
-
+  const { shift } = useActiveShift();
   // Additional cart state
   const [note, setNote] = useState("");
   const [saleDate, setSaleDate] = useState(new Date());
@@ -519,6 +520,7 @@ export default function NuevaVentaPage() {
         exchangeData={exchangeData}
         itemsToReturn={itemsToReturn}
         exchangeTotals={exchangeTotals}
+        shiftId={shift?.id || null}
       />
     </div>
   );

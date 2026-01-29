@@ -5,10 +5,25 @@ export interface Location {
   name: string;
   address: string | null;
   is_main: boolean;
-  active: boolean;
+  status: "active" | "archived";
   created_at: string;
   updated_at: string;
-  points_of_sale?: PointOfSaleBasic[];
+  points_of_sale?: {
+    id: string;
+    number: number;
+    name: string;
+    enabled_for_arca: boolean;
+  }[];
+  cash_registers?: {
+    id: string;
+    name: string;
+    status: "active" | "archived";
+    point_of_sale?: {
+      id: string;
+      number: number;
+      name: string;
+    } | null;
+  }[];
 }
 
 export interface PointOfSaleBasic {
@@ -36,14 +51,15 @@ export async function getLocations(): Promise<Location[]> {
     .select(
       `
       *,
-      points_of_sale:point_of_sale(id, number, name, is_digital, enabled_for_arca)
+      points_of_sale:point_of_sale(id, number, name, enabled_for_arca),
+      cash_registers(id, name, status, point_of_sale:point_of_sale(id, number, name))
     `,
     )
-    .eq("active", true)
     .order("is_main", { ascending: false })
     .order("name");
 
   if (error) throw error;
+
   return data || [];
 }
 

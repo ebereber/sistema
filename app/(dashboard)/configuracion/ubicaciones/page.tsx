@@ -17,6 +17,7 @@ import {
 
 import { LocationCard } from "@/components/configuracion/location-card";
 import { LocationSheet } from "@/components/configuracion/location-sheet";
+import CashRegistersTab from "@/components/configuracion/ubicaciones/cash-registers-tab";
 import {
   archiveLocation,
   deleteLocation,
@@ -105,9 +106,7 @@ export default function UbicacionesPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
-                    <TabsTrigger value="cajas" disabled>
-                      Cajas
-                    </TabsTrigger>
+                    <TabsTrigger value="cajas">Cajas</TabsTrigger>
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -116,7 +115,9 @@ export default function UbicacionesPage() {
               </Tooltip>
             </TooltipProvider>
           </TabsList>
+        </div>
 
+        <TabsContent value="ubicaciones" className="mt-6">
           <LocationSheet
             mode="create"
             onSuccess={handleSuccess}
@@ -130,9 +131,6 @@ export default function UbicacionesPage() {
               </Button>
             }
           />
-        </div>
-
-        <TabsContent value="ubicaciones" className="mt-6">
           {isLoading ? (
             <div className="flex flex-col w-full min-h-100">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -189,9 +187,7 @@ export default function UbicacionesPage() {
         </TabsContent>
 
         <TabsContent value="cajas">
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Próximamente</p>
-          </div>
+          <CashRegistersTab />
         </TabsContent>
       </Tabs>
     </div>

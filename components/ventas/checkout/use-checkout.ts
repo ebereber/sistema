@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import {
   applyCreditNoteToSale,
   getAvailableCreditNotes,
@@ -27,15 +25,16 @@ import {
   type GlobalDiscount,
   type SelectedCustomer,
 } from "@/lib/validations/sale";
+import { DollarSign } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
-  CARD_TYPES,
   ICON_MAP,
   type CardType,
   type CheckoutView,
   type PaymentMethod,
   type SplitPayment,
 } from "./types";
-import { DollarSign } from "lucide-react";
 
 interface UseCheckoutProps {
   open: boolean;
@@ -50,6 +49,7 @@ interface UseCheckoutProps {
   exchangeData?: ExchangeData | null;
   itemsToReturn: ExchangeItem[];
   exchangeTotals?: ExchangeTotals;
+  shiftId: string | null;
 }
 
 export function useCheckout({
@@ -65,6 +65,7 @@ export function useCheckout({
   exchangeData,
   itemsToReturn,
   exchangeTotals,
+  shiftId,
 }: UseCheckoutProps) {
   // Calculate totals from cart
   const totals = calculateCartTotals(cartItems, globalDiscount);
@@ -78,7 +79,7 @@ export function useCheckout({
     Map<string, number>
   >(new Map());
   const [exchangeResult, setExchangeResult] = useState<ExchangeResult | null>(
-    null
+    null,
   );
 
   const [selectedVoucher, setSelectedVoucher] = useState("COMPROBANTE_X");
@@ -90,7 +91,7 @@ export function useCheckout({
   >(null);
   const [saleNumber, setSaleNumber] = useState<string | null>(null);
   const [location, setLocation] = useState<{ id: string; name: string } | null>(
-    null
+    null,
   );
 
   // Split payment states
@@ -101,7 +102,7 @@ export function useCheckout({
 
   // Card payment states
   const [selectedCardType, setSelectedCardType] = useState<CardType | null>(
-    null
+    null,
   );
   const [cardLote, setCardLote] = useState("");
   const [cardCupon, setCardCupon] = useState("");
@@ -218,7 +219,7 @@ export function useCheckout({
   const isPaymentComplete = Math.abs(remaining) < 0.1;
 
   const totalSelectedCreditNotes = Array.from(
-    selectedCreditNotes.values()
+    selectedCreditNotes.values(),
   ).reduce((sum, amount) => sum + amount, 0);
 
   const exchangeAmountToPay = exchangeTotals
@@ -232,7 +233,7 @@ export function useCheckout({
   const needsPayment = finalAmountToPay > 0 && !isPending;
 
   const selectedMethod = paymentMethods.find(
-    (m) => m.id === selectedPaymentMethod
+    (m) => m.id === selectedPaymentMethod,
   );
 
   // Handlers
@@ -268,7 +269,7 @@ export function useCheckout({
 
         const newTotalPaid = newSplitPayments.reduce(
           (sum, p) => sum + p.amount,
-          0
+          0,
         );
         const newRemaining = total - newTotalPaid;
 
@@ -427,7 +428,7 @@ export function useCheckout({
       } else {
         const currentTotal = Array.from(newMap.values()).reduce(
           (sum, amt) => sum + amt,
-          0
+          0,
         );
         const totalToPay = exchangeTotals
           ? Math.max(0, exchangeTotals.balance)
@@ -479,7 +480,7 @@ export function useCheckout({
                         ?.name || "",
                     amount: Math.max(
                       0,
-                      exchangeTotals.balance - totalSelectedCreditNotes
+                      exchangeTotals.balance - totalSelectedCreditNotes,
                     ),
                     reference: buildPaymentReference(),
                   },
@@ -487,7 +488,7 @@ export function useCheckout({
               : [];
 
         const appliedCreditNotes = Array.from(
-          selectedCreditNotes.entries()
+          selectedCreditNotes.entries(),
         ).map(([creditNoteId, amount]) => ({
           creditNoteId,
           amount,
@@ -507,6 +508,7 @@ export function useCheckout({
           saleDate,
           note: note || undefined,
           globalDiscount,
+          shiftId,
         });
 
         setExchangeResult(result);
@@ -524,7 +526,7 @@ export function useCheckout({
       // Standard sale flow
       const amountAfterCreditNotes = Math.max(
         0,
-        total - totalSelectedCreditNotes
+        total - totalSelectedCreditNotes,
       );
 
       const payments: PaymentInsert[] =
@@ -561,6 +563,7 @@ export function useCheckout({
           | "CANCELLED",
         voucher_type: selectedVoucher,
         sale_date: saleDate.toISOString(),
+        shift_id: shiftId,
       };
 
       const items: SaleItemInsert[] = cartItems.map((item) => ({
@@ -616,7 +619,7 @@ export function useCheckout({
 
   const handleTransferClick = () => {
     const transferMethod = paymentMethods.find(
-      (m) => m.type === "TRANSFERENCIA"
+      (m) => m.type === "TRANSFERENCIA",
     );
     if (transferMethod) {
       setSelectedPaymentMethod(transferMethod.id);

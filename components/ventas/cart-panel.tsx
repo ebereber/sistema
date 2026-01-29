@@ -26,6 +26,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useActiveShift } from "@/hooks/use-active-shift";
+import type { CashRegister } from "@/lib/services/cash-registers";
+import { getCashRegisters } from "@/lib/services/cash-registers";
 import {
   type CartItem as CartItemType,
   type CartTotals,
@@ -38,17 +41,20 @@ import {
   calculateCartTotals,
   formatPrice,
 } from "@/lib/validations/sale";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { Kbd } from "../ui/kbd";
 import { Separator } from "../ui/separator";
+import { ActiveShiftDialog } from "./active-shift-dialog";
 import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
 import { ChangeDateDialog } from "./change-date-dialog";
 import { CustomItemDialog } from "./custom-item-dialog";
 import { CustomerSelectDialog } from "./customer-select-dialog";
 import { DiscountDialog } from "./discount-dialog";
+import { OpenShiftDialog } from "./open-shift-dialog";
 import { ReturnItem } from "./return-item";
 import { SaveQuoteDialog } from "./save-quote-dialog";
-
 interface CartPanelProps {
   items: CartItemType[];
   customer: SelectedCustomer;
@@ -111,7 +117,20 @@ export function CartPanel({
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [saveQuoteDialogOpen, setSaveQuoteDialogOpen] = useState(false);
-
+  const {
+    shift,
+    summary,
+    isLoading: isShiftLoading,
+    openNewShift,
+    closeCurrentShift,
+    addCash,
+    removeCash,
+    refetch: refetchShift,
+  } = useActiveShift();
+  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+  const [selectedCashRegisterId, setSelectedCashRegisterId] = useState<
+    string | null
+  >(null);
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
@@ -136,12 +155,118 @@ export function CartPanel({
     return format(date, "d/M/yy", { locale: es });
   };
 
+  // Load cash registers
+  useEffect(() => {
+    async function loadCashRegisters() {
+      try {
+        // Por ahora cargamos todas, después filtraremos por ubicación del usuario
+        const registers = await getCashRegisters();
+        setCashRegisters(registers);
+
+        // Si hay una sola caja, seleccionarla por defecto
+        if (registers.length === 1) {
+          setSelectedCashRegisterId(registers[0].id);
+        }
+      } catch (error) {
+        console.error("Error loading cash registers:", error);
+      }
+    }
+    loadCashRegisters();
+  }, []);
+
+  // Handlers
+  const handleOpenShift = async (openingAmount: number) => {
+    if (!selectedCashRegisterId) {
+      toast.error("Seleccioná una caja");
+      return;
+    }
+    try {
+      await openNewShift(selectedCashRegisterId, openingAmount);
+      toast.success("Turno abierto");
+    } catch (error) {
+      console.error("Error opening shift:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Error al abrir turno",
+      );
+    }
+  };
+
+  const handleCloseShift = async (
+    countedAmount: number,
+    leftInCash: number,
+    notes?: string,
+  ) => {
+    try {
+      await closeCurrentShift(countedAmount, leftInCash, undefined, notes);
+      toast.success("Turno cerrado");
+    } catch (error) {
+      console.error("Error closing shift:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Error al cerrar turno",
+      );
+    }
+  };
+
+  const handleCashIn = async (amount: number, notes?: string) => {
+    try {
+      await addCash(amount, notes);
+      toast.success("Efectivo agregado");
+    } catch (error) {
+      console.error("Error adding cash:", error);
+      toast.error("Error al agregar efectivo");
+    }
+  };
+
+  const handleCashOut = async (amount: number, notes?: string) => {
+    try {
+      await removeCash(amount, notes);
+      toast.success("Efectivo retirado");
+    } catch (error) {
+      console.error("Error removing cash:", error);
+      toast.error("Error al retirar efectivo");
+    }
+  };
+
   return (
     <div className="flex h-full flex-col rounded-lg mt-4 lg:mt-0 lg:border bg-sidebar">
       {/* Header */}
       <div className="flex items-center p-2 justify-between">
-        <div className="items-center gap-2">
-          <h2 className="font-semibold text-sm">Caja Principal</h2>
+        <div className="flex flex-col">
+          <h2 className="text-sm font-semibold">
+            {shift?.cash_register?.name || "Sin caja"}
+          </h2>
+          {shift && summary ? (
+            <ActiveShiftDialog
+              shift={shift}
+              summary={summary}
+              onCashIn={handleCashIn}
+              onCashOut={handleCashOut}
+              onCloseShift={handleCloseShift}
+              onRefresh={refetchShift}
+              trigger={
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-green-600">
+                  Turno abierto
+                </Button>
+              }
+            />
+          ) : (
+            <OpenShiftDialog
+              cashRegisterName={
+                cashRegisters.find((cr) => cr.id === selectedCashRegisterId)
+                  ?.name || "Caja"
+              }
+              onOpenShift={handleOpenShift}
+              trigger={
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs text-muted-foreground"
+                >
+                  Abrir turno
+                </Button>
+              }
+            />
+          )}
         </div>
         <div className="flex items-center gap-1">
           <DropdownMenu>
@@ -406,16 +531,37 @@ export function CartPanel({
               </div>
 
               {/* Continue button */}
-              <Button
-                className="mt-2 w-full"
-                size="lg"
-                onClick={onContinue}
-                disabled={
-                  itemsToReturn.filter((i) => i.quantity > 0).length === 0
-                }
-              >
-                Continuar cambio
-              </Button>
+              {shift ? (
+                <Button
+                  className="mt-2 w-full"
+                  size="lg"
+                  onClick={onContinue}
+                  disabled={
+                    itemsToReturn.filter((i) => i.quantity > 0).length === 0
+                  }
+                >
+                  Continuar cambio
+                </Button>
+              ) : (
+                <OpenShiftDialog
+                  cashRegisterName={
+                    cashRegisters.find((cr) => cr.id === selectedCashRegisterId)
+                      ?.name || "Caja Principal"
+                  }
+                  onOpenShift={handleOpenShift}
+                  trigger={
+                    <Button
+                      className="mt-2 w-full"
+                      size="lg"
+                      disabled={
+                        itemsToReturn.filter((i) => i.quantity > 0).length === 0
+                      }
+                    >
+                      Continuar cambio
+                    </Button>
+                  }
+                />
+              )}
             </div>
           ) : (
             <>
@@ -472,9 +618,25 @@ export function CartPanel({
               </div>
 
               {/* Continue button */}
-              <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
-                Continuar
-              </Button>
+              {shift ? (
+                <Button className="mt-4 w-full" size="lg" onClick={onContinue}>
+                  Continuar
+                </Button>
+              ) : (
+                <OpenShiftDialog
+                  cashRegisterId={selectedCashRegisterId || undefined}
+                  cashRegisterName={
+                    cashRegisters.find((cr) => cr.id === selectedCashRegisterId)
+                      ?.name || "Caja Principal"
+                  }
+                  onOpenShift={handleOpenShift}
+                  trigger={
+                    <Button className="mt-4 w-full" size="lg">
+                      Continuar
+                    </Button>
+                  }
+                />
+              )}
             </>
           )}
         </div>

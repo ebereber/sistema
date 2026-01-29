@@ -2,8 +2,8 @@
 
 import {
   Archive,
-  Banknote,
   ChevronDown,
+  Landmark,
   MapPin,
   MoreVertical,
   Pencil,
@@ -156,7 +156,7 @@ export function LocationCard({
                           posOpen ? "rotate-180" : ""
                         }`}
                       />
-                      <Store className="h-4 w-4" />
+                      <Landmark className="h-4 w-4" />
                       <span className="text-sm font-medium">
                         Puntos de Venta
                       </span>
@@ -250,35 +250,74 @@ export function LocationCard({
           </Collapsible>
 
           {/* Cajas Section (Disabled) */}
-          <Collapsible open={cajasOpen} onOpenChange={setCajasOpen}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="rounded-lg border border-border px-4  py-2">
-                    <CollapsibleTrigger asChild disabled>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between px-0 opacity-50 cursor-not-allowed"
-                        disabled
-                      >
-                        <div className="flex items-center gap-2">
-                          <ChevronDown className="h-4 w-4" />
-                          <Banknote className="h-4 w-4" />
-                          <span className="text-sm font-medium">Cajas</span>
-                          <Badge variant="secondary" className="ml-1">
-                            0
-                          </Badge>
-                        </div>
-                      </Button>
-                    </CollapsibleTrigger>
+          {/* Cajas Section */}
+          {location.cash_registers &&
+          location.cash_registers.filter((cr) => cr.status === "active")
+            .length > 0 ? (
+            <Collapsible open={cajasOpen} onOpenChange={setCajasOpen}>
+              <div className="rounded-lg border border-border">
+                <CollapsibleTrigger asChild>
+                  <div className="flex px-4 justify-between py-2">
+                    <Button
+                      variant="ghost"
+                      className="flex items-center gap-2 p-0 h-auto hover:bg-transparent"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${
+                            cajasOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                        <Store className="h-4 w-4" />
+                        <span className="text-sm font-medium">Cajas</span>
+                        <Badge variant="secondary" className="ml-1">
+                          {
+                            location.cash_registers.filter(
+                              (cr) => cr.status === "active",
+                            ).length
+                          }
+                        </Badge>
+                      </div>
+                    </Button>
                   </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Próximamente</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Collapsible>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-2 border-border border-t p-4">
+                    {location.cash_registers
+                      .filter((cr) => cr.status === "active")
+                      .map((caja) => (
+                        <div
+                          key={caja.id}
+                          className="flex items-center justify-between py-2 px-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {caja.name}
+                            </span>
+                          </div>
+                          {caja.point_of_sale && (
+                            <span className="text-xs text-muted-foreground">
+                              POS: #{caja.point_of_sale.number} -{" "}
+                              {caja.point_of_sale.name}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ) : (
+            <div className="rounded-lg border border-border px-4 py-2">
+              <div className="flex items-center gap-2 opacity-50">
+                <Store className="h-4 w-4" />
+                <span className="text-sm font-medium">Sin Cajas</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Sin cajas
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -1,7 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +39,7 @@ export function CheckoutDialog({
   exchangeData,
   itemsToReturn = [],
   exchangeTotals,
+  shiftId,
 }: CheckoutDialogProps) {
   const checkout = useCheckout({
     open,
@@ -48,6 +54,7 @@ export function CheckoutDialog({
     exchangeData,
     itemsToReturn,
     exchangeTotals,
+    shiftId,
   });
 
   return (
@@ -55,9 +62,7 @@ export function CheckoutDialog({
       <SheetContent
         side={checkout.needsPayment ? "bottom" : "right"}
         className={cn(
-          checkout.needsPayment
-            ? "h-[95vh] w-full"
-            : "h-full w-full max-w-md"
+          checkout.needsPayment ? "h-[95vh] w-full" : "h-full w-full max-w-md",
         )}
       >
         <SheetDescription className="hidden"></SheetDescription>
@@ -86,7 +91,7 @@ export function CheckoutDialog({
               className={cn(
                 checkout.needsPayment
                   ? "flex flex-1 flex-col overflow-hidden px-4"
-                  : "flex flex-col overflow-hidden px-4"
+                  : "flex flex-col overflow-hidden px-4",
               )}
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -98,7 +103,7 @@ export function CheckoutDialog({
                   "flex flex-1 flex-col gap-6 overflow-y-auto pt-0.5",
                   checkout.needsPayment
                     ? "lg:flex-row"
-                    : "items-center justify-center"
+                    : "items-center justify-center",
                 )}
               >
                 {/* Left panel - Only show if needs payment */}

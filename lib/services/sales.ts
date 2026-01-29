@@ -267,6 +267,7 @@ export interface SaleInsert {
   status: "COMPLETED" | "PENDING" | "CANCELLED";
   voucher_type: string;
   sale_date: string;
+  shift_id: string | null; // Required (not optional) to ensure it's never undefined
 }
 
 export interface SaleItemInsert {
@@ -870,6 +871,7 @@ export interface CreateExchangeParams {
   saleDate: Date;
   note?: string;
   globalDiscount?: GlobalDiscount | null;
+  shiftId: string | null;
 }
 
 /**
@@ -888,6 +890,7 @@ export async function createExchange(
     saleDate,
     note,
     globalDiscount,
+    shiftId,
   } = params;
 
   const supabase = createClient();
@@ -957,6 +960,7 @@ export async function createExchange(
         location_id: locationId,
         created_by: user.id,
         related_sale_id: exchangeData.originalSaleId,
+        shift_id: shiftId,
       })
       .select()
       .single();
@@ -1038,6 +1042,7 @@ export async function createExchange(
         seller_id: user.id,
         location_id: locationId,
         created_by: user.id,
+        shift_id: shiftId,
       })
       .select()
       .single();

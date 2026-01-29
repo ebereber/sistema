@@ -1,14 +1,4 @@
-import {
-  Banknote,
-  Building2,
-  CreditCard,
-  DollarSign,
-  FileCheck,
-  Smartphone,
-} from "lucide-react";
-import type {
-  AvailableCreditNote,
-} from "@/lib/services/credit-note-applications";
+import type { AvailableCreditNote } from "@/lib/services/credit-note-applications";
 import type {
   CartItem,
   ExchangeData,
@@ -18,6 +8,14 @@ import type {
   GlobalDiscount,
   SelectedCustomer,
 } from "@/lib/validations/sale";
+import {
+  Banknote,
+  Building2,
+  CreditCard,
+  DollarSign,
+  FileCheck,
+  Smartphone,
+} from "lucide-react";
 
 export type CheckoutView =
   | "payment-list"
@@ -128,6 +126,7 @@ export interface CheckoutDialogProps {
   exchangeData?: ExchangeData | null;
   itemsToReturn?: ExchangeItem[];
   exchangeTotals?: ExchangeTotals;
+  shiftId: string | null;
 }
 
 // Re-export types used by child components

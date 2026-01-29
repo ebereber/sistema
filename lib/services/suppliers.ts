@@ -1,206 +1,214 @@
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client";
 
 // Manual types since database.types.ts doesn't exist yet
 export interface Supplier {
-  id: string
-  name: string
-  tax_id: string | null
-  tax_id_type: string | null
-  legal_entity_type: string | null
-  tax_category: string | null
-  email: string | null
-  phone: string | null
-  street_address: string | null
-  apartment: string | null
-  postal_code: string | null
-  province: string | null
-  city: string | null
-  trade_name: string | null
-  business_description: string | null
-  payment_terms: string | null
-  contact_person: string | null
-  notes: string | null
-  active: boolean
-  created_at: string
-  updated_at: string
+  id: string;
+  name: string;
+  tax_id: string | null;
+  tax_id_type: string | null;
+  legal_entity_type: string | null;
+  tax_category: string | null;
+  email: string | null;
+  phone: string | null;
+  street_address: string | null;
+  apartment: string | null;
+  postal_code: string | null;
+  province: string | null;
+  city: string | null;
+  trade_name: string | null;
+  business_description: string | null;
+  payment_terms: string | null;
+  contact_person: string | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export type SupplierInsert = Omit<Supplier, "id" | "created_at" | "updated_at">
-export type SupplierUpdate = Partial<SupplierInsert>
+export type SupplierInsert = Omit<Supplier, "id" | "created_at" | "updated_at">;
+export type SupplierUpdate = Partial<SupplierInsert>;
 
 export interface SupplierFilters {
-  search?: string
-  active?: boolean
+  search?: string;
+  active?: boolean;
 }
 
 /**
  * Get all suppliers with optional filters
  */
-export async function getSuppliers(filters?: SupplierFilters): Promise<Supplier[]> {
-  const supabase = createClient()
+export async function getSuppliers(
+  filters?: SupplierFilters,
+): Promise<Supplier[]> {
+  const supabase = createClient();
 
   let query = supabase
     .from("suppliers")
     .select("*")
-    .order("name", { ascending: true })
+    .order("name", { ascending: true });
 
   if (filters?.search && filters.search.trim()) {
-    const searchTerm = filters.search.trim()
-    query = query.or(`name.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`)
+    const searchTerm = filters.search.trim();
+    query = query.or(`name.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`);
   }
 
   if (filters?.active !== undefined) {
-    query = query.eq("active", filters.active)
+    query = query.eq("active", filters.active);
   }
 
-  const { data, error } = await query
+  const { data, error } = await query;
 
-  if (error) throw error
-  return data || []
+  if (error) throw error;
+  return data || [];
 }
 
 /**
  * Get a supplier by ID
  */
 export async function getSupplierById(id: string): Promise<Supplier> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("suppliers")
     .select("*")
     .eq("id", id)
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Create a new supplier
  */
-export async function createSupplier(supplier: SupplierInsert): Promise<Supplier> {
-  const supabase = createClient()
+export async function createSupplier(
+  supplier: SupplierInsert,
+): Promise<Supplier> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("suppliers")
     .insert(supplier)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Update a supplier
  */
-export async function updateSupplier(id: string, supplier: SupplierUpdate): Promise<Supplier> {
-  const supabase = createClient()
+export async function updateSupplier(
+  id: string,
+  supplier: SupplierUpdate,
+): Promise<Supplier> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("suppliers")
     .update({ ...supplier, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Archive a supplier (soft delete)
  */
 export async function archiveSupplier(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { error } = await supabase
     .from("suppliers")
     .update({ active: false, updated_at: new Date().toISOString() })
-    .eq("id", id)
+    .eq("id", id);
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 /**
  * Unarchive a supplier (restore)
  */
 export async function unarchiveSupplier(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { error } = await supabase
     .from("suppliers")
     .update({ active: true, updated_at: new Date().toISOString() })
-    .eq("id", id)
+    .eq("id", id);
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 /**
  * Delete a supplier permanently
  */
 export async function deleteSupplier(id: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = createClient();
 
-  const { error } = await supabase
-    .from("suppliers")
-    .delete()
-    .eq("id", id)
+  const { error } = await supabase.from("suppliers").delete().eq("id", id);
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 /**
  * Get supplier purchase statistics
  */
 export async function getSupplierStats(supplierId: string): Promise<{
-  totalPurchases: number
-  totalAmount: number
+  totalPurchases: number;
+  totalAmount: number;
 }> {
-  const supabase = createClient()
+  const supabase = createClient();
 
   // For now, return placeholder stats until purchases table is implemented
   const { count, error } = await supabase
     .from("purchases")
     .select("*", { count: "exact", head: true })
-    .eq("supplier_id", supplierId)
+    .eq("supplier_id", supplierId);
 
   if (error) {
     // Table might not exist yet
-    return { totalPurchases: 0, totalAmount: 0 }
+    return { totalPurchases: 0, totalAmount: 0 };
   }
 
   // Get total amount
   const { data: purchases } = await supabase
     .from("purchases")
     .select("total")
-    .eq("supplier_id", supplierId)
+    .eq("supplier_id", supplierId);
 
-  const totalAmount = purchases?.reduce((sum, p) => sum + (p.total || 0), 0) || 0
+  const totalAmount =
+    purchases?.reduce((sum, p) => sum + (p.total || 0), 0) || 0;
 
   return {
     totalPurchases: count || 0,
     totalAmount,
-  }
+  };
 }
 
 /**
  * Get recent purchases for a supplier
  */
-export async function getSupplierRecentPurchases(supplierId: string, limit: number = 5) {
-  const supabase = createClient()
+export async function getSupplierRecentPurchases(
+  supplierId: string,
+  limit: number = 5,
+) {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("purchases")
     .select("id, purchase_number, created_at, total")
     .eq("supplier_id", supplierId)
     .order("created_at", { ascending: false })
-    .limit(limit)
+    .limit(limit);
 
   if (error) {
     // Table might not exist yet
-    return []
+    return [];
   }
 
-  return data || []
+  return data || [];
 }
