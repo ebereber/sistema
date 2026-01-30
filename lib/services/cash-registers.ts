@@ -8,6 +8,7 @@ export interface CashRegister {
   status: "active" | "archived";
   created_at: string;
   updated_at: string;
+  is_default: boolean;
   // Relaciones
   location?: {
     id: string;

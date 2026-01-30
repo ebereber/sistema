@@ -67,6 +67,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { DeletePurchaseDialog } from "@/components/compras/delete-purchase-dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { getPurchases, type Purchase } from "@/lib/services/purchases";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
 
@@ -258,7 +259,12 @@ export default function ComprasPage() {
           <div className="flex flex-1 flex-col gap-2">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+              {isLoading ? (
+                <Spinner className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+              )}
+
               <Input
                 placeholder="Buscar por nº factura o proveedor…"
                 value={searchQuery}
@@ -642,8 +648,29 @@ export default function ComprasPage() {
                           <Badge variant="outline">No</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(Number(purchase.total))}
+                      <TableCell className="text-right">
+                        <div className="font-medium">
+                          {formatCurrency(Number(purchase.total))}
+                        </div>
+                        {purchase.payment_status === "paid" ? (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-50 text-green-700 dark:bg-green-800 dark:text-green-100"
+                          >
+                            <Check className="mr-1 h-3 w-3" />
+                            Pagado
+                          </Badge>
+                        ) : Number(purchase.total) -
+                            Number(purchase.amount_paid || 0) >
+                          0 ? (
+                          <div className="text-sm text-destructive">
+                            Saldo:{" "}
+                            {formatCurrency(
+                              Number(purchase.total) -
+                                Number(purchase.amount_paid || 0),
+                            )}
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

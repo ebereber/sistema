@@ -23,6 +23,9 @@ export interface Purchase {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Payment tracking
+  amount_paid: number | null;
+  payment_status: "pending" | "partial" | "paid" | null;
   // Relations
   supplier?: {
     id: string;
@@ -86,6 +89,17 @@ export interface GetPurchasesParams {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+}
+
+export interface PurchasePaymentAllocation {
+  id: string;
+  amount: number;
+  created_at: string;
+  payment_id: string;
+  payment_number: string;
+  payment_date: string;
+  payment_status: string;
+  methods: string[];
 }
 
 export async function getPurchases(params: GetPurchasesParams = {}): Promise<{
@@ -519,4 +533,59 @@ export async function deletePurchase(id: string): Promise<void> {
   const { error } = await supabase.from("purchases").delete().eq("id", id);
 
   if (error) throw error;
+}
+
+// Get payments for a specific purchase
+export async function getPaymentsByPurchaseId(
+  purchaseId: string,
+): Promise<PurchasePaymentAllocation[]> {
+  const supabase = createClient();
+
+  // Get allocations with payment info
+  const { data: allocations, error: allocError } = await supabase
+    .from("supplier_payment_allocations")
+    .select("id, amount, created_at, payment_id")
+    .eq("purchase_id", purchaseId)
+    .order("created_at", { ascending: false });
+
+  if (allocError) throw allocError;
+  if (!allocations || allocations.length === 0) return [];
+
+  // Get payment details for each allocation
+  const paymentIds = allocations.map((a) => a.payment_id);
+
+  const { data: payments, error: payError } = await supabase
+    .from("supplier_payments")
+    .select("id, payment_number, payment_date, status")
+    .in("id", paymentIds);
+
+  if (payError) throw payError;
+
+  // Get payment methods
+  const { data: methods, error: methodsError } = await supabase
+    .from("supplier_payment_methods")
+    .select("payment_id, method_name")
+    .in("payment_id", paymentIds);
+
+  if (methodsError) throw methodsError;
+
+  // Combine data
+  return allocations.map((allocation) => {
+    const payment = payments?.find((p) => p.id === allocation.payment_id);
+    const paymentMethods =
+      methods
+        ?.filter((m) => m.payment_id === allocation.payment_id)
+        .map((m) => m.method_name) || [];
+
+    return {
+      id: allocation.id,
+      amount: Number(allocation.amount),
+      created_at: allocation.created_at,
+      payment_id: allocation.payment_id,
+      payment_number: payment?.payment_number || "",
+      payment_date: payment?.payment_date || "",
+      payment_status: payment?.status || "",
+      methods: paymentMethods,
+    };
+  });
 }

@@ -25,7 +25,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { AddNoteDialog } from "@/components/ventas/add-note-dialog";
 import {
+  getPaymentsByPurchaseId,
   getPurchaseById,
+  PurchasePaymentAllocation,
   updatePurchase,
   type Purchase,
 } from "@/lib/services/purchases";
@@ -37,6 +39,9 @@ export default function CompraDetallePage() {
 
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [purchasePayments, setPurchasePayments] = useState<
+    PurchasePaymentAllocation[]
+  >([]);
 
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [tempNote, setTempNote] = useState("");
@@ -47,6 +52,8 @@ export default function CompraDetallePage() {
       const data = await getPurchaseById(purchaseId);
       if (data) {
         setPurchase(data);
+        const payments = await getPaymentsByPurchaseId(purchaseId);
+        setPurchasePayments(payments);
       } else {
         toast.error("Compra no encontrada");
         router.push("/compras");
@@ -352,6 +359,7 @@ export default function CompraDetallePage() {
           </Card>
 
           {/* Card de Pagos */}
+          {/* Card de Pagos */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-base">
@@ -359,10 +367,14 @@ export default function CompraDetallePage() {
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
                   Pagos
                 </div>
-                <Button size="sm" disabled>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Nuevo pago
-                </Button>
+                {purchase.payment_status !== "paid" && (
+                  <Link href={`/pagos/nuevo?purchaseId=${purchase.id}`}>
+                    <Button size="sm">
+                      <Plus className="mr-1 h-4 w-4" />
+                      Nuevo pago
+                    </Button>
+                  </Link>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -381,29 +393,85 @@ export default function CompraDetallePage() {
                     {formatCurrency(Number(purchase.tax))}
                   </span>
                 </div>
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-sm font-medium text-primary">
-                    Total facturado
-                  </span>
-                  <span className="text-base font-bold">
+                <div className="flex items-center justify-between border-t pt-2">
+                  <span className="text-sm font-medium">Total facturado</span>
+                  <span className="text-sm font-medium">
                     {formatCurrency(Number(purchase.total))}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-destructive">
-                    Saldo pendiente
-                  </span>
-                  <span className="text-sm font-medium text-destructive">
-                    {formatCurrency(Number(purchase.total))}
-                  </span>
-                </div>
+
+                {Number(purchase.amount_paid || 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-green-600">
+                      Total pagado
+                    </span>
+                    <span className="text-sm font-medium text-green-600">
+                      {formatCurrency(Number(purchase.amount_paid))}
+                    </span>
+                  </div>
+                )}
+
+                {purchase.payment_status !== "paid" && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-destructive">
+                      Saldo pendiente
+                    </span>
+                    <span className="text-sm font-medium text-destructive">
+                      {formatCurrency(
+                        Number(purchase.total) -
+                          Number(purchase.amount_paid || 0),
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-4 border-t pt-4">
-                <p className="text-muted-foreground">
-                  No hay pagos registrados para esta compra
-                </p>
-              </div>
+              {/* Lista de pagos */}
+              {purchasePayments.length > 0 ? (
+                <div className="mt-4 space-y-3 border-t pt-4">
+                  {purchasePayments
+                    .filter((p) => p.payment_status !== "cancelled")
+                    .map((allocation) => {
+                      const methodsDisplay =
+                        allocation.methods.length === 1
+                          ? allocation.methods[0]
+                          : allocation.methods.length > 1
+                            ? `${allocation.methods[0]} + ${allocation.methods.length - 1} más`
+                            : "-";
+
+                      return (
+                        <div
+                          key={allocation.id}
+                          className="flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">
+                              {methodsDisplay}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatRelativeDate(allocation.payment_date)} ·{" "}
+                              <Link
+                                href={`/pagos/${allocation.payment_id}`}
+                                className="text-primary hover:underline"
+                              >
+                                #{allocation.payment_number}
+                              </Link>
+                            </p>
+                          </div>
+                          <span className="text-sm font-medium">
+                            {formatCurrency(allocation.amount)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="mt-4 border-t pt-4">
+                  <p className="text-muted-foreground">
+                    No hay pagos registrados para esta compra
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -435,7 +503,6 @@ export default function CompraDetallePage() {
             </CardContent>
           </Card>
 
-          {/* Card de Notas */}
           {/* Card de Notas */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
