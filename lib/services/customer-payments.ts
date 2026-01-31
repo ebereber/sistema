@@ -50,7 +50,15 @@ export interface CustomerPaymentWithDetails {
       sale_number: string;
       sale_date: string;
       total: number;
+      amount_paid: number;
     } | null;
+  }[];
+  related_receipts: {
+    id: string;
+    payment_number: string;
+    payment_date: string;
+    total_amount: number;
+    status: string;
   }[];
   methods: {
     id: string;
@@ -291,7 +299,7 @@ export async function getCustomerPaymentById(
       id,
       amount,
       sale_id,
-      sale:sales(id, sale_number, sale_date, total)
+      sale:sales(id, sale_number, sale_date, total, amount_paid)
     `,
     )
     .eq("customer_payment_id", id);
@@ -302,7 +310,9 @@ export async function getCustomerPaymentById(
     .select("*")
     .eq("customer_payment_id", id);
 
-  const customerData = normalizeRelation(payment.customer) as CustomerPaymentWithDetails["customer"];
+  const customerData = normalizeRelation(
+    payment.customer,
+  ) as CustomerPaymentWithDetails["customer"];
 
   // Map allocations
   const mappedAllocations = (allocations || []).map((a) => ({
@@ -311,6 +321,37 @@ export async function getCustomerPaymentById(
     sale_id: a.sale_id,
     sale: normalizeRelation(a.sale),
   }));
+
+  // Get related receipts (other RCBs for the same sales)
+  const saleIds = (allocations || []).map((a) => a.sale_id);
+  let relatedReceipts: CustomerPaymentWithDetails["related_receipts"] = [];
+
+  if (saleIds.length > 0) {
+    const { data: relatedAllocations } = await supabase
+      .from("customer_payment_allocations")
+      .select("customer_payment_id, amount")
+      .in("sale_id", saleIds)
+      .neq("customer_payment_id", id);
+
+    if (relatedAllocations && relatedAllocations.length > 0) {
+      const relatedPaymentIds = [
+        ...new Set(relatedAllocations.map((a) => a.customer_payment_id)),
+      ];
+
+      const { data: relatedPayments } = await supabase
+        .from("customer_payments")
+        .select("id, payment_number, payment_date, total_amount, status")
+        .in("id", relatedPaymentIds);
+
+      relatedReceipts = (relatedPayments || []).map((rp) => ({
+        id: rp.id,
+        payment_number: rp.payment_number,
+        payment_date: rp.payment_date,
+        total_amount: rp.total_amount,
+        status: rp.status,
+      }));
+    }
+  }
 
   return {
     id: payment.id,
@@ -327,6 +368,7 @@ export async function getCustomerPaymentById(
     customer: customerData,
     allocations: mappedAllocations,
     methods: methods || [],
+    related_receipts: relatedReceipts,
   };
 }
 
@@ -569,6 +611,9 @@ export async function updateCustomerPaymentNotes(
 /**
  * Get payments for a specific sale
  */
+/**
+ * Get payments for a specific sale
+ */
 export async function getPaymentsBySaleId(saleId: string): Promise<
   {
     id: string;
@@ -577,7 +622,12 @@ export async function getPaymentsBySaleId(saleId: string): Promise<
     payment_number: string;
     payment_date: string;
     payment_status: string;
-    methods: { method_name: string; amount: number }[];
+    methods: {
+      method_name: string;
+      amount: number;
+      fee_percentage: number;
+      fee_fixed: number;
+    }[];
   }[]
 > {
   const supabase = createClient();
@@ -601,10 +651,12 @@ export async function getPaymentsBySaleId(saleId: string): Promise<
 
   if (paymentsError) throw paymentsError;
 
-  // Get methods
+  // Get methods with payment_method fees
   const { data: methods, error: methodsError } = await supabase
     .from("customer_payment_methods")
-    .select("customer_payment_id, method_name, amount")
+    .select(
+      "customer_payment_id, method_name, amount, payment_method:payment_methods(fee_percentage, fee_fixed)",
+    )
     .in("customer_payment_id", paymentIds);
 
   if (methodsError) throw methodsError;
@@ -626,10 +678,16 @@ export async function getPaymentsBySaleId(saleId: string): Promise<
       payment_number: payment?.payment_number || "",
       payment_date: payment?.payment_date || "",
       payment_status: payment?.status || "",
-      methods: paymentMethods.map((m) => ({
-        method_name: m.method_name,
-        amount: m.amount,
-      })),
+      methods: paymentMethods.map((m) => {
+        const pm = m.payment_method;
+        const feeData = Array.isArray(pm) ? pm[0] : pm;
+        return {
+          method_name: m.method_name,
+          amount: m.amount,
+          fee_percentage: feeData?.fee_percentage ?? 0,
+          fee_fixed: feeData?.fee_fixed ?? 0,
+        };
+      }),
     };
   });
 }

@@ -165,11 +165,14 @@ export default function VentasDetailPage() {
     return sum + cost * item.quantity;
   }, 0);
 
-  const paymentFee = sale.payments.reduce((sum, payment) => {
-    const method = payment.payment_method;
-    if (!method) return sum;
-    const percentageFee = (payment.amount * method.fee_percentage) / 100;
-    return sum + percentageFee + method.fee_fixed;
+  const paymentFee = sale.customer_payment_receipts.reduce((sum, rcb) => {
+    return (
+      sum +
+      rcb.methods.reduce((mSum, method) => {
+        const percentageFee = (method.amount * method.fee_percentage) / 100;
+        return mSum + percentageFee + method.fee_fixed;
+      }, 0)
+    );
   }, 0);
 
   const grossProfit = sale.total - cmv - paymentFee;
@@ -185,7 +188,10 @@ export default function VentasDetailPage() {
     : null;
 
   // Total paid
-  const totalPaid = sale.payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = sale.customer_payment_receipts.reduce(
+    (sum, rcb) => sum + rcb.amount,
+    0,
+  );
 
   return (
     <div className="container mx-auto space-y-6 p-6">
@@ -535,13 +541,7 @@ export default function VentasDetailPage() {
                   {/* Pagos normales (efectivo, tarjeta, etc) */}
                   {sale.payments && sale.payments.length > 0 && (
                     <>
-                      {/* Total pagado */}
-                      {/*  <div className="flex items-center justify-between text-sm font-medium">
-                        <span>Pagado</span>
-                        <span>{formatCurrency(sale.amount_paid || 0)}</span>
-                      </div> */}
-
-                      {/* Saldo pendiente - solo si hay saldo */}
+                      {/* Saldo pendiente */}
                       {sale.status === "PENDING" &&
                         sale.total - (sale.amount_paid || 0) > 0 && (
                           <div className="flex items-center justify-between text-sm text-destructive">
@@ -554,48 +554,63 @@ export default function VentasDetailPage() {
                           </div>
                         )}
 
-                      {/* Fecha de vencimiento - solo si existe */}
+                      {/* Fecha de vencimiento */}
                       {sale.due_date && (
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
                           <span>Vencimiento</span>
                           <span>{formatRelativeDate(sale.due_date)}</span>
                         </div>
                       )}
-                      <Separator />
-                      {sale.payments.map((payment) => (
-                        <div
-                          key={payment.id}
-                          className="py-3 border-b last:border-b-0"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">
-                                RCB-{payment.id.slice(0, 8).toUpperCase()}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      {formatRelativeDate(payment.payment_date)}
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {formatFullDate(payment.payment_date)}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-2 flex items-center justify-between text-sm">
-                            <div>{payment.payment_method?.type || "Otro"}</div>
-                            <div>{formatCurrency(payment.amount)}</div>
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {payment.method_name}
-                            {payment.reference && ` · ${payment.reference}`}
-                          </div>
-                        </div>
-                      ))}
+
+                      {/* Recibos de cobro (RCBs) */}
+                      {sale.customer_payment_receipts &&
+                        sale.customer_payment_receipts.length > 0 && (
+                          <>
+                            <Separator />
+                            {sale.customer_payment_receipts.map((rcb) => (
+                              <Link
+                                key={rcb.id}
+                                href={`/cobranzas/${rcb.payment_id}`}
+                                className="-mx-2 rounded px-2 py-3 border-b last:border-b-0 hover:bg-muted/50"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">
+                                      {rcb.payment_number}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            {formatRelativeDate(
+                                              rcb.payment_date,
+                                            )}
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            {formatFullDate(rcb.payment_date)}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </span>
+                                    {rcb.payment_status === "cancelled" && (
+                                      <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">
+                                        Anulado
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {formatCurrency(rcb.amount)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {rcb.methods
+                                    .map((m) => m.method_name)
+                                    .join(", ")}
+                                </div>
+                              </Link>
+                            ))}
+                          </>
+                        )}
                     </>
                   )}
 

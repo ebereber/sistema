@@ -321,6 +321,7 @@ export default function CobranzaDetailPage() {
                       <TableHead>Comprobante</TableHead>
                       <TableHead className="text-right">Aplicado</TableHead>
                       <TableHead className="text-right">Total venta</TableHead>
+                      <TableHead className="text-right">Saldo venta</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -348,6 +349,14 @@ export default function CobranzaDetailPage() {
                         <TableCell className="text-right">
                           {allocation.sale
                             ? formatCurrency(allocation.sale.total)
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {allocation.sale
+                            ? formatCurrency(
+                                allocation.sale.total -
+                                  (allocation.sale.amount_paid ?? 0),
+                              )
                             : "-"}
                         </TableCell>
                       </TableRow>
@@ -384,6 +393,81 @@ export default function CobranzaDetailPage() {
               ))}
             </CardContent>
           </Card>
+          {/* Related receipts */}
+          {payment.related_receipts && payment.related_receipts.length > 0 && (
+            <Card className="py-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="size-4 text-muted-foreground" />
+                  Créditos aplicados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Anticipos
+                  </div>
+                  <div className="overflow-hidden rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Anticipo</TableHead>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead className="text-right">
+                            Monto aplicado
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payment.related_receipts.map((rcb) => (
+                          <TableRow
+                            key={rcb.id}
+                            className={
+                              rcb.status === "cancelled" ? "opacity-60" : ""
+                            }
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href={`/cobranzas/${rcb.id}`}
+                                  className="font-medium text-primary hover:underline"
+                                >
+                                  {rcb.payment_number}
+                                </Link>
+                                {rcb.status === "cancelled" && (
+                                  <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">
+                                    Anulado
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(rcb.payment_date).toLocaleDateString(
+                                "es-AR",
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(rcb.total_amount)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex justify-between pt-2 text-sm font-medium">
+                    <span>Total créditos aplicados</span>
+                    <span>
+                      {formatCurrency(
+                        payment.related_receipts
+                          .filter((rcb) => rcb.status !== "cancelled")
+                          .reduce((sum, rcb) => sum + rcb.total_amount, 0),
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right column */}

@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
 import { normalizeRelation } from "@/lib/supabase/types";
-import type { Tables, TablesInsert } from "@/lib/supabase/types";
 import type {
   CartItem,
   GlobalDiscount,
@@ -350,7 +349,60 @@ export async function createSale(
 
     if (paymentsError) throw paymentsError;
   }
+  // 5.5 Crear recibo de cobro (RCB) si hay pagos y  cliente
+  if (payments.length > 0 && saleData.customer_id) {
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
+    if (totalPaid > 0) {
+      // Generar número de RCB
+      const { data: paymentNumber, error: rcbNumberError } = await supabase.rpc(
+        "generate_customer_payment_number",
+        { pos_number: 1 },
+      );
+      if (rcbNumberError) throw rcbNumberError;
+
+      // Crear customer_payment
+      const { data: customerPayment, error: rcbError } = await supabase
+        .from("customer_payments")
+        .insert({
+          payment_number: paymentNumber,
+          customer_id: saleData.customer_id,
+          payment_date: saleData.sale_date,
+          total_amount: totalPaid,
+          notes: null,
+          status: "completed",
+          created_by: user.id,
+        })
+        .select("id")
+        .single();
+      if (rcbError) throw rcbError;
+
+      // Vincular RCB a la venta
+      const { error: allocationError } = await supabase
+        .from("customer_payment_allocations")
+        .insert({
+          customer_payment_id: customerPayment.id,
+          sale_id: sale.id,
+          amount: totalPaid,
+        });
+      if (allocationError) throw allocationError;
+
+      // Crear métodos de pago del RCB
+      const rcbMethods = payments.map((p) => ({
+        customer_payment_id: customerPayment.id,
+        payment_method_id: p.payment_method_id,
+        method_name: p.method_name,
+        amount: p.amount,
+        reference: p.reference,
+        cash_register_id: null,
+      }));
+
+      const { error: rcbMethodsError } = await supabase
+        .from("customer_payment_methods")
+        .insert(rcbMethods);
+      if (rcbMethodsError) throw rcbMethodsError;
+    }
+  }
   // 6. Descontar stock
   for (const item of items) {
     if (item.product_id) {
@@ -468,6 +520,20 @@ export interface SaleWithDetails {
   // Agregar estos campos al interface SaleWithDetails
   amount_paid: number;
   due_date: string | null;
+  customer_payment_receipts: {
+    id: string;
+    amount: number;
+    payment_id: string;
+    payment_number: string;
+    payment_date: string;
+    payment_status: string;
+    methods: {
+      method_name: string;
+      amount: number;
+      fee_percentage: number;
+      fee_fixed: number;
+    }[];
+  }[];
 }
 
 /**
@@ -520,7 +586,12 @@ export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
   }
 
   // Complex join requires manual cast — typed client can't fully infer nested relations
-  return data as unknown as SaleWithDetails;
+  const sale = data as unknown as SaleWithDetails;
+  const { getPaymentsBySaleId } = await import("./customer-payments");
+  const receipts = await getPaymentsBySaleId(id);
+  sale.customer_payment_receipts = receipts;
+
+  return sale;
 }
 
 /**
@@ -681,7 +752,7 @@ export async function getSales(
   if (error) throw error;
 
   // Map data to handle Supabase relation arrays
-  const mappedData = await Promise.all(
+  const mappedData = (await Promise.all(
     (data || []).map(async (item) => {
       let availableBalance: number | null = null;
 
@@ -715,7 +786,7 @@ export async function getSales(
         credit_notes: (item.credit_notes || []) as SaleListItem["credit_notes"],
       };
     }),
-  ) as SaleListItem[];
+  )) as SaleListItem[];
 
   return {
     data: mappedData,
@@ -1084,6 +1155,7 @@ export async function createExchange(
     }
 
     // Create payments if any
+    // Create payments if any
     if (payments.length > 0 && amountToPay > 0) {
       const paymentsWithSaleId = payments.map((payment) => ({
         ...payment,
@@ -1095,6 +1167,57 @@ export async function createExchange(
         .insert(paymentsWithSaleId);
 
       if (paymentsError) throw paymentsError;
+
+      // Create RCB for the exchange payment
+      if (exchangeData.customerId) {
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+        if (totalPaid > 0) {
+          const { data: paymentNumber, error: rcbNumberError } =
+            await supabase.rpc("generate_customer_payment_number", {
+              pos_number: 1,
+            });
+          if (rcbNumberError) throw rcbNumberError;
+
+          const { data: customerPayment, error: rcbError } = await supabase
+            .from("customer_payments")
+            .insert({
+              payment_number: paymentNumber,
+              customer_id: exchangeData.customerId,
+              payment_date: saleDate.toISOString(),
+              total_amount: totalPaid,
+              notes: `Cambio de venta ${exchangeData.originalSaleNumber}`,
+              status: "completed",
+              created_by: user.id,
+            })
+            .select("id")
+            .single();
+          if (rcbError) throw rcbError;
+
+          const { error: allocationError } = await supabase
+            .from("customer_payment_allocations")
+            .insert({
+              customer_payment_id: customerPayment.id,
+              sale_id: saleData.id,
+              amount: totalPaid,
+            });
+          if (allocationError) throw allocationError;
+
+          const rcbMethods = payments.map((p) => ({
+            customer_payment_id: customerPayment.id,
+            payment_method_id: p.payment_method_id,
+            method_name: p.method_name,
+            amount: p.amount,
+            reference: p.reference,
+            cash_register_id: null,
+          }));
+
+          const { error: rcbMethodsError } = await supabase
+            .from("customer_payment_methods")
+            .insert(rcbMethods);
+          if (rcbMethodsError) throw rcbMethodsError;
+        }
+      }
     }
 
     // Track credit note applications

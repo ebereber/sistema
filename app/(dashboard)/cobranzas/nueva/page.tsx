@@ -400,7 +400,7 @@ export default function NuevaCobranzaPage() {
       const payment = await createCustomerPayment(
         {
           customer_id: selectedCustomer.id,
-          payment_date: new Date(paymentDate).toISOString(),
+          payment_date: `${paymentDate}T12:00:00`,
           notes: notes || undefined,
         },
         allocations,
@@ -496,18 +496,20 @@ export default function NuevaCobranzaPage() {
                             No se encontraron clientes.
                           </CommandEmpty>
                           <CommandGroup>
-                            <CommandItem className="font-medium">
-                              <Plus className="size-4" />
+                            <CommandGroup>
                               <CustomerDialog
                                 mode="create"
                                 onSuccess={handleCustomerCreated}
                                 trigger={
-                                  <span className="flex items-center gap-2">
-                                    Nuevo cliente
-                                  </span>
+                                  <div className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground">
+                                    <Plus className="h-4 w-4" />
+                                    <span className="font-medium">
+                                      Nuevo cliente
+                                    </span>
+                                  </div>
                                 }
                               />
-                            </CommandItem>
+                            </CommandGroup>
                           </CommandGroup>
                           <CommandGroup heading="Clientes">
                             {filteredCustomers.map((customer) => (

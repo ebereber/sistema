@@ -53,6 +53,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -318,7 +319,12 @@ export default function VentasPage() {
           <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2">
             {/* Search */}
             <div className="relative w-full sm:w-[150px] lg:w-[250px]">
-              <Search className="absolute left-2 top-2 size-4 text-muted-foreground" />
+              {isLoading ? (
+                <Spinner className="absolute left-2 top-2 size-4 text-muted-foreground" />
+              ) : (
+                <Search className="absolute left-2 top-2 size-4 text-muted-foreground" />
+              )}
+
               <Input
                 placeholder="Buscar por factura…"
                 value={search}
