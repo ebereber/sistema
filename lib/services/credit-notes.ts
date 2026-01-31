@@ -18,6 +18,7 @@ export interface OriginalSaleForCreditNote {
   customerId: string | null;
   customerName: string;
   total: number;
+  amount_paid: number;
   items: CreditNoteItem[];
   payments: {
     methodName: string;
@@ -41,6 +42,7 @@ export async function getSaleForCreditNote(
       sale_number,
       customer_id,
       total,
+      amount_paid,
       customer:customers(name),
       items:sale_items(
         id,
@@ -67,6 +69,7 @@ export async function getSaleForCreditNote(
     customerId: data.customer_id,
     customerName: customer?.name || "Consumidor Final",
     total: data.total,
+    amount_paid: Number(data.amount_paid) || 0,
     items: (data.items || []).map((item) => ({
       id: item.id,
       productId: item.product_id,
@@ -181,18 +184,7 @@ export async function createCreditNote(data: CreateCreditNoteData) {
 
   if (itemsError) throw itemsError;
 
-  // 6. Create payment (negative - represents refund)
-  const { error: paymentError } = await supabase.from("payments").insert({
-    sale_id: creditNote.id,
-    payment_method_id: data.refund.paymentMethodId,
-    method_name: data.refund.methodName,
-    amount: -total, // NEGATIVE for refund
-    reference: null,
-  });
-
-  if (paymentError) throw paymentError;
-
-  // 7. Increment stock for returned products
+  // 6. Increment stock for returned products
   for (const item of data.items) {
     if (item.productId) {
       const { error: stockError } = await supabase.rpc("increase_stock", {

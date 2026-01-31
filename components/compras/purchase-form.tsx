@@ -5,12 +5,9 @@ import { es } from "date-fns/locale";
 import {
   CalendarIcon,
   Check,
-  ChevronDown,
   ChevronRight,
   ChevronsUpDown,
-  Image as ImageIcon,
   Plus,
-  Search,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
@@ -44,12 +41,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -88,6 +79,7 @@ import {
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
 import { SupplierDialog } from "../proveedores/supplier-dialog";
 import { FileUpload } from "../ui/file-upload";
+import { ProductSelector } from "./product-selector";
 
 // Types
 interface PurchaseItem {
@@ -704,121 +696,16 @@ export function PurchaseForm({
 
                     <TableRow>
                       <TableCell colSpan={5}>
-                        <div className="flex gap-2">
-                          <Dialog
-                            open={openProducts}
-                            onOpenChange={setOpenProducts}
-                          >
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Search className="mr-2 h-4 w-4" />
-                                Agregar productos
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="flex h-[80vh] max-w-2xl flex-col overflow-hidden p-0">
-                              <DialogHeader className="px-4 pt-4">
-                                <DialogTitle>Agregar productos</DialogTitle>
-                              </DialogHeader>
-                              <Command className="flex h-full w-full flex-col overflow-hidden">
-                                <CommandInput placeholder="Buscá productos por nombre o SKU…" />
-                                <CommandList className="relative flex-1 overflow-y-auto">
-                                  <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-background px-3 py-2 text-sm font-medium text-muted-foreground">
-                                    <div className="flex-1">Producto</div>
-                                    <div className="hidden min-w-20 text-right sm:block">
-                                      Stock
-                                    </div>
-                                    <div className="hidden min-w-28 text-right sm:block">
-                                      Costo
-                                    </div>
-                                  </div>
-                                  <CommandEmpty>
-                                    No se encontraron productos
-                                  </CommandEmpty>
-                                  <CommandGroup>
-                                    {products.map((product) => {
-                                      const alreadyAdded = items.some(
-                                        (item) => item.productId === product.id,
-                                      );
-                                      const isSelected = selectedProductIds.has(
-                                        product.id,
-                                      );
-
-                                      return (
-                                        <CommandItem
-                                          key={product.id}
-                                          value={`${product.name} ${product.sku}`}
-                                          onSelect={() =>
-                                            !alreadyAdded &&
-                                            toggleProductSelection(product.id)
-                                          }
-                                          disabled={alreadyAdded}
-                                          className="flex cursor-pointer items-center gap-3 px-3 py-1.5"
-                                        >
-                                          <Checkbox
-                                            checked={isSelected || alreadyAdded}
-                                            disabled={alreadyAdded}
-                                          />
-                                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted">
-                                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                          </div>
-                                          <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-medium">
-                                                {product.name}
-                                              </span>
-                                              {alreadyAdded && (
-                                                <span className="text-sm text-muted-foreground">
-                                                  (ya agregado)
-                                                </span>
-                                              )}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                              SKU: {product.sku || "-"}
-                                            </div>
-                                          </div>
-                                          <div className="hidden items-center gap-1 sm:flex">
-                                            <div className="min-w-20 text-right">
-                                              {getProductStock(product)}
-                                            </div>
-                                            <div className="min-w-28 text-right font-semibold">
-                                              {formatCurrency(
-                                                Number(product.cost) || 0,
-                                              )}
-                                            </div>
-                                          </div>
-                                        </CommandItem>
-                                      );
-                                    })}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                              {selectedProductIds.size > 0 && (
-                                <DialogFooter className="border-t p-4">
-                                  <Button
-                                    onClick={handleAddSelectedProducts}
-                                    className="w-full"
-                                  >
-                                    Agregar {selectedProductIds.size} producto
-                                    {selectedProductIds.size > 1 ? "s" : ""}
-                                  </Button>
-                                </DialogFooter>
-                              )}
-                            </DialogContent>
-                          </Dialog>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                              <DropdownMenuItem onClick={handleAddCustomItem}>
-                                Ítem personalizado
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        <ProductSelector
+                          products={products}
+                          selectedProductIds={items.map(
+                            (item) => item.productId,
+                          )}
+                          onAddProducts={handleAddProducts}
+                          onAddCustomItem={handleAddCustomItem}
+                          formatCurrency={(value) => `$ ${value.toFixed(2)}`}
+                          getProductStock={(product) => product.stock || 0}
+                        />
                       </TableCell>
                     </TableRow>
                   </TableBody>

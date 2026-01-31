@@ -45,6 +45,7 @@ export default function NuevaVentaPage() {
   const searchParams = useSearchParams();
   const duplicateProcessed = useRef(false);
   const exchangeProcessed = useRef(false);
+  const quoteProcessed = useRef(false);
   const productSearchRef = useRef<ProductSearchPanelRef>(null);
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -160,6 +161,47 @@ export default function NuevaVentaPage() {
       }
 
       loadExchangeData();
+    }
+  }, [searchParams, router]);
+
+  // Load quote items if quoteId is present
+  useEffect(() => {
+    const quoteId = searchParams.get("quoteId");
+
+    if (quoteId && !quoteProcessed.current) {
+      quoteProcessed.current = true;
+
+      async function loadQuote() {
+        try {
+          const { getQuoteById, getQuoteCartData } =
+            await import("@/lib/services/quotes");
+          const quote = await getQuoteById(quoteId!);
+          const cartData = getQuoteCartData(quote);
+
+          setCartItems(cartData.items as CartItem[]);
+          setGlobalDiscount(cartData.globalDiscount);
+          setNote(cartData.note);
+
+          if (cartData.customer.id) {
+            setCustomer({
+              ...DEFAULT_CUSTOMER,
+              id: cartData.customer.id,
+              name: cartData.customer.name,
+            });
+          }
+
+          toast.success(
+            `Presupuesto ${quote.quote_number} cargado (${cartData.items.length} producto/s)`,
+          );
+          router.replace("/ventas/nueva", { scroll: false });
+        } catch (error) {
+          console.error("Error loading quote:", error);
+          toast.error("Error al cargar presupuesto");
+          router.replace("/ventas/nueva", { scroll: false });
+        }
+      }
+
+      loadQuote();
     }
   }, [searchParams, router]);
 
@@ -374,6 +416,7 @@ export default function NuevaVentaPage() {
     setGlobalDiscount(null);
     setNote("");
     toast("Carrito vaciado");
+    setCustomer(DEFAULT_CUSTOMER);
   }, []);
 
   // Continue to checkout

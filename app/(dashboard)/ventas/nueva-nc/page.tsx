@@ -126,8 +126,7 @@ export default function NuevaNCredito() {
   const total = subtotal + tax;
 
   // Total paid in original sale
-  const totalPaid =
-    originalSale?.payments.reduce((sum, p) => sum + p.amount, 0) || 0;
+  const totalPaid = originalSale?.amount_paid || 0;
 
   // Handlers
   const handleQuantityChange = (itemId: string, change: number) => {

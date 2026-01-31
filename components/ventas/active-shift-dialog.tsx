@@ -99,7 +99,11 @@ export function ActiveShiftDialog({
           total,
           voucher_type,
           created_at,
-          payments(amount, method_name)
+          customer_payment_allocations(
+            customer_payment:customer_payments(
+              customer_payment_methods(method_name, amount)
+            )
+          )
         `,
         )
         .eq("shift_id", shift.id)
@@ -108,15 +112,19 @@ export function ActiveShiftDialog({
 
       if (sales) {
         for (const sale of sales) {
+          const methods = (sale.customer_payment_allocations || []).flatMap(
+            (a: any) =>
+              a.customer_payment?.customer_payment_methods || [],
+          );
           const paymentMethods =
-            sale.payments
-              ?.map((p: { method_name: string }) => {
-                const name = p.method_name?.toLowerCase();
+            methods
+              .map((m: { method_name: string }) => {
+                const name = m.method_name?.toLowerCase();
                 if (name === "efectivo") return "Efectivo";
                 if (name === "tarjeta") return "Tarjeta";
                 if (name === "transferencia") return "Transferencia";
                 if (name === "qr") return "QR";
-                return p.method_name;
+                return m.method_name;
               })
               .filter(Boolean)
               .join(", ") || "";

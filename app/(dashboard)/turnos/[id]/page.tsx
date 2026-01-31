@@ -112,7 +112,11 @@ export default function ShiftDetailPage() {
         voucher_type,
         created_at,
         seller_id,
-        payments(amount, method_name)
+        customer_payment_allocations(
+          customer_payment:customer_payments(
+            customer_payment_methods(method_name, amount)
+          )
+        )
       `,
       )
       .eq("shift_id", shiftId)
@@ -121,8 +125,13 @@ export default function ShiftDetailPage() {
     if (!salesError && sales) {
       for (const sale of sales) {
         const paymentMethods =
-          sale.payments
-            ?.map((p: { method_name: string }) => p.method_name)
+          (sale.customer_payment_allocations || [])
+            .flatMap(
+              (a: any) =>
+                a.customer_payment?.customer_payment_methods || [],
+            )
+            .map((m: { method_name: string }) => m.method_name)
+            .filter(Boolean)
             .join(", ") || "";
         const isRefund = sale.voucher_type?.startsWith("NOTA_CREDITO");
 

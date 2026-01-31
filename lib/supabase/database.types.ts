@@ -974,6 +974,72 @@ export type Database = {
           },
         ]
       }
+      quotes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          customer_name: string | null
+          discount: number
+          id: string
+          items: Json
+          location_id: string | null
+          notes: string | null
+          quote_number: string
+          status: string
+          subtotal: number
+          total: number
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          discount?: number
+          id?: string
+          items?: Json
+          location_id?: string | null
+          notes?: string | null
+          quote_number: string
+          status?: string
+          subtotal?: number
+          total?: number
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          discount?: number
+          id?: string
+          items?: Json
+          location_id?: string | null
+          notes?: string | null
+          quote_number?: string
+          status?: string
+          subtotal?: number
+          total?: number
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_items: {
         Row: {
           created_at: string
@@ -1547,6 +1613,7 @@ export type Database = {
         Args: { location_id_param: string }
         Returns: string
       }
+      generate_quote_number: { Args: { pos_number?: number }; Returns: string }
       generate_sale_number: {
         Args: { location_id_param: string; prefix_param?: string }
         Returns: string

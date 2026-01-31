@@ -336,20 +336,7 @@ export async function createSale(
 
   if (itemsError) throw itemsError;
 
-  // 5. Crear pagos
-  if (payments.length > 0) {
-    const paymentsWithSaleId = payments.map((payment) => ({
-      ...payment,
-      sale_id: sale.id,
-    }));
-
-    const { error: paymentsError } = await supabase
-      .from("payments")
-      .insert(paymentsWithSaleId);
-
-    if (paymentsError) throw paymentsError;
-  }
-  // 5.5 Crear recibo de cobro (RCB) si hay pagos y  cliente
+  // 5. Crear recibo de cobro (RCB) si hay pagos y cliente
   if (payments.length > 0 && saleData.customer_id) {
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -1154,21 +1141,8 @@ export async function createExchange(
       }
     }
 
-    // Create payments if any
-    // Create payments if any
+    // Create RCB for the exchange payment
     if (payments.length > 0 && amountToPay > 0) {
-      const paymentsWithSaleId = payments.map((payment) => ({
-        ...payment,
-        sale_id: saleData.id,
-      }));
-
-      const { error: paymentsError } = await supabase
-        .from("payments")
-        .insert(paymentsWithSaleId);
-
-      if (paymentsError) throw paymentsError;
-
-      // Create RCB for the exchange payment
       if (exchangeData.customerId) {
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 

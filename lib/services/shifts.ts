@@ -137,21 +137,40 @@ export async function getShiftSummary(shiftId: string): Promise<ShiftSummary> {
 
   if (shiftError) throw shiftError;
 
-  // Get sales payments (cash only for cash amount calculation)
+  // Get sales for this shift
   const { data: salesData, error: salesError } = await supabase
     .from("sales")
-    .select(
-      `
-      id,
-      total,
-      voucher_type,
-      payments(amount, method_name)
-    `,
-    )
+    .select("id, total, voucher_type")
     .eq("shift_id", shiftId)
     .eq("status", "COMPLETED");
 
   if (salesError) throw salesError;
+
+  // Get payment methods for these sales via allocations
+  const saleIds = (salesData || []).map((s) => s.id);
+  let methodsBySale: Record<string, { method_name: string; amount: number }[]> =
+    {};
+
+  if (saleIds.length > 0) {
+    const { data: allocations } = await supabase
+      .from("customer_payment_allocations")
+      .select(
+        `
+        sale_id,
+        customer_payment:customer_payments(
+          customer_payment_methods(method_name, amount)
+        )
+      `,
+      )
+      .in("sale_id", saleIds);
+
+    for (const alloc of allocations || []) {
+      const methods =
+        (alloc.customer_payment as any)?.customer_payment_methods || [];
+      if (!methodsBySale[alloc.sale_id]) methodsBySale[alloc.sale_id] = [];
+      methodsBySale[alloc.sale_id].push(...methods);
+    }
+  }
 
   // Get manual movements
   const { data: movements, error: movementsError } = await supabase
@@ -174,12 +193,12 @@ export async function getShiftSummary(shiftId: string): Promise<ShiftSummary> {
     }
 
     // Sum cash payments
-    for (const payment of sale.payments || []) {
-      if (payment.method_name?.toLowerCase() === "efectivo") {
+    for (const method of methodsBySale[sale.id] || []) {
+      if (method.method_name?.toLowerCase() === "efectivo") {
         if (sale.voucher_type?.startsWith("NOTA_CREDITO")) {
-          cashFromSales -= Number(payment.amount);
+          cashFromSales -= Number(method.amount);
         } else {
-          cashFromSales += Number(payment.amount);
+          cashFromSales += Number(method.amount);
         }
       }
     }

@@ -244,7 +244,11 @@ export function CartPanel({
               onCloseShift={handleCloseShift}
               onRefresh={refetchShift}
               trigger={
-                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-green-600">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs text-green-600"
+                >
                   Turno abierto
                 </Button>
               }
@@ -688,6 +692,12 @@ export function CartPanel({
       <SaveQuoteDialog
         open={saveQuoteDialogOpen}
         onOpenChange={setSaveQuoteDialogOpen}
+        items={items}
+        customer={customer}
+        globalDiscount={globalDiscount}
+        note={note}
+        totals={totals}
+        onSaved={onClearCart}
       />
     </div>
   );

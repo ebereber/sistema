@@ -503,8 +503,8 @@ export default function VentasDetailPage() {
                     <span>Pagado</span>
                     <span>
                       {formatCurrency(
-                        sale.payments?.reduce(
-                          (sum, p) => sum + Number(p.amount),
+                        sale.customer_payment_receipts?.reduce(
+                          (sum, rcb) => sum + rcb.amount,
                           0,
                         ) || 0,
                       )}
@@ -539,7 +539,8 @@ export default function VentasDetailPage() {
                     )}
 
                   {/* Pagos normales (efectivo, tarjeta, etc) */}
-                  {sale.payments && sale.payments.length > 0 && (
+                  {((sale.customer_payment_receipts && sale.customer_payment_receipts.length > 0) ||
+                    sale.status === "PENDING") && (
                     <>
                       {/* Saldo pendiente */}
                       {sale.status === "PENDING" &&
