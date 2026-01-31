@@ -1,15 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/types";
 
-export interface CashRegister {
-  id: string;
-  name: string;
-  location_id: string;
-  point_of_sale_id: string | null;
+export type CashRegister = Omit<Tables<"cash_registers">, "status"> & {
   status: "active" | "archived";
-  created_at: string;
-  updated_at: string;
-  is_default: boolean;
-  // Relaciones
   location?: {
     id: string;
     name: string;
@@ -19,7 +12,7 @@ export interface CashRegister {
     name: string;
     number: number;
   } | null;
-}
+};
 
 export interface CreateCashRegisterData {
   name: string;
@@ -51,7 +44,7 @@ export async function getCashRegisters(): Promise<CashRegister[]> {
 
   if (error) throw error;
 
-  return data || [];
+  return (data || []) as unknown as CashRegister[];
 }
 
 // Obtener cajas por ubicación
@@ -75,7 +68,7 @@ export async function getCashRegistersByLocation(
 
   if (error) throw error;
 
-  return data || [];
+  return (data || []) as unknown as CashRegister[];
 }
 
 // Obtener una caja por ID
@@ -101,7 +94,7 @@ export async function getCashRegisterById(
     throw error;
   }
 
-  return data;
+  return data as unknown as CashRegister;
 }
 
 // Crear caja
@@ -128,7 +121,7 @@ export async function createCashRegister(
 
   if (error) throw error;
 
-  return created;
+  return created as unknown as CashRegister;
 }
 
 // Actualizar caja
@@ -153,7 +146,7 @@ export async function updateCashRegister(
 
   if (error) throw error;
 
-  return updated;
+  return updated as unknown as CashRegister;
 }
 
 // Archivar/Desarchivar caja
@@ -188,7 +181,7 @@ export async function toggleCashRegisterStatus(
 
   if (error) throw error;
 
-  return updated;
+  return updated as unknown as CashRegister;
 }
 
 // Eliminar caja
@@ -218,5 +211,5 @@ export async function getActiveCashRegisters(): Promise<CashRegister[]> {
 
   if (error) throw error;
 
-  return data || [];
+  return (data || []) as unknown as CashRegister[];
 }

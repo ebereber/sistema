@@ -63,7 +63,7 @@ export default function ProductoDetailPage() {
           const stock = data.stock.map((s) => ({
             location_id: s.location_id,
             location_name: s.location.name,
-            is_main: s.location.is_main,
+            is_main: s.location.is_main ?? false,
             quantity: s.quantity,
           }));
           setStockData(stock);
@@ -171,7 +171,7 @@ export default function ProductoDetailPage() {
           const newStock = freshProduct.stock.map((s) => ({
             location_id: s.location_id,
             location_name: s.location.name,
-            is_main: s.location.is_main,
+            is_main: s.location.is_main ?? false,
             quantity: s.quantity,
           }));
           setStockData(newStock);

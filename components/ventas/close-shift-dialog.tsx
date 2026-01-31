@@ -22,7 +22,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import type { ActiveShiftData } from "./active-shift-dialog";
+interface ActiveShiftData {
+  id: string;
+  cashRegisterName: string;
+  currentCashAmount: number;
+}
 
 type Step = "count" | "discrepancy" | "distribute" | "confirm";
 

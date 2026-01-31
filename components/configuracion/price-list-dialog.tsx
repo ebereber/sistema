@@ -94,11 +94,11 @@ export function PriceListDialog({
       form.reset({
         name: priceList.name,
         description: priceList.description || "",
-        is_automatic: priceList.is_automatic,
-        adjustment_type: priceList.adjustment_type as "AUMENTO" | "DESCUENTO",
-        adjustment_percentage: priceList.adjustment_percentage,
-        includes_tax: priceList.includes_tax,
-        active: priceList.active,
+        is_automatic: priceList.is_automatic ?? true,
+        adjustment_type: (priceList.adjustment_type ?? "AUMENTO") as "AUMENTO" | "DESCUENTO",
+        adjustment_percentage: priceList.adjustment_percentage ?? 0,
+        includes_tax: priceList.includes_tax ?? true,
+        active: priceList.active ?? true,
       })
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido"

@@ -1,29 +1,12 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/types";
 
-// Types
-export interface Shift {
-  id: string;
-  cash_register_id: string;
-  opened_by: string;
-  closed_by: string | null;
-  opened_at: string;
-  closed_at: string | null;
-  opening_amount: number;
-  expected_amount: number | null;
-  counted_amount: number | null;
-  left_in_cash: number | null;
-  discrepancy: number | null;
-  discrepancy_reason: string | null;
-  discrepancy_notes: string | null;
+export type Shift = Omit<Tables<"cash_register_shifts">, "status"> & {
   status: "open" | "closed";
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  // Relations
   cash_register?: {
     id: string;
     name: string;
-    location_id: string | null;
+    location_id: string;
   };
   opened_by_user?: {
     id: string;
@@ -33,22 +16,15 @@ export interface Shift {
     id: string;
     email: string;
   };
-}
+};
 
-export interface ShiftMovement {
-  id: string;
-  shift_id: string;
+export type ShiftMovement = Omit<Tables<"cash_register_movements">, "type"> & {
   type: "cash_in" | "cash_out";
-  amount: number;
-  notes: string | null;
-  performed_by: string;
-  created_at: string;
-  // Relations
   performed_by_user?: {
     id: string;
     email: string;
   };
-}
+};
 
 export interface ShiftSummary {
   grossCollections: number;
@@ -94,7 +70,7 @@ export async function getActiveShift(): Promise<Shift | null> {
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as Shift | null;
 }
 
 // Get active shift for a specific cash register
@@ -121,7 +97,7 @@ export async function getActiveShiftByCashRegister(
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as Shift | null;
 }
 
 // Get shift by ID with all relations
@@ -145,7 +121,7 @@ export async function getShiftById(id: string): Promise<Shift | null> {
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as Shift | null;
 }
 
 // Get shift summary (collections, refunds, movements)
@@ -248,7 +224,7 @@ export async function getShiftMovements(
 
   if (error) throw error;
 
-  return data || [];
+  return (data || []) as unknown as ShiftMovement[];
 }
 
 // Open a new shift
@@ -290,7 +266,7 @@ export async function openShift(data: OpenShiftData): Promise<Shift> {
 
   if (error) throw error;
 
-  return shift;
+  return shift as unknown as Shift;
 }
 
 // Close a shift
@@ -350,7 +326,7 @@ export async function closeShift(
 
   if (error) throw error;
 
-  return shift;
+  return shift as unknown as Shift;
 }
 
 // Add cash to shift (ingreso)
@@ -381,7 +357,7 @@ export async function addCashToShift(
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as ShiftMovement;
 }
 
 // Remove cash from shift (retiro)
@@ -412,7 +388,7 @@ export async function removeCashFromShift(
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as ShiftMovement;
 }
 
 // Get shifts list (for /turnos page)
@@ -479,7 +455,7 @@ export async function getShifts(params: GetShiftsParams = {}): Promise<{
   if (error) throw error;
 
   return {
-    data: data || [],
+    data: (data || []) as unknown as Shift[],
     count: count || 0,
     totalPages: Math.ceil((count || 0) / pageSize),
   };
@@ -510,5 +486,5 @@ export async function getLastClosedShift(
     throw error;
   }
 
-  return data;
+  return data as unknown as Shift | null;
 }

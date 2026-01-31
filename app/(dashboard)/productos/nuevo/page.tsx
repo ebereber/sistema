@@ -52,7 +52,7 @@ export default function NuevoProductoPage() {
         const initialStock = locations.map((loc) => ({
           location_id: loc.id,
           location_name: loc.name,
-          is_main: loc.is_main,
+          is_main: loc.is_main ?? false,
           quantity: 0,
         }));
         setStockData(initialStock);
@@ -181,7 +181,7 @@ export default function NuevoProductoPage() {
           const initialStock = locations.map((loc) => ({
             location_id: loc.id,
             location_name: loc.name,
-            is_main: loc.is_main,
+            is_main: loc.is_main ?? false,
             quantity: 0,
           }));
           setStockData(initialStock);

@@ -1,75 +1,34 @@
 import { createClient } from "@/lib/supabase/client"
+import type { Tables, TablesInsert, TablesUpdate, Enums } from "@/lib/supabase/types"
 
-export interface Product {
-  id: string
-  name: string
-  description: string | null
-  product_type: string
-  sku: string
-  barcode: string | null
-  oem_code: string | null
-  category_id: string | null
-  default_supplier_id: string | null
-  price: number
-  cost: number | null
-  margin_percentage: number | null
-  tax_rate: number
-  currency: string
-  track_stock: boolean
-  min_stock: number | null
-  visibility: string
-  image_url: string | null
-  stock_quantity: number
-  active: boolean
-  created_at: string
-  updated_at: string
+export type Product = Tables<"products"> & {
   category?: { id: string; name: string } | null
   supplier?: { id: string; name: string } | null
   stock?: StockByLocation[]
 }
 
-export interface StockByLocation {
-  id: string
-  location_id: string
-  quantity: number
+export type StockByLocation = Tables<"stock"> & {
   location: {
     id: string
     name: string
-    is_main: boolean
+    is_main: boolean | null
   }
 }
 
-export interface PriceHistory {
-  id: string
-  product_id: string
-  cost: number | null
-  price: number
-  margin_percentage: number | null
-  tax_rate: number | null
-  reason: string | null
-  created_by: string | null
-  created_at: string
-  user?: { name: string } | null
+export type PriceHistory = Tables<"price_history"> & {
+  user?: { name: string | null } | null
 }
 
-export interface StockMovement {
-  id: string
-  product_id: string
-  location_from_id: string | null
-  location_to_id: string | null
-  quantity: number
-  reason: string | null
-  reference_type: string | null
-  reference_id: string | null
-  created_by: string | null
-  created_at: string
+export type StockMovement = Tables<"stock_movements"> & {
   location_from?: { id: string; name: string } | null
   location_to?: { id: string; name: string } | null
-  user?: { name: string } | null
+  user?: { name: string | null } | null
 }
 
-export type ProductInsert = Omit<Product, "id" | "created_at" | "updated_at" | "category" | "supplier" | "stock" | "stock_quantity">
-export type ProductUpdate = Partial<ProductInsert> & { stock_quantity?: number }
+export type ProductInsert = Omit<TablesInsert<"products">, "stock_quantity">
+export type ProductUpdate = TablesUpdate<"products">
+
+export type ProductType = Enums<"product_type">
 
 export interface GetProductsParams {
   search?: string
@@ -188,7 +147,7 @@ export async function getProductById(id: string): Promise<Product> {
     .single()
 
   if (error) throw error
-  return data
+  return data as unknown as Product
 }
 
 /**

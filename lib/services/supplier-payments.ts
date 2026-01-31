@@ -1,21 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/types";
 
-// Types
-export interface SupplierPayment {
-  id: string;
-  payment_number: string;
-  supplier_id: string;
-  payment_date: string;
-  total_amount: number;
-  on_account_amount: number;
-  notes: string | null;
+export type SupplierPayment = Omit<Tables<"supplier_payments">, "status"> & {
   status: "completed" | "cancelled";
-  cancelled_at: string | null;
-  cancelled_by: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  // Relations
   supplier?: {
     id: string;
     name: string;
@@ -23,38 +10,24 @@ export interface SupplierPayment {
   };
   allocations?: SupplierPaymentAllocation[];
   payment_methods?: SupplierPaymentMethod[];
-}
+};
 
-export interface SupplierPaymentAllocation {
-  id: string;
-  payment_id: string;
-  purchase_id: string;
-  amount: number;
-  created_at: string;
-  // Relations
+export type SupplierPaymentAllocation = Tables<"supplier_payment_allocations"> & {
   purchase?: {
     id: string;
     voucher_number: string;
-    purchase_number: string;
+    purchase_number: string | null;
     total: number;
     invoice_date: string;
   };
-}
+};
 
-export interface SupplierPaymentMethod {
-  id: string;
-  payment_id: string;
-  method_name: string;
-  reference: string | null;
-  cash_register_id: string | null;
-  amount: number;
-  created_at: string;
-  // Relations
+export type SupplierPaymentMethod = Tables<"supplier_payment_methods"> & {
   cash_register?: {
     id: string;
     name: string;
   };
-}
+};
 
 export interface CreatePaymentData {
   supplier_id: string;
@@ -146,7 +119,7 @@ export async function getSupplierPayments(params: GetPaymentsParams = {}) {
 
   if (error) throw error;
 
-  return { data: data as SupplierPayment[], count: count || 0 };
+  return { data: (data || []) as SupplierPayment[], count: count || 0 };
 }
 
 // Get single payment by ID
@@ -184,7 +157,7 @@ export async function getSupplierPaymentById(
     throw error;
   }
 
-  return data as SupplierPayment;
+  return data as unknown as SupplierPayment;
 }
 
 // Get pending purchases for a supplier
@@ -337,7 +310,7 @@ export async function createSupplierPayment(
     }
   }
 
-  return payment as SupplierPayment;
+  return payment as unknown as SupplierPayment;
 }
 
 // Cancel payment

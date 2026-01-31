@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { normalizeRelation } from "@/lib/supabase/types";
+import type { Tables, TablesInsert } from "@/lib/supabase/types";
 import type {
   CartItem,
   GlobalDiscount,
@@ -79,10 +81,10 @@ export async function searchProductsForSale(
     barcode: product.barcode,
     price: product.price,
     taxRate: product.tax_rate,
-    stockQuantity: product.stock_quantity,
+    stockQuantity: product.stock_quantity ?? 0,
     imageUrl: product.image_url,
     categoryId: product.category_id,
-    categoryName: (product.category as { name: string } | null)?.name || null,
+    categoryName: normalizeRelation(product.category)?.name || null,
   }));
 }
 
@@ -149,10 +151,10 @@ export async function getProductByBarcode(
     barcode: data.barcode,
     price: data.price,
     taxRate: data.tax_rate,
-    stockQuantity: data.stock_quantity,
+    stockQuantity: data.stock_quantity ?? 0,
     imageUrl: data.image_url,
     categoryId: data.category_id,
-    categoryName: (data.category as { name: string } | null)?.name || null,
+    categoryName: normalizeRelation(data.category)?.name || null,
   };
 }
 
@@ -187,16 +189,11 @@ export async function getCustomerPriceListAdjustment(
 
   if (error) throw error;
 
-  if (!data || !data.price_list) {
+  const priceList = normalizeRelation(data?.price_list);
+
+  if (!data || !priceList) {
     return null;
   }
-
-  const priceList = data.price_list as {
-    id: string;
-    name: string;
-    adjustment_type: string;
-    adjustment_percentage: number;
-  };
 
   return {
     priceListId: priceList.id,
@@ -446,13 +443,6 @@ export interface SaleWithDetails {
     created_at: string;
   }[];
   related_sale_id: string | null;
-  // NC que anulan esta venta (ya existe)
-  credit_notes: {
-    id: string;
-    sale_number: string;
-    total: number;
-    created_at: string;
-  }[];
 
   // Para NC: ventas donde se aplicó esta NC
   applied_to_sales: {
@@ -529,7 +519,8 @@ export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
     throw error;
   }
 
-  return data as SaleWithDetails;
+  // Complex join requires manual cast — typed client can't fully infer nested relations
+  return data as unknown as SaleWithDetails;
 }
 
 /**
@@ -690,7 +681,7 @@ export async function getSales(
   if (error) throw error;
 
   // Map data to handle Supabase relation arrays
-  const mappedData: SaleListItem[] = await Promise.all(
+  const mappedData = await Promise.all(
     (data || []).map(async (item) => {
       let availableBalance: number | null = null;
 
@@ -705,31 +696,26 @@ export async function getSales(
         availableBalance = item.total - used;
       }
 
-      // Handle Supabase relation format (may return array for single relations)
-      const customerData = item.customer;
-      const customer = Array.isArray(customerData)
-        ? customerData[0]
-        : customerData;
-      const sellerData = item.seller;
-      const seller = Array.isArray(sellerData) ? sellerData[0] : sellerData;
+      const customer = normalizeRelation(item.customer);
+      const seller = normalizeRelation(item.seller);
 
       return {
         id: item.id,
         sale_number: item.sale_number,
         sale_date: item.sale_date,
-        status: item.status,
+        status: item.status as SaleListItem["status"],
         voucher_type: item.voucher_type,
         total: item.total,
         amount_paid: item.amount_paid,
         due_date: item.due_date,
         related_sale_id: item.related_sale_id,
         availableBalance,
-        customer: (customer as SaleListItem["customer"]) || null,
-        seller: (seller as SaleListItem["seller"]) || null,
+        customer: customer as SaleListItem["customer"],
+        seller: seller as SaleListItem["seller"],
         credit_notes: (item.credit_notes || []) as SaleListItem["credit_notes"],
       };
     }),
-  );
+  ) as SaleListItem[];
 
   return {
     data: mappedData,
@@ -844,19 +830,15 @@ export async function getSaleForExchange(
     throw error;
   }
 
-  // Handle Supabase relation format (may return array for single relations)
-  const customerData = data.customer;
-  const customer = Array.isArray(customerData) ? customerData[0] : customerData;
+  const customer = normalizeRelation(data.customer);
 
   return {
     originalSaleId: data.id,
     originalSaleNumber: data.sale_number,
     customerId: data.customer_id,
-    customerName:
-      (customer as { name: string } | undefined)?.name || "Consumidor Final",
+    customerName: customer?.name || "Consumidor Final",
     items: (data.items || []).map((item) => {
-      const productData = item.product;
-      const product = Array.isArray(productData) ? productData[0] : productData;
+      const product = normalizeRelation(item.product);
       return {
         id: item.id,
         productId: item.product_id,
@@ -866,9 +848,7 @@ export async function getSaleForExchange(
         quantity: item.quantity,
         maxQuantity: item.quantity,
         taxRate: item.tax_rate,
-        imageUrl:
-          (product as { image_url: string | null } | undefined)?.image_url ||
-          null,
+        imageUrl: product?.image_url || null,
       };
     }),
   };
@@ -1219,7 +1199,7 @@ export async function cancelCreditNote(
         // NC increased stock, so we decrease it to revert
         const { error: stockError } = await supabase.rpc("decrease_stock", {
           p_product_id: item.product_id,
-          p_location_id: creditNote.location_id,
+          p_location_id: creditNote.location_id!,
           p_quantity: item.quantity,
         });
 

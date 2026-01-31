@@ -154,7 +154,7 @@ function SidebarProvider({
 function Sidebar({
   side = "left",
   variant = "sidebar",
-  collapsible = "",
+  collapsible = "none",
   className,
   children,
   ...props

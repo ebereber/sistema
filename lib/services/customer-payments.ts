@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { normalizeRelation } from "@/lib/supabase/types";
 
 // =====================================================
 // Types
@@ -221,13 +222,8 @@ export async function getCustomerPayments(
     // Build sales summary
     const salesNumbers = paymentAllocations
       .map((a) => {
-        const sale = a.sale;
-        if (!sale) return null;
-        // Supabase returns single relation as object, not array, when using typed client
-        if (Array.isArray(sale)) {
-          return sale[0]?.sale_number ?? null;
-        }
-        return sale.sale_number;
+        const sale = normalizeRelation(a.sale);
+        return sale?.sale_number ?? null;
       })
       .filter((s): s is string => s !== null);
 
@@ -238,16 +234,7 @@ export async function getCustomerPayments(
       salesSummary = `${salesNumbers[0]} +${salesNumbers.length - 1}`;
     }
 
-    // Handle customer relation
-    const customer = p.customer;
-    let customerData: { id: string; name: string } | null = null;
-    if (customer) {
-      if (Array.isArray(customer)) {
-        customerData = customer[0] ?? null;
-      } else {
-        customerData = customer;
-      }
-    }
+    const customerData = normalizeRelation(p.customer);
 
     return {
       id: p.id,
@@ -315,40 +302,15 @@ export async function getCustomerPaymentById(
     .select("*")
     .eq("customer_payment_id", id);
 
-  // Handle customer relation
-  const customer = payment.customer;
-  let customerData: CustomerPaymentWithDetails["customer"] = null;
-  if (customer) {
-    if (Array.isArray(customer)) {
-      customerData = customer[0] ?? null;
-    } else {
-      customerData = customer;
-    }
-  }
+  const customerData = normalizeRelation(payment.customer) as CustomerPaymentWithDetails["customer"];
 
   // Map allocations
-  const mappedAllocations = (allocations || []).map((a) => {
-    const sale = a.sale;
-    let saleData: {
-      id: string;
-      sale_number: string;
-      sale_date: string;
-      total: number;
-    } | null = null;
-    if (sale) {
-      if (Array.isArray(sale)) {
-        saleData = sale[0] ?? null;
-      } else {
-        saleData = sale;
-      }
-    }
-    return {
-      id: a.id,
-      amount: a.amount,
-      sale_id: a.sale_id,
-      sale: saleData,
-    };
-  });
+  const mappedAllocations = (allocations || []).map((a) => ({
+    id: a.id,
+    amount: a.amount,
+    sale_id: a.sale_id,
+    sale: normalizeRelation(a.sale),
+  }));
 
   return {
     id: payment.id,

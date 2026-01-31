@@ -1,57 +1,29 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 
-// Manual types since database.types.ts doesn't exist yet
-export interface Customer {
-  id: string;
-  name: string;
-  trade_name: string | null;
-  tax_id: string | null;
-  tax_id_type: string | null;
-  legal_entity_type: string | null;
-  tax_category: string | null;
-  email: string | null;
-  phone: string | null;
-  street_address: string | null;
-  apartment: string | null;
-  postal_code: string | null;
-  province: string | null;
-  city: string | null;
-  assigned_seller_id: string | null;
-  price_list_id: string | null;
-  payment_terms: string | null;
-  notes: string | null;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
+export type Customer = Tables<"customers"> & {
   assigned_seller?: {
     id: string;
-    name: string;
+    name: string | null;
   } | null;
   price_list?: {
     id: string;
     name: string;
-    is_automatic: boolean;
-    adjustment_type: string;
-    adjustment_percentage: number;
+    is_automatic: boolean | null;
+    adjustment_type: string | null;
+    adjustment_percentage: number | null;
   } | null;
-}
+};
 
-export type CustomerInsert = Omit<
-  Customer,
-  "id" | "created_at" | "updated_at" | "assigned_seller" | "price_list"
->;
-export type CustomerUpdate = Partial<CustomerInsert>;
+export type CustomerInsert = TablesInsert<"customers">;
+export type CustomerUpdate = TablesUpdate<"customers">;
 
 export interface CustomerFilters {
   search?: string;
   active?: boolean;
 }
 
-export interface Seller {
-  id: string;
-  name: string;
-  email: string | null;
-}
+export type Seller = Pick<Tables<"users">, "id" | "name" | "email">;
 
 /**
  * Get all customers with optional filters

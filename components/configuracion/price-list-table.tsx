@@ -176,12 +176,12 @@ export function PriceListTable({
                 <TableCell>
                   <span
                     className={`font-medium ${getPercentageColor(
-                      priceList.adjustment_type
+                      priceList.adjustment_type ?? ""
                     )}`}
                   >
                     {formatPercentage(
-                      priceList.adjustment_type,
-                      priceList.adjustment_percentage
+                      priceList.adjustment_type ?? "",
+                      priceList.adjustment_percentage ?? 0
                     )}
                   </span>
                 </TableCell>

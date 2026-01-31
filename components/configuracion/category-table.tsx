@@ -24,6 +24,7 @@ interface CategoryTableProps {
   categories: CategoryWithChildren[]
   onEdit: (category: CategoryWithChildren) => void
   onDelete: (id: string) => void
+  onAddSubcategory?: (parentCategory: CategoryWithChildren) => void
 }
 
 export function CategoryTable({ categories, onEdit, onDelete }: CategoryTableProps) {

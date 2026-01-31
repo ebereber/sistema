@@ -110,10 +110,10 @@ export function POSSheet({ mode, posId, trigger, onSuccess }: POSSheetProps) {
       form.reset({
         number: pos.number,
         name: pos.name,
-        is_digital: pos.is_digital,
+        is_digital: pos.is_digital ?? false,
         location_id: pos.location_id,
-        enabled_for_arca: pos.enabled_for_arca,
-        active: pos.active,
+        enabled_for_arca: pos.enabled_for_arca ?? false,
+        active: pos.active ?? true,
       });
     } catch (error: unknown) {
       const errorMessage =

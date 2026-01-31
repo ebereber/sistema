@@ -48,7 +48,7 @@ export function StockTable({ value, onChange, disabled }: StockTableProps) {
         const initialStock = data.map((loc) => ({
           location_id: loc.id,
           location_name: loc.name,
-          is_main: loc.is_main,
+          is_main: loc.is_main ?? false,
           quantity: 0,
         }));
         onChange(initialStock);

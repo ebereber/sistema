@@ -82,8 +82,8 @@ export function LocationSheet({
       form.reset({
         name: location.name,
         address: location.address || "",
-        is_main: location.is_main,
-        active: location.active,
+        is_main: location.is_main ?? false,
+        active: location.active ?? true,
       });
     } catch (error: unknown) {
       const errorMessage =

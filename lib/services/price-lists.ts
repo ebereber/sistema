@@ -1,20 +1,9 @@
 import { createClient } from "@/lib/supabase/client"
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types"
 
-export interface PriceList {
-  id: string
-  name: string
-  description: string | null
-  is_automatic: boolean
-  adjustment_type: string
-  adjustment_percentage: number
-  includes_tax: boolean
-  active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export type PriceListInsert = Omit<PriceList, "id" | "created_at" | "updated_at">
-export type PriceListUpdate = Partial<PriceListInsert>
+export type PriceList = Tables<"price_lists">
+export type PriceListInsert = TablesInsert<"price_lists">
+export type PriceListUpdate = TablesUpdate<"price_lists">
 
 /**
  * Get all active price lists
@@ -115,7 +104,7 @@ export async function deletePriceList(id: string): Promise<void> {
 export function calculatePriceWithList(basePrice: number, priceList: PriceList): number {
   if (!priceList.is_automatic) return basePrice
 
-  const percentage = priceList.adjustment_percentage / 100
+  const percentage = (priceList.adjustment_percentage ?? 0) / 100
 
   if (priceList.adjustment_type === "DESCUENTO") {
     return basePrice * (1 - percentage)

@@ -1,44 +1,36 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 
-export interface Location {
-  id: string;
-  name: string;
-  address: string | null;
-  is_main: boolean;
-  status: "active" | "archived";
-  created_at: string;
-  updated_at: string;
+export type Location = Tables<"locations"> & {
   points_of_sale?: {
     id: string;
     number: number;
     name: string;
-    enabled_for_arca: boolean;
+    enabled_for_arca: boolean | null;
+    is_digital?: boolean | null;
   }[];
   cash_registers?: {
     id: string;
     name: string;
-    status: "active" | "archived";
+    status: string;
     point_of_sale?: {
       id: string;
       number: number;
       name: string;
     } | null;
   }[];
-}
+};
 
 export interface PointOfSaleBasic {
   id: string;
   number: number;
   name: string;
-  is_digital: boolean;
-  enabled_for_arca: boolean;
+  is_digital: boolean | null;
+  enabled_for_arca: boolean | null;
 }
 
-export type LocationInsert = Omit<
-  Location,
-  "id" | "created_at" | "updated_at" | "points_of_sale"
->;
-export type LocationUpdate = Partial<LocationInsert>;
+export type LocationInsert = TablesInsert<"locations">;
+export type LocationUpdate = TablesUpdate<"locations">;
 
 /**
  * Get all active locations with their assigned POS

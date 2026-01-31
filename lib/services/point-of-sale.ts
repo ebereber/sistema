@@ -1,15 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types"
 
-export interface PointOfSale {
-  id: string
-  number: number
-  name: string
-  is_digital: boolean
-  location_id: string | null
-  enabled_for_arca: boolean
-  active: boolean
-  created_at: string
-  updated_at: string
+export type PointOfSale = Tables<"point_of_sale"> & {
   location?: LocationBasic | null
 }
 
@@ -18,8 +10,8 @@ export interface LocationBasic {
   name: string
 }
 
-export type PointOfSaleInsert = Omit<PointOfSale, "id" | "created_at" | "updated_at" | "location">
-export type PointOfSaleUpdate = Partial<PointOfSaleInsert>
+export type PointOfSaleInsert = TablesInsert<"point_of_sale">
+export type PointOfSaleUpdate = TablesUpdate<"point_of_sale">
 
 /**
  * Get all active points of sale with their assigned location

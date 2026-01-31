@@ -1,15 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
+import type { Tables } from "@/lib/supabase/types"
 
-// Manual types since database.types.ts doesn't exist yet
-export interface Category {
-  id: string
-  name: string
-  description: string | null
-  parent_id: string | null
-  active: boolean
-  created_at: string
-  updated_at: string
-}
+export type Category = Tables<"categories">
 
 export interface CategoryWithChildren extends Category {
   children?: CategoryWithChildren[]

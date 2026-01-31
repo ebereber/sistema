@@ -39,7 +39,7 @@ export async function getPaymentMethods(filters?: {
   const { data, error } = await query;
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as unknown as PaymentMethod[];
 }
 
 export async function getPaymentMethodById(id: string): Promise<PaymentMethod> {
@@ -52,7 +52,7 @@ export async function getPaymentMethodById(id: string): Promise<PaymentMethod> {
     .single();
 
   if (error) throw error;
-  return data;
+  return data as unknown as PaymentMethod;
 }
 
 /**
@@ -70,7 +70,7 @@ export async function createPaymentMethod(
     .single();
 
   if (error) throw error;
-  return data;
+  return data as unknown as PaymentMethod;
 }
 
 /**
@@ -90,7 +90,7 @@ export async function updatePaymentMethod(
     .single();
 
   if (error) throw error;
-  return data;
+  return data as unknown as PaymentMethod;
 }
 
 /**

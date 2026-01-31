@@ -10,5 +10,6 @@ export async function getPriceRoundingSetting(): Promise<PriceRoundingType> {
     .eq("key", "price_rounding")
     .single();
 
-  return data?.value?.type || "none";
+  const value = data?.value as Record<string, unknown> | null;
+  return ((value?.type as string) || "none") as PriceRoundingType;
 }

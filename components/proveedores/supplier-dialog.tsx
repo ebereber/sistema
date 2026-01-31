@@ -111,7 +111,7 @@ export function SupplierDialog({
         tax_id_type: supplier.tax_id_type || "CUIT/CUIL",
         legal_entity_type: supplier.legal_entity_type || "Física",
         tax_category: supplier.tax_category || "Consumidor Final",
-        active: supplier.active,
+        active: supplier.active ?? true,
       });
       setFiscalInfo({
         tax_id_type: supplier.tax_id_type || "CUIT/CUIL",

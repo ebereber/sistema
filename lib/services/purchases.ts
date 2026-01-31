@@ -1,32 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/types";
 
-// Types
-export interface Purchase {
-  id: string;
-  purchase_number: string | null;
-  supplier_id: string;
-  location_id: string | null;
-  voucher_type: string;
-  voucher_number: string;
-  invoice_date: string;
-  due_date: string | null;
-  accounting_date: string | null;
-  subtotal: number;
-  discount: number;
-  tax: number;
-  total: number;
+export type Purchase = Omit<Tables<"purchases">, "status" | "payment_status"> & {
   status: "draft" | "completed" | "cancelled";
-  products_received: boolean;
-  notes: string | null;
-  attachment_url: string | null;
-  tax_category: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  // Payment tracking
-  amount_paid: number | null;
   payment_status: "pending" | "partial" | "paid" | null;
-  // Relations
   supplier?: {
     id: string;
     name: string;
@@ -37,20 +14,11 @@ export interface Purchase {
     name: string;
   };
   items?: PurchaseItem[];
-}
+};
 
-export interface PurchaseItem {
-  id: string;
-  purchase_id: string;
-  product_id: string | null;
-  name: string;
-  sku: string | null;
-  quantity: number;
-  unit_cost: number;
-  subtotal: number;
+export type PurchaseItem = Omit<Tables<"purchase_items">, "type"> & {
   type: "product" | "custom";
-  created_at: string;
-}
+};
 
 export interface CreatePurchaseData {
   supplier_id: string;
@@ -158,7 +126,7 @@ export async function getPurchases(params: GetPurchasesParams = {}): Promise<{
   if (error) throw error;
 
   return {
-    data: data || [],
+    data: (data || []) as unknown as Purchase[],
     count: count || 0,
     totalPages: Math.ceil((count || 0) / pageSize),
   };
@@ -186,7 +154,7 @@ export async function getPurchaseById(id: string): Promise<Purchase | null> {
     throw error;
   }
 
-  return data;
+  return data as unknown as Purchase;
 }
 
 // Create purchase with items
@@ -206,7 +174,7 @@ export async function createPurchase(
   // Generate purchase number
   const { data: purchaseNumber, error: numberError } = await supabase.rpc(
     "generate_purchase_number",
-    { location_id_param: purchaseData.location_id || null },
+    { location_id_param: purchaseData.location_id || "" },
   );
   if (numberError) throw numberError;
 
@@ -214,7 +182,7 @@ export async function createPurchase(
   const { data: purchase, error: purchaseError } = await supabase
     .from("purchases")
     .insert({
-      purchase_number: purchaseNumber, // ← Agregar
+      purchase_number: purchaseNumber || "", // ← Agregar
       supplier_id: purchaseData.supplier_id,
       location_id: purchaseData.location_id || null,
       voucher_type: purchaseData.voucher_type,
@@ -278,7 +246,7 @@ export async function createPurchase(
     }
   }
 
-  return purchase;
+  return purchase as unknown as Purchase;
 }
 
 // Update purchase
@@ -297,7 +265,7 @@ export async function updatePurchase(
       supplier_id: purchaseData.supplier_id,
       location_id: purchaseData.location_id || null,
       voucher_type: purchaseData.voucher_type,
-      voucher_number: purchaseData.voucher_number,
+      voucher_number: purchaseData.voucher_number || "",
       invoice_date: purchaseData.invoice_date,
       due_date: purchaseData.due_date || null,
       accounting_date: purchaseData.accounting_date || null,
@@ -347,7 +315,7 @@ export async function updatePurchase(
     }
   }
 
-  return purchase;
+  return purchase as unknown as Purchase;
 }
 // Cancel purchase (and revert stock if needed)
 export async function cancelPurchase(id: string): Promise<Purchase> {
@@ -389,7 +357,7 @@ export async function cancelPurchase(id: string): Promise<Purchase> {
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as Purchase;
 }
 
 // Mark products as received (increase stock)
@@ -440,7 +408,7 @@ export async function markProductsReceived(
 
   if (error) throw error;
 
-  return data;
+  return data as unknown as Purchase;
 }
 
 // Upload attachment
@@ -580,7 +548,7 @@ export async function getPaymentsByPurchaseId(
     return {
       id: allocation.id,
       amount: Number(allocation.amount),
-      created_at: allocation.created_at,
+      created_at: allocation.created_at || "",
       payment_id: allocation.payment_id,
       payment_number: payment?.payment_number || "",
       payment_date: payment?.payment_date || "",

@@ -129,14 +129,14 @@ export function ProductForm({
         price: initialData.price,
         tax_rate: initialData.tax_rate,
         currency: initialData.currency,
-        track_stock: initialData.track_stock,
+        track_stock: initialData.track_stock ?? false,
         min_stock: initialData.min_stock,
         visibility: initialData.visibility as
           | "SALES_AND_PURCHASES"
           | "SALES_ONLY"
           | "PURCHASES_ONLY",
         image_url: initialData.image_url,
-        active: initialData.active,
+        active: initialData.active ?? true,
       });
     }
   }, [initialData, form]);

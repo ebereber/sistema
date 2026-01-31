@@ -99,11 +99,11 @@ import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
 interface PendingPurchase {
   id: string;
   voucher_number: string;
-  purchase_number: string;
+  purchase_number: string | null;
   total: number;
-  amount_paid: number;
+  amount_paid: number | null;
   invoice_date: string;
-  payment_status: string;
+  payment_status: string | null;
   balance: number;
   selected: boolean;
   amountToPay: number;
@@ -399,7 +399,7 @@ export default function NuevoPagoPage() {
   const filteredPurchases = purchases.filter(
     (p) =>
       p.voucher_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.purchase_number.toLowerCase().includes(searchQuery.toLowerCase()),
+      (p.purchase_number || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Submit
@@ -1013,7 +1013,7 @@ export default function NuevoPagoPage() {
                   {cashRegisters.map((cr) => (
                     <SelectItem key={cr.id} value={cr.id}>
                       {cr.name}
-                      {cr.is_default && " (Principal)"}
+                      {(cr as Record<string, unknown>).is_default ? " (Principal)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -1,32 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 
-// Manual types since database.types.ts doesn't exist yet
-export interface Supplier {
-  id: string;
-  name: string;
-  tax_id: string | null;
-  tax_id_type: string | null;
-  legal_entity_type: string | null;
-  tax_category: string | null;
-  email: string | null;
-  phone: string | null;
-  street_address: string | null;
-  apartment: string | null;
-  postal_code: string | null;
-  province: string | null;
-  city: string | null;
-  trade_name: string | null;
-  business_description: string | null;
-  payment_terms: string | null;
-  contact_person: string | null;
-  notes: string | null;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export type SupplierInsert = Omit<Supplier, "id" | "created_at" | "updated_at">;
-export type SupplierUpdate = Partial<SupplierInsert>;
+export type Supplier = Tables<"suppliers">;
+export type SupplierInsert = TablesInsert<"suppliers">;
+export type SupplierUpdate = TablesUpdate<"suppliers">;
 
 export interface SupplierFilters {
   search?: string;

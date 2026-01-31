@@ -36,7 +36,7 @@ import {
 
 interface Purchase {
   id: string
-  purchase_number: string
+  purchase_number: string | null
   created_at: string
   total: number
 }

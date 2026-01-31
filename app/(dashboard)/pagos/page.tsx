@@ -147,7 +147,7 @@ export default function PagosPage() {
 
   const getVoucherDisplay = (payment: SupplierPayment) => {
     if (!payment.allocations || payment.allocations.length === 0) {
-      return payment.on_account_amount > 0 ? "Pago a cuenta" : "-";
+      return (payment.on_account_amount ?? 0) > 0 ? "Pago a cuenta" : "-";
     }
     if (payment.allocations.length === 1) {
       return payment.allocations[0].purchase?.voucher_number || "-";

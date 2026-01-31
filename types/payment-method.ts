@@ -1,3 +1,5 @@
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
+
 export type PaymentMethodType =
   | "EFECTIVO"
   | "CHEQUE"
@@ -16,26 +18,19 @@ export interface GetPaymentMethodsFilters {
   availability?: PaymentMethodAvailability;
 }
 
-export interface PaymentMethod {
-  id: string;
-  name: string;
+export type PaymentMethod = Omit<Tables<"payment_methods">, "type" | "availability"> & {
   type: PaymentMethodType;
-  icon: string;
-  fee_percentage: number;
-  fee_fixed: number;
-  requires_reference: boolean;
   availability: PaymentMethodAvailability;
-  is_active: boolean;
-  is_system: boolean;
-  created_at: string;
-  updated_at: string;
-}
+};
 
-export type PaymentMethodInsert = Omit<
-  PaymentMethod,
-  "id" | "created_at" | "updated_at"
->;
-export type PaymentMethodUpdate = Partial<PaymentMethodInsert>;
+export type PaymentMethodInsert = Omit<TablesInsert<"payment_methods">, "type" | "availability"> & {
+  type: PaymentMethodType;
+  availability?: PaymentMethodAvailability;
+};
+export type PaymentMethodUpdate = Omit<TablesUpdate<"payment_methods">, "type" | "availability"> & {
+  type?: PaymentMethodType;
+  availability?: PaymentMethodAvailability;
+};
 
 export const PAYMENT_TYPE_CONFIG = {
   EFECTIVO: {

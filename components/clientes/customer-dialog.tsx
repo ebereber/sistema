@@ -154,7 +154,7 @@ export function CustomerDialog({
         tax_id_type: customer.tax_id_type || "DNI",
         legal_entity_type: customer.legal_entity_type || "Física",
         tax_category: customer.tax_category || "Consumidor Final",
-        active: customer.active,
+        active: customer.active ?? true,
       });
       setFiscalInfo({
         tax_id_type: customer.tax_id_type || "DNI",

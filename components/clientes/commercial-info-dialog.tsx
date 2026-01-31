@@ -199,7 +199,7 @@ export function CommercialInfoDialog({
                       {sellers.map((seller) => (
                         <CommandItem
                           key={seller.id}
-                          value={seller.name}
+                          value={seller.name ?? undefined}
                           onSelect={() => {
                             setAssignedSellerId(seller.id)
                             setSellerComboboxOpen(false)

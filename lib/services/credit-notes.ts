@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { normalizeRelation } from "@/lib/supabase/types";
 
 export interface CreditNoteItem {
   id: string;
@@ -58,9 +59,7 @@ export async function getSaleForCreditNote(
 
   if (error) throw error;
 
-  // Supabase can return single object or array depending on relation
-  const customerData = data.customer as { name: string } | { name: string }[] | null;
-  const customer = Array.isArray(customerData) ? customerData[0] : customerData;
+  const customer = normalizeRelation(data.customer);
 
   return {
     id: data.id,
@@ -68,7 +67,7 @@ export async function getSaleForCreditNote(
     customerId: data.customer_id,
     customerName: customer?.name || "Consumidor Final",
     total: data.total,
-    items: (data.items as any[]).map((item) => ({
+    items: (data.items || []).map((item) => ({
       id: item.id,
       productId: item.product_id,
       name: item.description,
@@ -78,7 +77,7 @@ export async function getSaleForCreditNote(
       maxQuantity: item.quantity,
       taxRate: item.tax_rate,
     })),
-    payments: (data.payments as any[]).map((p) => ({
+    payments: (data.payments || []).map((p) => ({
       methodName: p.method_name,
       amount: p.amount,
     })),

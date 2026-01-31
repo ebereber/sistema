@@ -23,12 +23,12 @@ export async function getAvailableCreditNotes(
 
   if (error) throw error;
 
-  return (data || []).map((nc: Record<string, unknown>) => ({
-    id: nc.id as string,
-    saleNumber: nc.sale_number as string,
-    total: nc.total as number,
-    availableBalance: nc.available_balance as number,
-    createdAt: nc.created_at as string,
+  return (data || []).map((nc) => ({
+    id: nc.id,
+    saleNumber: nc.sale_number,
+    total: nc.total,
+    availableBalance: nc.available_balance,
+    createdAt: nc.created_at,
   }));
 }
 
