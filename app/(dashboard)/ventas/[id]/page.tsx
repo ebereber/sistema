@@ -421,6 +421,15 @@ export default function VentasDetailPage() {
                   <CreditCard className="size-4 text-muted-foreground" />
                   Pagos
                 </div>
+                {/* Botón Nuevo cobro - solo si está pendiente y NO es NC */}
+                {sale.status === "PENDING" &&
+                  !sale.voucher_type.startsWith("NOTA_CREDITO") && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/cobranzas/nueva?saleId=${sale.id}`}>
+                        Nuevo cobro
+                      </Link>
+                    </Button>
+                  )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -526,6 +535,32 @@ export default function VentasDetailPage() {
                   {/* Pagos normales (efectivo, tarjeta, etc) */}
                   {sale.payments && sale.payments.length > 0 && (
                     <>
+                      {/* Total pagado */}
+                      {/*  <div className="flex items-center justify-between text-sm font-medium">
+                        <span>Pagado</span>
+                        <span>{formatCurrency(sale.amount_paid || 0)}</span>
+                      </div> */}
+
+                      {/* Saldo pendiente - solo si hay saldo */}
+                      {sale.status === "PENDING" &&
+                        sale.total - (sale.amount_paid || 0) > 0 && (
+                          <div className="flex items-center justify-between text-sm text-destructive">
+                            <span>Saldo pendiente</span>
+                            <span className="font-medium">
+                              {formatCurrency(
+                                sale.total - (sale.amount_paid || 0),
+                              )}
+                            </span>
+                          </div>
+                        )}
+
+                      {/* Fecha de vencimiento - solo si existe */}
+                      {sale.due_date && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>Vencimiento</span>
+                          <span>{formatRelativeDate(sale.due_date)}</span>
+                        </div>
+                      )}
                       <Separator />
                       {sale.payments.map((payment) => (
                         <div

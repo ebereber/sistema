@@ -130,10 +130,13 @@ export function CheckoutDialog({
                           isAmountValid={checkout.isAmountValid}
                           isPaymentComplete={checkout.isPaymentComplete}
                           paymentMethods={checkout.paymentMethods}
+                          isPending={checkout.isPending}
+                          pendingAmount={checkout.pendingAmount}
                           onAmountChange={checkout.setCurrentSplitAmount}
                           onMethodClick={checkout.handlePaymentMethodClick}
                           onRemovePayment={checkout.handleRemoveSplitPayment}
                           onBack={checkout.handleBack}
+                          onMarkAsPending={checkout.handleMarkAsPending}
                         />
                       )}
 
@@ -258,6 +261,10 @@ export function CheckoutDialog({
                   selectedPaymentMethod={checkout.selectedPaymentMethod}
                   isPaymentComplete={checkout.isPaymentComplete}
                   onSubmit={checkout.handleConfirm}
+                  dueDate={checkout.dueDate}
+                  onDueDateChange={checkout.setDueDate}
+                  pendingAmount={checkout.pendingAmount}
+                  totalPaid={checkout.totalPaid}
                 />
               </div>
             </form>

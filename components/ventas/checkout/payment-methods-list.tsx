@@ -1,12 +1,7 @@
 "use client";
 
+import { CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import {
   Item,
   ItemActions,
@@ -15,7 +10,8 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import { ChevronRight, ListTodo } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { ChevronRight, Clock, ListTodo } from "lucide-react";
 import type { PaymentMethod } from "./types";
 
 interface PaymentMethodsListProps {
@@ -52,7 +48,18 @@ export function PaymentMethodsList({
         </div>
       </CardHeader>
 
-      <CardContent className="p-2">
+      <CardContent className="relative p-2">
+        {/* Overlay cuando isPending */}
+        {isPending && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
+            <Clock className="mb-2 size-8 text-muted-foreground" />
+            <span className="text-lg font-medium">Pendiente de pago</span>
+            <span className="text-sm text-muted-foreground">
+              El total quedará como saldo a cobrar
+            </span>
+          </div>
+        )}
+
         <ItemGroup role="list">
           {paymentMethods.map((method) => (
             <Item
@@ -72,11 +79,7 @@ export function PaymentMethodsList({
             </Item>
           ))}
 
-          <Item
-            className="mt-2"
-            variant="outline"
-            onClick={onSplitPayment}
-          >
+          <Item className="mt-2" variant="outline" onClick={onSplitPayment}>
             <ItemMedia>
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted">
                 <ListTodo className="size-5" />

@@ -13,6 +13,7 @@ import {
 import { Loader2, Pencil } from "lucide-react";
 import { CreditNotesSelector } from "./credit-notes-selector";
 import type { AvailableCreditNote, CheckoutView } from "./types";
+import { VencimientoSelect } from "./vencimiento-select";
 
 interface CheckoutSummaryProps {
   // Totals
@@ -40,6 +41,11 @@ interface CheckoutSummaryProps {
   selectedPaymentMethod: string | null;
   isPaymentComplete: boolean;
   onSubmit: () => void;
+  // Pending payment
+  dueDate: string;
+  onDueDateChange: (value: string) => void;
+  pendingAmount: number;
+  totalPaid: number;
 }
 
 export function CheckoutSummary({
@@ -63,9 +69,16 @@ export function CheckoutSummary({
   selectedPaymentMethod,
   isPaymentComplete,
   onSubmit,
+  dueDate,
+  onDueDateChange,
+  pendingAmount,
+  totalPaid,
 }: CheckoutSummaryProps) {
   const canSubmit = (() => {
     if (isSubmitting) return false;
+
+    // Si está pendiente, siempre puede confirmar
+    if (isPending) return true;
 
     if (isExchangeMode) {
       if (exchangeTotals?.isInFavorOfCustomer) {
@@ -90,6 +103,10 @@ export function CheckoutSummary({
       (currentView === "split-payment" && !isPaymentComplete)
     );
   })();
+
+  // Calcular el saldo pendiente a mostrar
+  const displayPendingAmount =
+    pendingAmount > 0 ? pendingAmount : total - totalSelectedCreditNotes;
 
   return (
     <div className="sticky top-0 flex shrink-0 flex-col space-y-6 self-start w-full max-w-md">
@@ -266,6 +283,35 @@ export function CheckoutSummary({
             <span>Total</span>
             <span>{formatPrice(total - totalSelectedCreditNotes)}</span>
           </div>
+
+          {/* Sección de pago pendiente */}
+          {isPending && (
+            <div className="space-y-3 border-t pt-3">
+              {/* Mostrar monto pagado si hay pagos parciales */}
+              {totalPaid > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Pagado</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">
+                    {formatPrice(totalPaid)}
+                  </span>
+                </div>
+              )}
+
+              {/* Saldo pendiente */}
+              <div className="flex justify-between text-sm text-destructive">
+                <span>Saldo pendiente</span>
+                <span className="font-medium">
+                  {formatPrice(displayPendingAmount)}
+                </span>
+              </div>
+
+              {/* Selector de vencimiento */}
+              <VencimientoSelect
+                value={dueDate}
+                onValueChange={onDueDateChange}
+              />
+            </div>
+          )}
         </div>
       )}
 

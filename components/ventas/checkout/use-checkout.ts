@@ -116,6 +116,10 @@ export function useCheckout({
 
   const [isLoadingMethods, setIsLoadingMethods] = useState(true);
 
+  // Pending payment states
+  const [dueDate, setDueDate] = useState<string>("30");
+  const [pendingAmount, setPendingAmount] = useState<number>(0);
+
   // Check if there are any discounts
   const hasItemDiscounts = totals.itemDiscounts > 0;
   const hasGlobalDiscount = totals.globalDiscount > 0;
@@ -187,6 +191,8 @@ export function useCheckout({
       setIsFromSplitPayment(false);
       setSelectedCreditNotes(new Map());
       setExchangeResult(null);
+      setDueDate("30");
+      setPendingAmount(0);
     }
   }, [open]);
 
@@ -230,7 +236,7 @@ export function useCheckout({
     ? exchangeAmountToPay
     : Math.max(0, total - totalSelectedCreditNotes);
 
-  const needsPayment = finalAmountToPay > 0 && !isPending;
+  const needsPayment = finalAmountToPay > 0;
 
   const selectedMethod = paymentMethods.find(
     (m) => m.id === selectedPaymentMethod,
@@ -301,6 +307,13 @@ export function useCheckout({
     setCurrentView("split-payment");
     setSplitPayments([]);
     setCurrentSplitAmount("");
+    setIsPending(false);
+    setPendingAmount(0);
+  };
+
+  const handleMarkAsPending = () => {
+    setPendingAmount(remaining);
+    setIsPending(true);
   };
 
   const handleRemoveSplitPayment = (id: string) => {
@@ -409,6 +422,13 @@ export function useCheckout({
       setSelectedPaymentMethod(null);
       setPaymentReference("");
     } else if (currentView === "split-payment") {
+      // Si está pendiente, primero quitamos el estado pendiente
+      if (isPending && pendingAmount > 0) {
+        setIsPending(false);
+        setPendingAmount(0);
+        return;
+      }
+
       if (splitPayments.length > 0) {
         const lastPayment = splitPayments[splitPayments.length - 1];
         const newPayments = splitPayments.slice(0, -1);
@@ -459,6 +479,14 @@ export function useCheckout({
           return paymentReference;
         }
         return null;
+      };
+
+      // Calculate due date if pending
+      const calculateDueDate = (): string | null => {
+        if (!isPending) return null;
+        const date = new Date(saleDate);
+        date.setDate(date.getDate() + parseInt(dueDate));
+        return date.toISOString();
       };
 
       // Handle exchange mode
@@ -537,7 +565,7 @@ export function useCheckout({
               amount: p.amount,
               reference: p.reference || null,
             }))
-          : selectedPaymentMethod && amountAfterCreditNotes > 0
+          : selectedPaymentMethod && amountAfterCreditNotes > 0 && !isPending
             ? [
                 {
                   payment_method_id: selectedPaymentMethod,
@@ -564,6 +592,8 @@ export function useCheckout({
         voucher_type: selectedVoucher,
         sale_date: saleDate.toISOString(),
         shift_id: shiftId,
+        due_date: calculateDueDate(),
+        amount_paid: isPending ? totalPaid : total,
       };
 
       const items: SaleItemInsert[] = cartItems.map((item) => ({
@@ -705,6 +735,12 @@ export function useCheckout({
     // Computed
     needsPayment,
     finalAmountToPay,
+
+    // Pending payment
+    dueDate,
+    setDueDate,
+    pendingAmount,
+    handleMarkAsPending,
 
     // Handlers
     handlePaymentMethodClick,

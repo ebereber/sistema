@@ -268,6 +268,8 @@ export interface SaleInsert {
   voucher_type: string;
   sale_date: string;
   shift_id: string | null; // Required (not optional) to ensure it's never undefined
+  due_date?: string | null;
+  amount_paid?: number;
 }
 
 export interface SaleItemInsert {
@@ -473,6 +475,9 @@ export interface SaleWithDetails {
       sale_number: string;
     };
   }[];
+  // Agregar estos campos al interface SaleWithDetails
+  amount_paid: number;
+  due_date: string | null;
 }
 
 /**
@@ -486,6 +491,8 @@ export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
     .select(
       `
       *,
+      amount_paid,
+      due_date,
       customer:customers(id, name, email, phone, tax_id, street_address, city),
       seller:users!sales_seller_id_fkey(id, name),
       location:locations(id, name),
@@ -550,8 +557,10 @@ export interface SaleListItem {
   status: "COMPLETED" | "PENDING" | "CANCELLED";
   voucher_type: string;
   total: number;
-  related_sale_id: string | null; // Si es NC, apunta a la venta original
-  availableBalance: number | null; // Solo para NC: saldo disponible
+  related_sale_id: string | null;
+  availableBalance: number | null;
+  amount_paid: number; // NUEVO
+  due_date: string | null; // NUEVO
   customer: {
     id: string;
     name: string;
@@ -619,6 +628,8 @@ export async function getSales(
       status,
       voucher_type,
       total,
+      amount_paid,
+    due_date,
       related_sale_id,
       customer:customers(id, name),
       seller:users!sales_seller_id_fkey(id, name),
@@ -709,6 +720,8 @@ export async function getSales(
         status: item.status,
         voucher_type: item.voucher_type,
         total: item.total,
+        amount_paid: item.amount_paid,
+        due_date: item.due_date,
         related_sale_id: item.related_sale_id,
         availableBalance,
         customer: (customer as SaleListItem["customer"]) || null,

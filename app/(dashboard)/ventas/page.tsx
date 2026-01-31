@@ -747,10 +747,19 @@ export default function VentasPage() {
                         <div className="font-medium">
                           {formatCurrency(sale.total)}
                         </div>
+                        {/* Saldo pendiente para ventas PENDING */}
+                        {sale.status === "PENDING" &&
+                          sale.total - sale.amount_paid > 0 && (
+                            <div className="text-xs text-destructive">
+                              Saldo:{" "}
+                              {formatCurrency(sale.total - sale.amount_paid)}
+                            </div>
+                          )}
+                        {/* Saldo disponible para NC */}
                         {sale.availableBalance !== null &&
                           sale.availableBalance > 0 && (
                             <div className="text-xs text-red-500">
-                              Saldo: {formatCurrency(sale.availableBalance)}
+                              Saldo NC: {formatCurrency(sale.availableBalance)}
                             </div>
                           )}
                       </TableCell>
