@@ -390,6 +390,11 @@ export default function PagosPage() {
                       </TableCell>
                       <TableCell className="text-left">
                         {getVoucherDisplay(payment)}
+                        {Number(payment.on_account_amount) > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            + pago a cuenta
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
