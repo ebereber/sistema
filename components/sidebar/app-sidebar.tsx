@@ -64,6 +64,7 @@ const data = {
         { title: "Clientes", url: "/clientes" },
         { title: "Cobranzas", url: "/cobranzas" },
         { title: "Presupuestos", url: "/presupuestos" },
+        { title: "Turnos", url: "/turnos" },
       ],
     },
     {

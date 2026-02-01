@@ -37,6 +37,12 @@ function CategoriasPage() {
   const [editingCategory, setEditingCategory] =
     useState<CategoryWithChildren | null>(null);
 
+  const [sheetMode, setSheetMode] = useState<
+    "create" | "edit-parent" | "edit-sub" | "add-sub"
+  >("create");
+  const [sheetCategory, setSheetCategory] =
+    useState<CategoryWithChildren | null>(null);
+
   // Fetch categories
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
@@ -64,7 +70,7 @@ function CategoriasPage() {
     const timer = setTimeout(() => {
       if (search.trim()) {
         const filtered = categories.filter((cat) =>
-          cat.name.toLowerCase().includes(search.toLowerCase())
+          cat.name.toLowerCase().includes(search.toLowerCase()),
         );
         setFilteredCategories(filtered);
       } else {
@@ -80,23 +86,30 @@ function CategoriasPage() {
   const totalPages = Math.ceil(filteredCategories.length / ITEMS_PER_PAGE);
   const paginatedCategories = filteredCategories.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * ITEMS_PER_PAGE,
   );
 
-  // Handlers
   function handleEdit(category: CategoryWithChildren) {
-    setEditingCategory(category);
+    setSheetMode("edit-parent");
+    setSheetCategory(category);
+    setSheetOpen(true);
+  }
+
+  function handleEditSubcategory(subcategory: CategoryWithChildren) {
+    setSheetMode("edit-sub");
+    setSheetCategory(subcategory);
     setSheetOpen(true);
   }
 
   function handleAddNew() {
-    setEditingCategory(null);
+    setSheetMode("create");
+    setSheetCategory(null);
     setSheetOpen(true);
   }
 
   function handleAddSubcategory(parentCategory: CategoryWithChildren) {
-    // Set the parent category as context for adding subcategory
-    setEditingCategory({ ...parentCategory, isAddingSubcategory: true } as CategoryWithChildren);
+    setSheetMode("add-sub");
+    setSheetCategory(parentCategory);
     setSheetOpen(true);
   }
 
@@ -183,6 +196,7 @@ function CategoriasPage() {
           <CategoryTable
             categories={paginatedCategories}
             onEdit={handleEdit}
+            onEditSubcategory={handleEditSubcategory}
             onDelete={handleDelete}
             onAddSubcategory={handleAddSubcategory}
           />
@@ -250,7 +264,8 @@ function CategoriasPage() {
       <CategoryFormSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        category={editingCategory}
+        mode={sheetMode}
+        category={sheetCategory}
         onSuccess={handleSuccess}
       />
     </div>

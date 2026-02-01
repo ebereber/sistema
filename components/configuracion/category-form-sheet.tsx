@@ -1,13 +1,12 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useForm, useFieldArray } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Plus, X, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { Loader2, Plus, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -15,253 +14,275 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet"
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+} from "@/components/ui/sheet";
 
-import {
-  createCategoryWithSubsSchema,
-  updateCategorySchema,
-  type CreateCategoryWithSubsData,
-  type UpdateCategoryData,
-} from "@/lib/validations/category"
 import {
   createCategory,
+  createSubcategory,
+  getSubcategories,
   updateCategory,
+  updateCategoryWithSubs,
   type CategoryWithChildren,
-} from "@/lib/services/categories"
+} from "@/lib/services/categories";
+
+type SheetMode =
+  | "create" // New category + optional subcategories
+  | "edit-parent" // Edit category name + manage subcategories
+  | "edit-sub" // Edit single subcategory name
+  | "add-sub"; // Add subcategory to existing parent
 
 interface CategoryFormSheetProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  category?: CategoryWithChildren | null
-  onSuccess: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: SheetMode;
+  category?: CategoryWithChildren | null;
+  onSuccess: () => void;
+}
+
+interface SubItem {
+  id?: string;
+  name: string;
 }
 
 export function CategoryFormSheet({
   open,
   onOpenChange,
+  mode,
   category,
   onSuccess,
 }: CategoryFormSheetProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const isEditMode = !!category
+  const [isLoading, setIsLoading] = useState(false);
+  const [name, setName] = useState("");
+  const [subcategories, setSubcategories] = useState<SubItem[]>([]);
+  const [newSubName, setNewSubName] = useState("");
 
-  // Create mode form
-  const createForm = useForm<CreateCategoryWithSubsData>({
-    resolver: zodResolver(createCategoryWithSubsSchema),
-    defaultValues: {
-      name: "",
-      subcategories: [],
-    },
-  })
+  // Reset form when sheet opens
+  useEffect(() => {
+    if (!open) return;
 
-  // Edit mode form
-  const editForm = useForm<UpdateCategoryData>({
-    resolver: zodResolver(updateCategorySchema),
-    defaultValues: {
-      name: category?.name || "",
-    },
-  })
+    setNewSubName("");
 
-  // Dynamic subcategories for create mode
-  const { fields, append, remove } = useFieldArray({
-    control: createForm.control,
-    name: "subcategories" as never,
-  })
+    if (mode === "create") {
+      setName("");
+      setSubcategories([]);
+    } else if (mode === "edit-parent" && category) {
+      setName(category.name);
+      // Load existing subcategories
+      setIsLoading(true);
+      getSubcategories(category.id)
+        .then((subs) => {
+          setSubcategories(subs.map((s) => ({ id: s.id, name: s.name })));
+        })
+        .finally(() => setIsLoading(false));
+    } else if (mode === "edit-sub" && category) {
+      setName(category.name);
+      setSubcategories([]);
+    } else if (mode === "add-sub") {
+      setName("");
+      setSubcategories([]);
+    }
+  }, [open, mode, category]);
 
-  // Reset forms when sheet opens/closes or category changes
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen) {
-      if (category) {
-        editForm.reset({ name: category.name })
-      } else {
-        createForm.reset({ name: "", subcategories: [] })
+  function addSubcategoryField() {
+    if (!newSubName.trim()) return;
+    setSubcategories((prev) => [...prev, { name: newSubName.trim() }]);
+    setNewSubName("");
+  }
+
+  function removeSubcategory(index: number) {
+    setSubcategories((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateSubcategoryName(index: number, newName: string) {
+    setSubcategories((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, name: newName } : s)),
+    );
+  }
+
+  async function handleSubmit() {
+    setIsLoading(true);
+
+    try {
+      if (mode === "create") {
+        if (!name.trim()) {
+          toast.error("Ingresá el nombre de la categoría");
+          return;
+        }
+        await createCategory({
+          name: name.trim(),
+          subcategories: subcategories.map((s) => s.name).filter(Boolean),
+        });
+        toast.success("Categoría creada");
+      } else if (mode === "edit-parent" && category) {
+        if (!name.trim()) {
+          toast.error("Ingresá el nombre de la categoría");
+          return;
+        }
+        await updateCategoryWithSubs(
+          category.id,
+          name.trim(),
+          subcategories.filter((s) => s.name.trim()),
+        );
+        toast.success("Categoría actualizada");
+      } else if (mode === "edit-sub" && category) {
+        if (!name.trim()) {
+          toast.error("Ingresá el nombre");
+          return;
+        }
+        await updateCategory(category.id, name.trim());
+        toast.success("Subcategoría actualizada");
+      } else if (mode === "add-sub" && category) {
+        if (!name.trim()) {
+          toast.error("Ingresá el nombre de la subcategoría");
+          return;
+        }
+        await createSubcategory(category.id, name.trim());
+        toast.success("Subcategoría creada");
       }
-    }
-    onOpenChange(newOpen)
-  }
 
-  async function onCreateSubmit(data: CreateCategoryWithSubsData) {
-    setIsLoading(true)
-
-    try {
-      await createCategory({
-        name: data.name,
-        subcategories: data.subcategories?.filter(Boolean),
-      })
-
-      toast.success("Categoría creada correctamente")
-      createForm.reset()
-      onOpenChange(false)
-      onSuccess()
+      onOpenChange(false);
+      onSuccess();
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      toast.error("Error al crear la categoría", {
-        description: errorMessage,
-      })
+      const msg = error instanceof Error ? error.message : "Error desconocido";
+      toast.error("Error", { description: msg });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
-  async function onEditSubmit(data: UpdateCategoryData) {
-    if (!category) return
-
-    setIsLoading(true)
-
-    try {
-      await updateCategory(category.id, data.name)
-
-      toast.success("Categoría actualizada correctamente")
-      editForm.reset()
-      onOpenChange(false)
-      onSuccess()
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      toast.error("Error al actualizar la categoría", {
-        description: errorMessage,
-      })
-    } finally {
-      setIsLoading(false)
+  function getTitle() {
+    switch (mode) {
+      case "create":
+        return "Agregar categoría";
+      case "edit-parent":
+        return "Editar categoría";
+      case "edit-sub":
+        return "Editar subcategoría";
+      case "add-sub":
+        return `Agregar subcategoría a "${category?.name}"`;
     }
   }
+
+  function getDescription() {
+    switch (mode) {
+      case "create":
+        return "Creá una nueva categoría y agregá subcategorías si necesitás.";
+      case "edit-parent":
+        return "Modificá el nombre y gestioná las subcategorías.";
+      case "edit-sub":
+        return "Modificá el nombre de la subcategoría.";
+      case "add-sub":
+        return "Ingresá el nombre de la nueva subcategoría.";
+    }
+  }
+
+  const showSubcategories = mode === "create" || mode === "edit-parent";
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="sm:max-w-md">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex flex-col sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>
-            {isEditMode ? "Editar Categoría" : "Agregar Categoría"}
-          </SheetTitle>
-          <SheetDescription>
-            {isEditMode
-              ? "Modificá el nombre de la categoría"
-              : "Creá una nueva categoría y agregá subcategorías si necesitás"}
-          </SheetDescription>
+          <SheetTitle>{getTitle()}</SheetTitle>
+          <SheetDescription>{getDescription()}</SheetDescription>
         </SheetHeader>
 
-        {isEditMode ? (
-          <Form {...editForm}>
-            <form
-              onSubmit={editForm.handleSubmit(onEditSubmit)}
-              className="flex flex-col gap-4 px-4 flex-1"
-            >
-              <FormField
-                control={editForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre de la categoría *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Ej: Electricidad"
-                        {...field}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
+          {/* Name */}
+          <div className="space-y-2">
+            <Label>
+              {mode === "add-sub" ? "Nombre de la subcategoría *" : "Nombre *"}
+            </Label>
+            <Input
+              placeholder={
+                mode === "add-sub" ? "Ej: Cables" : "Ej: Electricidad"
+              }
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (!showSubcategories) handleSubmit();
+                }
+              }}
+              autoFocus
+            />
+          </div>
 
-              <SheetFooter className="mt-auto px-0">
+          {/* Subcategories section */}
+          {showSubcategories && (
+            <div className="space-y-3">
+              <Label>Subcategorías</Label>
+
+              {subcategories.length > 0 && (
+                <div className="space-y-2">
+                  {subcategories.map((sub, index) => (
+                    <div key={sub.id || index} className="flex gap-2">
+                      <Input
+                        value={sub.name}
+                        onChange={(e) =>
+                          updateSubcategoryName(index, e.target.value)
+                        }
+                        disabled={isLoading}
+                        placeholder="Nombre"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => removeSubcategory(index)}
+                        disabled={isLoading}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nueva subcategoría"
+                  value={newSubName}
+                  onChange={(e) => setNewSubName(e.target.value)}
+                  disabled={isLoading}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addSubcategoryField();
+                    }
+                  }}
+                />
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isLoading}
+                  size="icon"
+                  className="shrink-0"
+                  onClick={addSubcategoryField}
+                  disabled={isLoading || !newSubName.trim()}
                 >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Guardar cambios
-                </Button>
-              </SheetFooter>
-            </form>
-          </Form>
-        ) : (
-          <Form {...createForm}>
-            <form
-              onSubmit={createForm.handleSubmit(onCreateSubmit)}
-              className="flex flex-col gap-4 px-4 flex-1"
-            >
-              <FormField
-                control={createForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre de la categoría *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Ej: Electricidad"
-                        {...field}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-3">
-                <FormLabel>Subcategorías</FormLabel>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2">
-                    <Input
-                      placeholder={`Subcategoría ${index + 1}`}
-                      {...createForm.register(`subcategories.${index}` as const)}
-                      disabled={isLoading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove(index)}
-                      disabled={isLoading}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append("")}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar subcategoría
+                  <Plus className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+          )}
+        </div>
 
-              <SheetFooter className="mt-auto px-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Crear categoría
-                </Button>
-              </SheetFooter>
-            </form>
-          </Form>
-        )}
+        <SheetFooter className="px-4">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {mode === "create" ? "Crear categoría" : "Guardar cambios"}
+          </Button>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
-  )
+  );
 }

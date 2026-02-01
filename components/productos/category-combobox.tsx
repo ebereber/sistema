@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowLeft, Check, ChevronRight, ChevronsUpDown } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, ChevronRight, ChevronsUpDown } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,8 @@ import {
 import {
   getCategories,
   getCategoryById,
-  getSubcategories,
   type Category,
 } from "@/lib/services/categories";
-import { cn } from "@/lib/utils";
 
 interface CategoryComboboxProps {
   value?: string | null;
@@ -45,28 +43,24 @@ export function CategoryCombobox({
   disabled,
 }: CategoryComboboxProps) {
   const [open, setOpen] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
+    null,
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([]);
   const [currentParentId, setCurrentParentId] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
-  // Load initial categories or subcategories
-  const loadCategories = useCallback(async (parentId: string | null = null) => {
+  // Load ALL categories once
+  const loadAllCategories = useCallback(async () => {
+    if (loadedRef.current && allCategories.length > 0) return;
     setIsLoading(true);
     try {
-      if (parentId) {
-        const data = await getSubcategories(parentId);
-        setCategories(data);
-      } else {
-        const data = await getCategories();
-        // Filter to only show root categories (no parent)
-        const rootCategories = data.filter((cat) => !cat.parent_id);
-        setCategories(rootCategories);
-      }
+      const data = await getCategories();
+      setAllCategories(data);
+      loadedRef.current = true;
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Error desconocido";
@@ -74,12 +68,18 @@ export function CategoryCombobox({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [allCategories.length]);
 
-  // Load selected category info
+  // Load selected category display name
   useEffect(() => {
     async function loadSelectedCategory() {
       if (value) {
+        // Try from cache first
+        const cached = allCategories.find((c) => c.id === value);
+        if (cached) {
+          setSelectedCategory(cached);
+          return;
+        }
         try {
           const category = await getCategoryById(value);
           setSelectedCategory(category);
@@ -91,52 +91,45 @@ export function CategoryCombobox({
       }
     }
     loadSelectedCategory();
-  }, [value]);
+  }, [value, allCategories]);
 
-  // Load categories when popover opens
+  // Load on first open
   useEffect(() => {
     if (open) {
-      loadCategories(currentParentId);
+      loadAllCategories();
     }
-  }, [open, currentParentId, loadCategories]);
+  }, [open, loadAllCategories]);
 
-  // Search categories
-  useEffect(() => {
-    if (!open) return;
+  // Derive current visible categories from memory (no API calls)
+  const visibleCategories = useMemo(() => {
+    if (searchQuery.trim()) {
+      return allCategories.filter((cat) =>
+        cat.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+    }
+    return allCategories.filter((cat) =>
+      currentParentId ? cat.parent_id === currentParentId : !cat.parent_id,
+    );
+  }, [allCategories, currentParentId, searchQuery]);
 
-    const searchCategories = async () => {
-      if (searchQuery.trim()) {
-        setIsLoading(true);
-        try {
-          const data = await getCategories(searchQuery);
-          setCategories(data);
-        } catch (error: unknown) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Error desconocido";
-          toast.error("Error al buscar categorías", { description: errorMessage });
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        loadCategories(currentParentId);
-      }
-    };
+  // Derive which categories have children (no API calls)
+  const categoriesWithChildren = useMemo(() => {
+    const set = new Set<string>();
+    allCategories.forEach((cat) => {
+      if (cat.parent_id) set.add(cat.parent_id);
+    });
+    return set;
+  }, [allCategories]);
 
-    const debounce = setTimeout(searchCategories, 300);
-    return () => clearTimeout(debounce);
-  }, [searchQuery, open, currentParentId, loadCategories]);
-
-  async function navigateToCategory(category: Category) {
-    // Check if category has children
-    const children = await getSubcategories(category.id);
-
-    if (children.length > 0) {
-      // Navigate into this category
-      setBreadcrumb((prev) => [...prev, { id: category.id, name: category.name }]);
+  function navigateToCategory(category: Category) {
+    if (categoriesWithChildren.has(category.id)) {
+      setBreadcrumb((prev) => [
+        ...prev,
+        { id: category.id, name: category.name },
+      ]);
       setCurrentParentId(category.id);
       setSearchQuery("");
     } else {
-      // Select this category (it's a leaf)
       handleSelect(category);
     }
   }
@@ -146,12 +139,11 @@ export function CategoryCombobox({
       const newBreadcrumb = [...breadcrumb];
       newBreadcrumb.pop();
       setBreadcrumb(newBreadcrumb);
-
-      const newParentId =
+      setCurrentParentId(
         newBreadcrumb.length > 0
           ? newBreadcrumb[newBreadcrumb.length - 1].id
-          : null;
-      setCurrentParentId(newParentId);
+          : null,
+      );
       setSearchQuery("");
     }
   }
@@ -160,7 +152,6 @@ export function CategoryCombobox({
     onChange(category.id === value ? null : category.id);
     setOpen(false);
     setSearchQuery("");
-    // Reset navigation
     setBreadcrumb([]);
     setCurrentParentId(null);
   }
@@ -168,46 +159,11 @@ export function CategoryCombobox({
   function handleOpenChange(newOpen: boolean) {
     setOpen(newOpen);
     if (!newOpen) {
-      // Reset navigation when closing
       setBreadcrumb([]);
       setCurrentParentId(null);
       setSearchQuery("");
     }
   }
-
-  function getDisplayText(): string {
-    if (!selectedCategory) return "Seleccionar categoría";
-
-    if (selectedCategory.parent_id) {
-      // Try to find parent name from breadcrumb or show just category name
-      return selectedCategory.name;
-    }
-
-    return selectedCategory.name;
-  }
-
-  // Check which categories have children (for showing chevron)
-  const [categoriesWithChildren, setCategoriesWithChildren] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    async function checkChildren() {
-      if (!open || categories.length === 0) return;
-
-      const checks = await Promise.all(
-        categories.map(async (cat) => {
-          const children = await getSubcategories(cat.id);
-          return { id: cat.id, hasChildren: children.length > 0 };
-        })
-      );
-
-      const withChildren = new Set(
-        checks.filter((c) => c.hasChildren).map((c) => c.id)
-      );
-      setCategoriesWithChildren(withChildren);
-    }
-
-    checkChildren();
-  }, [open, categories]);
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -219,7 +175,7 @@ export function CategoryCombobox({
           className="w-full justify-between font-normal"
           disabled={disabled}
         >
-          {getDisplayText()}
+          {selectedCategory?.name || "Seleccionar categoría"}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -237,7 +193,6 @@ export function CategoryCombobox({
               </div>
             ) : (
               <>
-                {/* Back button when navigating */}
                 {breadcrumb.length > 0 && !searchQuery && (
                   <>
                     <CommandGroup>
@@ -246,36 +201,20 @@ export function CategoryCombobox({
                         Volver
                       </CommandItem>
                     </CommandGroup>
-                    <CommandSeparator />
-                    <CommandGroup heading={breadcrumb[breadcrumb.length - 1].name}>
-                      {/* Current category can be selected */}
+
+                    <CommandGroup
+                    /* heading={breadcrumb[breadcrumb.length - 1].name} */
+                    >
                       <CommandItem
                         onSelect={() => {
-                          const currentCat = categories.find(
-                            (c) => c.parent_id === currentParentId
-                          );
-                          if (currentCat) {
-                            handleSelect({
-                              ...currentCat,
-                              id: currentParentId!,
-                              name: breadcrumb[breadcrumb.length - 1].name,
-                            } as Category);
-                          } else {
-                            // Select the parent directly
-                            onChange(currentParentId);
-                            setOpen(false);
-                            setBreadcrumb([]);
-                            setCurrentParentId(null);
-                          }
+                          onChange(currentParentId);
+                          setOpen(false);
+                          setBreadcrumb([]);
+                          setCurrentParentId(null);
                         }}
+                        className="font-semibold"
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            value === currentParentId ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        Seleccionar &quot;{breadcrumb[breadcrumb.length - 1].name}&quot;
+                        {breadcrumb[breadcrumb.length - 1].name}
                       </CommandItem>
                     </CommandGroup>
                     <CommandSeparator />
@@ -284,19 +223,27 @@ export function CategoryCombobox({
 
                 <CommandEmpty>No se encontraron categorías</CommandEmpty>
 
-                <CommandGroup heading={breadcrumb.length > 0 ? "Subcategorías" : undefined}>
-                  {categories.map((category) => (
+                <CommandGroup
+                  heading={
+                    breadcrumb.length > 0
+                      ? "Subcategorías"
+                      : searchQuery
+                        ? "Resultados"
+                        : undefined
+                  }
+                >
+                  {visibleCategories.map((category) => (
                     <CommandItem
                       key={category.id}
                       value={category.id}
                       onSelect={() => navigateToCategory(category)}
                     >
-                      <Check
+                      {/*   <Check
                         className={cn(
-                          "mr-2 h-4 w-4",
-                          value === category.id ? "opacity-100" : "opacity-0"
+                          "h-4 w-4",
+                          value === category.id ? "opacity-100" : "opacity-0",
                         )}
-                      />
+                      /> */}
                       <span className="flex-1">{category.name}</span>
                       {categoriesWithChildren.has(category.id) && (
                         <ChevronRight className="ml-2 h-4 w-4 text-muted-foreground" />
