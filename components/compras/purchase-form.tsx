@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import {
   CalendarIcon,
   Check,
+  ChevronDown,
   ChevronRight,
   ChevronsUpDown,
   Plus,
@@ -41,6 +42,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -68,6 +75,7 @@ import { cn } from "@/lib/utils";
 
 import { getLocations, type Location } from "@/lib/services/locations";
 import { getProducts, type Product } from "@/lib/services/products";
+import { type PurchaseOrderWithDetails } from "@/lib/services/purchase-orders";
 import {
   checkDuplicatePurchase,
   createPurchase,
@@ -79,7 +87,7 @@ import {
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
 import { SupplierDialog } from "../proveedores/supplier-dialog";
 import { FileUpload } from "../ui/file-upload";
-import { ProductSelector } from "./product-selector";
+import { ProductSearchDialog } from "./product-search-dialog";
 
 // Types
 interface PurchaseItem {
@@ -96,12 +104,14 @@ interface PurchaseFormProps {
   mode: "create" | "edit";
   initialData?: Purchase;
   duplicateFrom?: Purchase;
+  fromPurchaseOrder?: PurchaseOrderWithDetails;
 }
 
 export function PurchaseForm({
   mode,
   initialData,
   duplicateFrom,
+  fromPurchaseOrder,
 }: PurchaseFormProps) {
   const router = useRouter();
 
@@ -127,11 +137,7 @@ export function PurchaseForm({
 
   // UI state
   const [openSupplier, setOpenSupplier] = useState(false);
-  const [openProducts, setOpenProducts] = useState(false);
   const [openInfoDialog, setOpenInfoDialog] = useState(false);
-  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(
-    new Set(),
-  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
 
@@ -201,6 +207,36 @@ export function PurchaseForm({
       } else if (duplicateFrom) {
         populateForm(duplicateFrom);
       }
+      // Populate form if editing or duplicating
+      if (initialData) {
+        populateForm(initialData);
+      } else if (duplicateFrom) {
+        populateForm(duplicateFrom);
+      } else if (fromPurchaseOrder) {
+        setSelectedSupplierId(fromPurchaseOrder.supplier_id);
+        setSelectedLocationId(
+          fromPurchaseOrder.location_id ||
+            locationsData.find((l) => l.is_main)?.id ||
+            "",
+        );
+        setProductsReceived(true);
+        setNotes(
+          fromPurchaseOrder.notes
+            ? `OC ${fromPurchaseOrder.order_number} — ${fromPurchaseOrder.notes}`
+            : `OC ${fromPurchaseOrder.order_number}`,
+        );
+        setItems(
+          fromPurchaseOrder.items.map((item) => ({
+            id: `po-${item.id}-${Date.now()}`,
+            productId: item.product_id,
+            name: item.name,
+            sku: item.sku || "",
+            quantity: item.quantity,
+            unitCost: Number(item.unit_cost),
+            type: item.type as "product" | "custom",
+          })),
+        );
+      }
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Error al cargar datos");
@@ -212,14 +248,6 @@ export function PurchaseForm({
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // Helper for product stock
-  const getProductStock = (product: Product): number => {
-    if (Array.isArray(product.stock)) {
-      return product.stock.reduce((sum, s) => sum + (s.quantity || 0), 0);
-    }
-    return typeof product.stock === "number" ? product.stock : 0;
-  };
 
   // Calculations
   const calculateSubtotal = (item: PurchaseItem) =>
@@ -235,25 +263,9 @@ export function PurchaseForm({
     }).format(value);
 
   // Handlers
-  const toggleProductSelection = (productId: string) => {
-    setSelectedProductIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        newSet.delete(productId);
-      } else {
-        newSet.add(productId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleAddSelectedProducts = () => {
-    const newItems = products
-      .filter(
-        (p) =>
-          selectedProductIds.has(p.id) &&
-          !items.some((i) => i.productId === p.id),
-      )
+  const handleAddSelectedProducts = (selectedProducts: Product[]) => {
+    const newItems = selectedProducts
+      .filter((p) => !items.some((i) => i.productId === p.id))
       .map((p) => ({
         id: `product-${p.id}-${Date.now()}`,
         productId: p.id,
@@ -265,8 +277,6 @@ export function PurchaseForm({
       }));
 
     setItems([...items, ...newItems]);
-    setSelectedProductIds(new Set());
-    setOpenProducts(false);
   };
 
   const handleAddCustomItem = () => {
@@ -401,6 +411,7 @@ export function PurchaseForm({
         notes: notes || null,
         tax_category: taxCategory || null,
         attachment_url: attachmentUrl,
+        purchase_order_id: fromPurchaseOrder?.id || null,
       };
 
       if (mode === "edit" && initialData) {
@@ -696,16 +707,29 @@ export function PurchaseForm({
 
                     <TableRow>
                       <TableCell colSpan={5}>
-                        <ProductSelector
-                          products={products}
-                          selectedProductIds={items.map(
-                            (item) => item.productId,
-                          )}
-                          onAddProducts={handleAddProducts}
-                          onAddCustomItem={handleAddCustomItem}
-                          formatCurrency={(value) => `$ ${value.toFixed(2)}`}
-                          getProductStock={(product) => product.stock || 0}
-                        />
+                        <div className="flex gap-2">
+                          <ProductSearchDialog
+                            products={products}
+                            excludedProductIds={items
+                              .filter((i) => i.productId)
+                              .map((i) => i.productId!)}
+                            onProductsSelected={handleAddSelectedProducts}
+                            formatCurrency={formatCurrency}
+                          />
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem onClick={handleAddCustomItem}>
+                                Ítem personalizado
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   </TableBody>

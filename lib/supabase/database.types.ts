@@ -881,6 +881,187 @@ export type Database = {
           },
         ]
       }
+      purchase_order_history: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string | null
+          field_name: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          purchase_order_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by?: string | null
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          purchase_order_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string | null
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          purchase_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_history_order_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_history_user_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_order_items: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          product_id: string | null
+          purchase_order_id: string
+          quantity: number
+          quantity_received: number
+          sku: string | null
+          subtotal: number
+          type: string
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          product_id?: string | null
+          purchase_order_id: string
+          quantity?: number
+          quantity_received?: number
+          sku?: string | null
+          subtotal?: number
+          type?: string
+          unit_cost?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          product_id?: string | null
+          purchase_order_id?: string
+          quantity?: number
+          quantity_received?: number
+          sku?: string | null
+          subtotal?: number
+          type?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_order_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_product_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          discount: number
+          expected_delivery_date: string | null
+          id: string
+          location_id: string | null
+          notes: string | null
+          order_date: string
+          order_number: string
+          status: string
+          subtotal: number
+          supplier_id: string
+          tax: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          expected_delivery_date?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          order_date?: string
+          order_number: string
+          status?: string
+          subtotal?: number
+          supplier_id: string
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          expected_delivery_date?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          order_date?: string
+          order_number?: string
+          status?: string
+          subtotal?: number
+          supplier_id?: string
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchases: {
         Row: {
           accounting_date: string | null
@@ -897,6 +1078,7 @@ export type Database = {
           payment_status: string | null
           products_received: boolean
           purchase_number: string | null
+          purchase_order_id: string | null
           status: string
           subtotal: number
           supplier_id: string
@@ -922,6 +1104,7 @@ export type Database = {
           payment_status?: string | null
           products_received?: boolean
           purchase_number?: string | null
+          purchase_order_id?: string | null
           status?: string
           subtotal?: number
           supplier_id: string
@@ -947,6 +1130,7 @@ export type Database = {
           payment_status?: string | null
           products_received?: boolean
           purchase_number?: string | null
+          purchase_order_id?: string | null
           status?: string
           subtotal?: number
           supplier_id?: string
@@ -963,6 +1147,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
           {
@@ -1613,6 +1804,7 @@ export type Database = {
         Args: { location_id_param: string }
         Returns: string
       }
+      generate_purchase_order_number: { Args: never; Returns: string }
       generate_quote_number: { Args: { pos_number?: number }; Returns: string }
       generate_sale_number: {
         Args: { location_id_param: string; prefix_param?: string }

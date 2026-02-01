@@ -44,270 +44,249 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  cancelPurchaseOrder,
+  confirmPurchaseOrder,
+  getPurchaseOrderById,
+  receiveProducts,
+  type PurchaseOrderWithDetails,
+} from "@/lib/services/purchase-orders";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import {
   Archive,
   ArrowRight,
   ChevronDown,
   ChevronRight,
+  Circle,
   CircleCheck,
   CircleDashed,
+  CircleEllipsis,
+  CircleOff,
   Download,
   File,
+  Loader2,
   Pencil,
   ReceiptText,
   StickyNote,
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-// Tipos
-interface Producto {
-  id: string;
-  nombre: string;
-  sku: string;
-  precio: number;
-  cantidadOrdenada: number;
-  cantidadRecibida: number;
+// ---------------------------------------------------------------------------
+// Status helpers
+// ---------------------------------------------------------------------------
+
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; icon: typeof CircleDashed; className: string }
+> = {
+  draft: {
+    label: "Borrador",
+    icon: CircleDashed,
+    className: "text-muted-foreground",
+  },
+  confirmed: {
+    label: "Confirmada",
+    icon: CircleDashed,
+    className: "text-muted-foreground",
+  },
+  partial: {
+    label: "Parcial",
+    icon: CircleEllipsis,
+    className: "text-muted-foreground",
+  },
+  received: {
+    label: "Recibida",
+    icon: CircleCheck,
+    className: "text-green-500",
+  },
+  invoiced: {
+    label: "Facturada",
+    icon: Circle,
+    className: "text-muted-foreground fill-muted",
+  },
+  cancelled: {
+    label: "Cancelada",
+    icon: CircleOff,
+    className: "text-muted-foreground",
+  },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  const Icon = config.icon;
+  return (
+    <Badge variant="outline">
+      <Icon className={config.className} />
+      {config.label}
+    </Badge>
+  );
 }
 
-interface HistorialCambio {
-  tipo: "Creada" | "Actualizada";
-  fecha: string;
-  usuario: string;
-  cambios?: {
-    campo: string;
-    anterior: string;
-    nuevo: string;
-  };
+// ---------------------------------------------------------------------------
+// Date helpers
+// ---------------------------------------------------------------------------
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = Math.round(
+    (today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (diff === 0) return "hoy";
+  if (diff === 1) return "ayer";
+  return format(date, "d MMM", { locale: es });
 }
 
-/**
- * FLUJO DE LA ORDEN DE COMPRA:
- *
- * 1. BORRADOR (estado inicial)
- *    - Botón "Confirmar orden" visible
- *    - Al confirmar: se abre AlertDialog de confirmación
- *
- * 2. CONFIRMADA (después de confirmar)
- *    - Se agrega entrada al historial de cambios (Borrador → Confirmada)
- *    - Botón "Confirmar orden" desaparece
- *    - Aparece botón "Recibir productos"
- *    - Aparece botón "Crear factura" (link a /compras/nueva?purchaseOrderId=...)
- *
- * 3. RECIBIR PRODUCTOS (Dialog)
- *    - Usuario ingresa cantidades recibidas para cada producto
- *    - Si TODOS los productos están completos (recibido === ordenado):
- *      → Estado cambia a "Recibida"
- *      → Botón "Recibir productos" desaparece
- *      → Solo quedan: "Más acciones" y "Crear factura"
- *    - Si NO todos están completos (recibido < ordenado):
- *      → Estado cambia a "Parcial"
- *      → Botón "Recibir productos" permanece visible
- *      → Se puede seguir recibiendo productos
- *
- * 4. HISTORIAL DE CAMBIOS
- *    - Se muestra solo después de confirmar la orden
- *    - Registra: Creación y cambios de estado
- */
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 2,
+  }).format(value);
+}
 
-export default function OrdenDetallesPage() {
+function formatHistoryDate(dateStr: string) {
+  return format(new Date(dateStr), "dd/MM/yyyy HH:mm", { locale: es });
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default function OrdenDetallePage() {
+  const router = useRouter();
   const params = useParams();
-  // Estado inicial: Borrador
-  const [estado, setEstado] = useState<
-    "Borrador" | "Confirmada" | "Parcial" | "Recibida"
-  >("Borrador");
-  const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const id = params.id as string;
+
+  const [order, setOrder] = useState<PurchaseOrderWithDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Dialogs
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
-  // Datos de ejemplo
-  const [orden] = useState({
-    numero: "OC-00000004",
-    proveedor: {
-      id: "d3c11656-0ae5-4ab7-9584-01c389ecd7b4",
-      nombre: "Sportline",
-    },
-    fecha: "2026-01-31",
-    fechaEntrega: "2026-02-12",
-    deposito: "Principal",
-    notas: "nota de orden",
-    total: 138.0,
-  });
+  // Receive quantities temp state
+  const [tempQuantities, setTempQuantities] = useState<Record<string, number>>(
+    {},
+  );
 
-  const [productos, setProductos] = useState<Producto[]>([
-    {
-      id: "1",
-      nombre: "Botas de Cuero Negro",
-      sku: "BT-006",
-      precio: 35.0,
-      cantidadOrdenada: 1,
-      cantidadRecibida: 0,
-    },
-    {
-      id: "2",
-      nombre: "Camisa Lino Blanca",
-      sku: "CM-005",
-      precio: 18.0,
-      cantidadOrdenada: 1,
-      cantidadRecibida: 0,
-    },
-    {
-      id: "3",
-      nombre: "Campera de Abrigo Puffer",
-      sku: "CP-007",
-      precio: 40.0,
-      cantidadOrdenada: 1,
-      cantidadRecibida: 0,
-    },
-    {
-      id: "4",
-      nombre: "Nike Air Max Plus",
-      sku: "12345",
-      precio: 45.0,
-      cantidadOrdenada: 1,
-      cantidadRecibida: 0,
-    },
-  ]);
+  // Loading states for actions
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isReceiving, setIsReceiving] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  const [historial, setHistorial] = useState<HistorialCambio[]>([
-    {
-      tipo: "Creada",
-      fecha: "31/01/2026 22:24",
-      usuario: "vos",
-    },
-  ]);
+  const loadOrder = useCallback(async () => {
+    try {
+      const data = await getPurchaseOrderById(id);
+      setOrder(data);
+    } catch {
+      toast.error("Orden no encontrada");
+      router.push("/ordenes");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, router]);
 
-  // Cantidades temporales para el dialog de recibir productos
-  const [cantidadesTemp, setCantidadesTemp] = useState<{
-    [key: string]: number;
-  }>({});
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
 
+  // ---------------------------------------------------------------------------
   // Handlers
-  const handleConfirmarOrden = () => {
-    setEstado("Confirmada");
-    setMostrarHistorial(true);
+  // ---------------------------------------------------------------------------
 
-    // Agregar cambio al historial
-    setHistorial((prev) => [
-      {
-        tipo: "Actualizada",
-        fecha: new Date().toLocaleString("es-AR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        usuario: "vos",
-        cambios: {
-          campo: "Estado",
-          anterior: "Borrador",
-          nuevo: "Confirmada",
-        },
-      },
-      ...prev,
-    ]);
-
-    setConfirmDialogOpen(false);
+  const handleConfirm = async () => {
+    setIsConfirming(true);
+    try {
+      await confirmPurchaseOrder(id);
+      toast.success("Orden confirmada");
+      setConfirmDialogOpen(false);
+      await loadOrder();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al confirmar la orden");
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   const handleOpenReceiveDialog = () => {
-    // Inicializar cantidades temporales con las actuales
-    const temp: { [key: string]: number } = {};
-    productos.forEach((p) => {
-      temp[p.id] = p.cantidadRecibida;
+    if (!order) return;
+    const temp: Record<string, number> = {};
+    order.items.forEach((item) => {
+      temp[item.id] = item.quantity_received;
     });
-    setCantidadesTemp(temp);
+    setTempQuantities(temp);
     setReceiveDialogOpen(true);
   };
 
-  const handleConfirmarRecepcion = () => {
-    // Actualizar productos con las cantidades recibidas
-    const productosActualizados = productos.map((p) => ({
-      ...p,
-      cantidadRecibida: cantidadesTemp[p.id] || 0,
-    }));
-
-    setProductos(productosActualizados);
-
-    // Verificar si todos los productos están completos
-    const todosCompletos = productosActualizados.every(
-      (p) => p.cantidadRecibida >= p.cantidadOrdenada,
-    );
-
-    const nuevoEstado = todosCompletos ? "Recibida" : "Parcial";
-    setEstado(nuevoEstado);
-
-    // Agregar al historial
-    setHistorial((prev) => [
-      {
-        tipo: "Actualizada",
-        fecha: new Date().toLocaleString("es-AR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        usuario: "vos",
-        cambios: {
-          campo: "Estado",
-          anterior: estado,
-          nuevo: nuevoEstado,
-        },
-      },
-      ...prev,
-    ]);
-
-    setReceiveDialogOpen(false);
+  const handleReceive = async () => {
+    if (!order) return;
+    setIsReceiving(true);
+    try {
+      const receivedItems = order.items.map((item) => ({
+        itemId: item.id,
+        quantityReceived: tempQuantities[item.id] || 0,
+      }));
+      await receiveProducts(id, receivedItems);
+      toast.success("Recepción registrada");
+      setReceiveDialogOpen(false);
+      await loadOrder();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al registrar recepción");
+    } finally {
+      setIsReceiving(false);
+    }
   };
 
-  const formatearFechaRelativa = (fecha: string) => {
-    const hoy = new Date();
-    const fechaOrden = new Date(fecha);
-    const diferencia = Math.floor(
-      (hoy.getTime() - fechaOrden.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (diferencia === 0) return "hoy";
-    if (diferencia === 1) return "ayer";
-
-    return fechaOrden.toLocaleDateString("es-AR", {
-      day: "numeric",
-      month: "short",
-    });
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    try {
+      await cancelPurchaseOrder(id);
+      toast.success("Orden cancelada");
+      setCancelDialogOpen(false);
+      await loadOrder();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al cancelar la orden");
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
-  const getEstadoBadge = () => {
-    const config = {
-      Borrador: { icon: CircleDashed, className: "text-muted-foreground" },
-      Confirmada: { icon: CircleDashed, className: "text-muted-foreground" },
-      Parcial: { icon: CircleDashed, className: "text-muted-foreground" },
-      Recibida: { icon: CircleCheck, className: "text-green-500" },
-    };
+  // ---------------------------------------------------------------------------
+  // Loading
+  // ---------------------------------------------------------------------------
 
-    const { icon: Icon, className } = config[estado];
+  if (isLoading) {
     return (
-      <Badge variant="outline">
-        <Icon className={className} />
-        {estado}
-      </Badge>
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
-  };
+  }
 
-  const calcularProgreso = (producto: Producto) => {
-    return (producto.cantidadRecibida / producto.cantidadOrdenada) * 100;
-  };
+  if (!order) return null;
 
-  const totalRecibido = productos.reduce(
-    (sum, p) => sum + p.cantidadRecibida,
+  const status = order.status;
+  const isDraft = status === "draft";
+  const canReceive = status === "confirmed" || status === "partial";
+  const showHistory = order.history.length > 0; // more than just "Creada"
+  const isCancelled = status === "cancelled";
+
+  const totalReceived = order.items.reduce(
+    (s, i) => s + i.quantity_received,
     0,
   );
-  const totalOrdenado = productos.reduce(
-    (sum, p) => sum + p.cantidadOrdenada,
-    0,
-  );
+  const totalOrdered = order.items.reduce((s, i) => s + i.quantity, 0);
 
   return (
     <div className="container mx-auto space-y-6 p-6">
@@ -323,25 +302,29 @@ export default function OrdenDetallesPage() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold">{orden.numero}</h1>
-              {getEstadoBadge()}
+              <h1 className="text-3xl font-bold">{order.order_number}</h1>
+              <StatusBadge status={status} />
             </div>
             <p className="text-lg text-muted-foreground">
-              Orden a {orden.proveedor.nombre}{" "}
+              Orden a {order.supplier?.name || "—"}{" "}
               <Tooltip>
                 <TooltipTrigger className="font-semibold text-primary">
-                  {formatearFechaRelativa(orden.fecha)}
+                  {formatRelativeDate(order.order_date)}
                 </TooltipTrigger>
-                <TooltipContent>{orden.fecha}</TooltipContent>
+                <TooltipContent>
+                  {format(new Date(order.order_date), "d 'de' MMMM 'de' yyyy", {
+                    locale: es,
+                  })}
+                </TooltipContent>
               </Tooltip>
             </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <div className="flex items-center gap-2">
-            {/* Dropdown "Más acciones" */}
+        {/* Actions */}
+        {!isCancelled && (
+          <div className="flex gap-2">
+            {/* More actions */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -350,25 +333,30 @@ export default function OrdenDetallesPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem asChild>
-                  <Link href={`/ordenes/${params.id}/editar`}>
-                    <Pencil className="size-3.5" />
-                    Editar
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
+                {(isDraft || status === "confirmed") && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/ordenes/${id}/editar`}>
+                      <Pencil className="size-3.5" />
+                      Editar
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => toast.info("Próximamente")}>
                   <Download />
                   Descargar PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setCancelDialogOpen(true)}
+                >
                   <Archive className="size-3.5" />
-                  Cancelar orden de compra
+                  Cancelar orden
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Botón "Confirmar orden" - Solo visible en estado Borrador */}
-            {estado === "Borrador" && (
+            {/* Confirm (draft only) */}
+            {isDraft && (
               <AlertDialog
                 open={confirmDialogOpen}
                 onOpenChange={setConfirmDialogOpen}
@@ -385,17 +373,22 @@ export default function OrdenDetallesPage() {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmarOrden}>
-                      Confirmar orden
+                    <AlertDialogCancel disabled={isConfirming}>
+                      Cancelar
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleConfirm}
+                      disabled={isConfirming}
+                    >
+                      {isConfirming ? "Confirmando…" : "Confirmar orden"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             )}
 
-            {/* Botón "Recibir productos" - Visible en Confirmada y Parcial */}
-            {(estado === "Confirmada" || estado === "Parcial") && (
+            {/* Receive (confirmed/partial) */}
+            {canReceive && (
               <Dialog
                 open={receiveDialogOpen}
                 onOpenChange={setReceiveDialogOpen}
@@ -405,58 +398,56 @@ export default function OrdenDetallesPage() {
                     Recibir productos
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="lg:max-w-3xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-h-[80vh] overflow-y-auto lg:max-w-3xl">
                   <DialogHeader>
                     <DialogTitle>Recibir productos</DialogTitle>
                     <DialogDescription>
-                      Ingresá las cantidades recibidas para cada producto. Podés
-                      recibir más o menos de lo ordenado.
+                      Ingresá las cantidades recibidas para cada producto.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
-                    {productos.map((producto) => (
+                    {order.items.map((item) => (
                       <div
-                        key={producto.id}
+                        key={item.id}
                         className="grid grid-cols-[1fr_auto] items-start gap-4 border-b pb-4 last:border-b-0"
                       >
                         <div>
-                          <div className="font-medium">{producto.nombre}</div>
-                          <div className="text-sm text-muted-foreground">
-                            SKU: {producto.sku}
-                          </div>
+                          <div className="font-medium">{item.name}</div>
+                          {item.sku && (
+                            <div className="text-sm text-muted-foreground">
+                              SKU: {item.sku}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-24">
                             <Input
                               type="number"
                               min="0"
-                              value={cantidadesTemp[producto.id] || 0}
+                              value={tempQuantities[item.id] || 0}
                               onChange={(e) =>
-                                setCantidadesTemp({
-                                  ...cantidadesTemp,
-                                  [producto.id]: parseInt(e.target.value) || 0,
+                                setTempQuantities({
+                                  ...tempQuantities,
+                                  [item.id]: parseInt(e.target.value) || 0,
                                 })
                               }
                               className="h-8 w-full text-center"
                             />
                           </div>
-                          <div className="mt-2 w-36">
+                          <div className="w-36">
                             <Progress
                               value={
-                                ((cantidadesTemp[producto.id] || 0) /
-                                  producto.cantidadOrdenada) *
+                                ((tempQuantities[item.id] || 0) /
+                                  item.quantity) *
                                 100
                               }
                             />
-                            <div className="mt-1 flex items-center justify-between space-x-1 pr-0.5 text-right text-xs text-muted-foreground">
+                            <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                               <span className="font-medium">Recibido</span>
-                              <div>
-                                {cantidadesTemp[producto.id] || 0}
-                                <span className="text-muted-foreground">
-                                  {" "}
-                                  de {producto.cantidadOrdenada}
-                                </span>
-                              </div>
+                              <span>
+                                {tempQuantities[item.id] || 0} de{" "}
+                                {item.quantity}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -465,105 +456,120 @@ export default function OrdenDetallesPage() {
                   </div>
                   <DialogFooter>
                     <DialogClose asChild>
-                      <Button variant="outline">Cancelar</Button>
+                      <Button variant="outline" disabled={isReceiving}>
+                        Cancelar
+                      </Button>
                     </DialogClose>
-                    <Button onClick={handleConfirmarRecepcion}>
-                      Confirmar recepción
+                    <Button onClick={handleReceive} disabled={isReceiving}>
+                      {isReceiving ? "Registrando…" : "Confirmar recepción"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             )}
 
-            {/* Botón "Crear factura" - Visible después de confirmar */}
-            {estado !== "Borrador" && (
-              <Link href={`/compras/nueva?purchaseOrderId=${params.id}`}>
-                <Button>
+            {/* Create invoice (after confirm) */}
+            {!isDraft && (
+              <Button asChild>
+                <Link href={`/compras/nueva?purchaseOrderId=${id}`}>
                   <ReceiptText />
                   Crear factura
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 gap-y-6 lg:grid-cols-5 lg:gap-6">
-        {/* Left Column - Productos */}
+        {/* Left Column - Products */}
         <div className="space-y-6 lg:col-span-3">
-          {/* Order Info Card */}
+          {/* Order info strip */}
           <Card className="bg-muted p-4">
             <div className="flex flex-col items-center justify-between gap-2 md:flex-row">
-              <div className="flex w-full items-center justify-between gap-2 md:w-auto">
-                <div className="flex items-center gap-2">
-                  <File className="size-4 text-muted-foreground" />
-                  <span className="font-medium">{orden.numero}</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <File className="size-4 text-muted-foreground" />
+                <span className="font-medium">{order.order_number}</span>
               </div>
-              <div className="flex w-full flex-col items-center gap-2 md:w-auto md:flex-row">
+              {order.expected_delivery_date && (
                 <div className="text-sm text-muted-foreground">
-                  Fecha estimada: {orden.fechaEntrega}
+                  Fecha estimada:{" "}
+                  {format(
+                    new Date(order.expected_delivery_date),
+                    "d 'de' MMMM 'de' yyyy",
+                    { locale: es },
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </Card>
 
-          {/* Products Card */}
+          {/* Products */}
           <Card>
             <CardHeader>
               <CardTitle>Productos</CardTitle>
               <CardDescription>
-                Depósito: <span className="text-primary">{orden.deposito}</span>
+                Depósito:{" "}
+                <span className="text-primary">
+                  {order.location?.name || "—"}
+                </span>
               </CardDescription>
-              {estado !== "Borrador" && (
+              {!isDraft && (
                 <div className="col-start-2 row-span-2 row-start-1 flex items-center justify-end gap-2 self-start justify-self-end text-xs text-muted-foreground">
                   <Progress
-                    value={(totalRecibido / totalOrdenado) * 100}
+                    value={(totalReceived / totalOrdered) * 100}
                     className="w-36"
                   />
-                  <div className="text-muted-foreground">
-                    {totalRecibido} / {totalOrdenado}
+                  <div>
+                    {totalReceived} / {totalOrdered}
                   </div>
                 </div>
               )}
             </CardHeader>
             <CardContent>
               <div>
-                {productos.map((producto, index) => (
+                {order.items.map((item, index) => (
                   <div
-                    key={producto.id}
+                    key={item.id}
                     className={`py-4 ${
-                      index !== productos.length - 1 ? "border-b" : ""
+                      index !== order.items.length - 1 ? "border-b" : ""
                     }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="mb-1 flex items-center gap-2">
-                          <Link
-                            href={`/productos/${producto.id}`}
-                            className="text-base font-medium underline-offset-4 transition-colors hover:underline"
-                          >
-                            {producto.nombre}
-                          </Link>
+                          {item.product_id ? (
+                            <Link
+                              href={`/productos/${item.product_id}`}
+                              className="text-base font-medium underline-offset-4 transition-colors hover:underline"
+                            >
+                              {item.name}
+                            </Link>
+                          ) : (
+                            <span className="text-base font-medium">
+                              {item.name}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          SKU: {producto.sku}
-                        </div>
+                        {item.sku && (
+                          <div className="text-sm text-muted-foreground">
+                            SKU: {item.sku}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="text-base font-medium">
-                          $ {producto.precio.toFixed(2)}
+                          {formatCurrency(Number(item.unit_cost))}
                         </div>
                         <Badge variant="outline" className="font-mono text-sm">
-                          {producto.cantidadOrdenada}
+                          {item.quantity}
                         </Badge>
-                        {estado !== "Borrador" && (
+                        {!isDraft && (
                           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                             <span className="font-medium">Recibido:</span>
                             <span className="font-mono">
-                              {producto.cantidadRecibida}/
-                              {producto.cantidadOrdenada}
+                              {item.quantity_received}/{item.quantity}
                             </span>
                           </div>
                         )}
@@ -577,7 +583,7 @@ export default function OrdenDetallesPage() {
                       Costo esperado total
                     </span>
                     <span className="font-bold md:text-xl">
-                      $ {orden.total.toFixed(2)}
+                      {formatCurrency(Number(order.total))}
                     </span>
                   </div>
                 </div>
@@ -586,9 +592,9 @@ export default function OrdenDetallesPage() {
           </Card>
         </div>
 
-        {/* Right Column - Info Cards */}
+        {/* Right Column */}
         <div className="col-span-2 space-y-6">
-          {/* Proveedor Card */}
+          {/* Supplier */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -596,76 +602,80 @@ export default function OrdenDetallesPage() {
                 Proveedor
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
+            <CardContent>
+              {order.supplier ? (
                 <Link
-                  href={`/proveedores/${orden.proveedor.id}`}
-                  className="px-0 text-lg font-semibold text-primary hover:underline"
+                  href={`/proveedores/${order.supplier.id}`}
+                  className="text-lg font-semibold text-primary hover:underline"
                 >
-                  {orden.proveedor.nombre}
+                  {order.supplier.name}
                 </Link>
-              </div>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
             </CardContent>
           </Card>
 
-          {/* Notas Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+          {/* Notes */}
+          {order.notes && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <StickyNote className="size-4 text-muted-foreground" />
                   Notas
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between gap-8">
-                <span className="text-muted-foreground">{orden.notas}</span>
-              </div>
-            </CardContent>
-          </Card>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">{order.notes}</p>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Historial Card - Solo se muestra después de confirmar */}
-          {mostrarHistorial && (
+          {/* History */}
+          {showHistory && (
             <Card>
               <CardHeader>
                 <CardTitle>Historial de cambios</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {historial.map((cambio, index) => (
+                  {order.history.map((entry, index) => (
                     <div
-                      key={index}
-                      className={`flex gap-4 pb-4 ${
-                        index !== historial.length - 1 ? "border-b" : ""
+                      key={entry.id}
+                      className={`flex gap-4 pb-4 justify-between items-start ${
+                        index !== order.history.length - 1 ? "border-b" : ""
                       }`}
                     >
-                      <div className="flex-1">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium">{cambio.tipo}</p>
-                          <span className="text-sm text-muted-foreground">
-                            {cambio.fecha}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          por {cambio.usuario}
-                        </p>
-                        {cambio.cambios && (
+                      <div className="flex flex-col">
+                        <p className="text-sm font-medium">{entry.action}</p>
+                        {entry.user?.name && (
+                          <p className="text-xs text-muted-foreground">
+                            por {entry.user.name}
+                          </p>
+                        )}
+                        {entry.field_name && (
                           <div className="mt-2 space-y-1 text-sm">
                             <div className="flex gap-2 text-muted-foreground">
                               <span className="font-medium">
-                                {cambio.cambios.campo}:
+                                {entry.field_name}:
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="line-through">
-                                  {cambio.cambios.anterior}
+                                  {entry.old_value}
                                 </span>
                                 <ArrowRight className="size-3" />
-                                <span>{cambio.cambios.nuevo}</span>
+                                <span>{entry.new_value}</span>
                               </div>
                             </div>
                           </div>
                         )}
+                      </div>
+
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        {/*  <p className="text-sm font-medium">{entry.action}</p> */}
+                        <span className="text-sm text-muted-foreground">
+                          {formatHistoryDate(entry.created_at)}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -675,6 +685,31 @@ export default function OrdenDetallesPage() {
           )}
         </div>
       </div>
+
+      {/* Cancel dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar orden de compra?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La orden {order.order_number} será marcada como cancelada. Esta
+              acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>
+              Volver
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isCancelling ? "Cancelando…" : "Cancelar orden"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

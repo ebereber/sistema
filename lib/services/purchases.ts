@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/types";
 
-export type Purchase = Omit<Tables<"purchases">, "status" | "payment_status"> & {
+export type Purchase = Omit<
+  Tables<"purchases">,
+  "status" | "payment_status"
+> & {
   status: "draft" | "completed" | "cancelled";
   payment_status: "pending" | "partial" | "paid" | null;
   supplier?: {
@@ -36,6 +39,7 @@ export interface CreatePurchaseData {
   notes?: string | null;
   attachment_url?: string | null;
   tax_category?: string | null;
+  purchase_order_id?: string | null;
 }
 
 export interface CreatePurchaseItemData {
@@ -200,6 +204,7 @@ export async function createPurchase(
       attachment_url: purchaseData.attachment_url || null,
       tax_category: purchaseData.tax_category || null,
       created_by: user.id,
+      purchase_order_id: purchaseData.purchase_order_id || null,
     })
     .select()
     .single();
@@ -244,6 +249,14 @@ export async function createPurchase(
         }
       }
     }
+  }
+
+  // Si viene de una orden de compra, marcarla como facturada
+  if (purchaseData.purchase_order_id) {
+    await supabase
+      .from("purchase_orders")
+      .update({ status: "invoiced", updated_at: new Date().toISOString() })
+      .eq("id", purchaseData.purchase_order_id);
   }
 
   return purchase as unknown as Purchase;

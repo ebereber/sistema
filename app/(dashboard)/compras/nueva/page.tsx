@@ -2,6 +2,10 @@
 
 import { PurchaseForm } from "@/components/compras/purchase-form";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  getPurchaseOrderById,
+  type PurchaseOrderWithDetails,
+} from "@/lib/services/purchase-orders";
 import { getPurchaseById, type Purchase } from "@/lib/services/purchases";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,27 +13,34 @@ import { useEffect, useState } from "react";
 export default function NuevaCompraPage() {
   const searchParams = useSearchParams();
   const duplicateFromId = searchParams.get("duplicateFrom");
+  const purchaseOrderId = searchParams.get("purchaseOrderId");
 
   const [duplicateData, setDuplicateData] = useState<Purchase | undefined>();
-  const [isLoading, setIsLoading] = useState(!!duplicateFromId);
+  const [purchaseOrderData, setPurchaseOrderData] = useState<
+    PurchaseOrderWithDetails | undefined
+  >();
+  const [isLoading, setIsLoading] = useState(
+    !!duplicateFromId || !!purchaseOrderId,
+  );
 
   useEffect(() => {
-    async function loadDuplicateData() {
-      if (duplicateFromId) {
-        try {
+    async function loadData() {
+      try {
+        if (duplicateFromId) {
           const purchase = await getPurchaseById(duplicateFromId);
-          if (purchase) {
-            setDuplicateData(purchase);
-          }
-        } catch (error) {
-          console.error("Error loading purchase to duplicate:", error);
-        } finally {
-          setIsLoading(false);
+          if (purchase) setDuplicateData(purchase);
+        } else if (purchaseOrderId) {
+          const order = await getPurchaseOrderById(purchaseOrderId);
+          if (order) setPurchaseOrderData(order);
         }
+      } catch (error) {
+        console.error("Error loading data:", error);
+      } finally {
+        setIsLoading(false);
       }
     }
-    loadDuplicateData();
-  }, [duplicateFromId]);
+    loadData();
+  }, [duplicateFromId, purchaseOrderId]);
 
   if (isLoading) {
     return (
@@ -43,5 +54,11 @@ export default function NuevaCompraPage() {
     );
   }
 
-  return <PurchaseForm mode="create" duplicateFrom={duplicateData} />;
+  return (
+    <PurchaseForm
+      mode="create"
+      duplicateFrom={duplicateData}
+      fromPurchaseOrder={purchaseOrderData}
+    />
+  );
 }
