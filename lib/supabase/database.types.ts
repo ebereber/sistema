@@ -1231,6 +1231,39 @@ export type Database = {
           },
         ]
       }
+      roles: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          is_system: boolean
+          name: string
+          permissions: Json
+          special_actions: Json
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          name: string
+          permissions?: Json
+          special_actions?: Json
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+          permissions?: Json
+          special_actions?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sale_items: {
         Row: {
           created_at: string
@@ -1749,35 +1782,175 @@ export type Database = {
         }
         Relationships: []
       }
+      user_cash_registers: {
+        Row: {
+          cash_register_id: string
+          user_id: string
+        }
+        Insert: {
+          cash_register_id: string
+          user_id: string
+        }
+        Update: {
+          cash_register_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_cash_registers_cash_register_id_fkey"
+            columns: ["cash_register_id"]
+            isOneToOne: false
+            referencedRelation: "cash_registers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_cash_registers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_invitations: {
+        Row: {
+          cash_register_ids: Json
+          commission_percentage: number
+          created_at: string
+          data_visibility_scope: string
+          email: string
+          id: string
+          invited_by: string | null
+          location_ids: Json
+          max_discount_percentage: number
+          role_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cash_register_ids?: Json
+          commission_percentage?: number
+          created_at?: string
+          data_visibility_scope?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          location_ids?: Json
+          max_discount_percentage?: number
+          role_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cash_register_ids?: Json
+          commission_percentage?: number
+          created_at?: string
+          data_visibility_scope?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          location_ids?: Json
+          max_discount_percentage?: number
+          role_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_invitations_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_locations: {
+        Row: {
+          location_id: string
+          user_id: string
+        }
+        Insert: {
+          location_id: string
+          user_id: string
+        }
+        Update: {
+          location_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           active: boolean | null
+          commission_percentage: number
           created_at: string
+          data_visibility_scope: string
           email: string
           id: string
+          max_discount_percentage: number
           name: string | null
           role: Database["public"]["Enums"]["user_role"]
+          role_id: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean | null
+          commission_percentage?: number
           created_at?: string
+          data_visibility_scope?: string
           email: string
           id: string
+          max_discount_percentage?: number
           name?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          role_id?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean | null
+          commission_percentage?: number
           created_at?: string
+          data_visibility_scope?: string
           email?: string
           id?: string
+          max_discount_percentage?: number
           name?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          role_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
