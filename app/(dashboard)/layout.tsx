@@ -3,6 +3,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 import { AppHeader } from "@/components/sidebar/app-header";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { UserProvider } from "@/lib/auth/user-provider";
 
 export default function DashboardLayout({
   children,
@@ -10,12 +11,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <AppHeader />
-        <div className="flex  flex-1 flex-col gap-4 p-4">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <UserProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <AppHeader />
+          <div className="flex  flex-1 flex-col gap-4 p-4">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </UserProvider>
   );
 }

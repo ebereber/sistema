@@ -12,13 +12,24 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import * as React from "react";
+import React from "react";
 
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -33,106 +44,117 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { DropdownMenuLabel } from "@radix-ui/react-dropdown-menu";
-import { ThemeSwitcher } from "../theme-switcher";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuPortal,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
+import { hasPermission } from "@/lib/auth/permissions";
+import { useCurrentUser } from "@/lib/auth/user-provider";
 
-const data = {
-  company: {
-    name: "Lemar",
-    logo: Lightbulb,
-  },
-  navItems: [
-    {
-      title: "Nueva Venta",
-      icon: Plus,
-      url: "/ventas/nueva",
-    },
-    {
-      title: "Ventas",
-      url: "/ventas",
-      icon: ShoppingCart,
-      items: [
-        { title: "Clientes", url: "/clientes" },
-        { title: "Cobranzas", url: "/cobranzas" },
-        { title: "Presupuestos", url: "/presupuestos" },
-        { title: "Turnos", url: "/turnos" },
-      ],
-    },
-    {
-      title: "Productos",
-      url: "/productos",
-      icon: Package,
-      items: [{ title: "Transferencias", url: "/transferencias" }],
-    },
-    {
-      title: "Compras",
-      url: "/compras",
-      icon: ShoppingBag,
-      items: [
-        { title: "Órdenes de Compra", url: "/ordenes" },
-        { title: "Proveedores", url: "/proveedores" },
-        { title: "Pagos", url: "/pagos" },
-      ],
-    },
-    {
-      title: "Configuración",
-      url: "/configuracion",
-      icon: Settings,
-    },
-  ],
+const COMPANY = {
+  name: "Lemar",
+  logo: Lightbulb,
 };
+
+const NAV_ITEMS = [
+  {
+    title: "Nueva Venta",
+    icon: Plus,
+    url: "/ventas/nueva",
+    permission: "sales:write",
+  },
+  {
+    title: "Ventas",
+    url: "/ventas",
+    icon: ShoppingCart,
+    permission: "sales:read",
+    items: [
+      { title: "Clientes", url: "/clientes", permission: "customers:read" },
+      { title: "Cobranzas", url: "/cobranzas", permission: "sales:read" },
+      { title: "Presupuestos", url: "/presupuestos", permission: "sales:read" },
+      { title: "Turnos", url: "/turnos", permission: "sales:read" },
+    ],
+  },
+  {
+    title: "Productos",
+    url: "/productos",
+    icon: Package,
+    permission: "products:read",
+    items: [
+      {
+        title: "Transferencias",
+        url: "/transferencias",
+        permission: "products:read",
+      },
+    ],
+  },
+  {
+    title: "Compras",
+    url: "/compras",
+    icon: ShoppingBag,
+    permission: "purchases:read",
+    items: [
+      {
+        title: "Órdenes de Compra",
+        url: "/ordenes",
+        permission: "orders:read",
+      },
+      {
+        title: "Proveedores",
+        url: "/proveedores",
+        permission: "suppliers:read",
+      },
+      { title: "Pagos", url: "/pagos", permission: "purchases:read" },
+    ],
+  },
+  {
+    title: "Configuración",
+    url: "/configuracion",
+    icon: Settings,
+    permission: "settings:write",
+  },
+];
 
 type SidebarMode = "expanded" | "collapsed" | "hover";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
+  const { permissions } = useCurrentUser();
   const [mode, setMode] = React.useState<SidebarMode>("hover");
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
-  const { setOpen, open } = useSidebar();
+  const { setOpen } = useSidebar();
 
-  // Control del Hover - MEJORADO para prevenir el glitch
+  // Filtrar items según permisos
+  const filteredItems = NAV_ITEMS.filter(
+    (item) => !item.permission || hasPermission(permissions, item.permission),
+  ).map((item) => ({
+    ...item,
+    items: item.items?.filter(
+      (sub) => !sub.permission || hasPermission(permissions, sub.permission),
+    ),
+  }));
+
   const handleMouseEnter = () => {
-    // Solo abre automáticamente si está en modo hover Y el dropdown NO está abierto
-    if (mode === "hover" && !isDropdownOpen) {
-      setOpen(true);
-    }
+    if (mode === "hover" && !isDropdownOpen) setOpen(true);
   };
 
   const handleMouseLeave = () => {
-    // Solo cierra automáticamente si está en modo hover Y el dropdown NO está abierto
-    if (mode === "hover" && !isDropdownOpen) {
-      setOpen(false);
-    }
+    if (mode === "hover" && !isDropdownOpen) setOpen(false);
   };
 
   return (
     <Sidebar
-      variant={"sidebar"}
+      variant="sidebar"
       collapsible={mode === "expanded" ? "offcanvas" : "icon"}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       {...props}
     >
-      <SidebarHeader className="border-b h-12 flex items-center justify-center border-sidebar-border">
+      <SidebarHeader className="flex h-12 items-center justify-center border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <data.company.logo className="size-4" />
+                  <COMPANY.logo className="size-4" />
                 </div>
-                <span className="text-sm font-semibold">
-                  {data.company.name}
-                </span>
+                <span className="text-sm font-semibold">{COMPANY.name}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -141,7 +163,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <SidebarMenu className="gap-1 px-2 py-2">
-          {data.navItems.map((item) => {
+          {filteredItems.map((item) => {
             const hasItems = item.items && item.items.length > 0;
             const isChildActive = item.items?.some(
               (sub) => pathname === sub.url,
@@ -214,15 +236,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <PanelLeft />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
-
           <DropdownMenuPortal>
             <DropdownMenuContent side="right" align="end" className="w-56">
               <DropdownMenuLabel className="px-2 py-1.5 text-xs text-muted-foreground">
                 Control lateral
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-
-              {/* Usamos RadioGroup para manejar el punto automáticamente */}
               <DropdownMenuRadioGroup
                 value={mode}
                 onValueChange={(v) => setMode(v as SidebarMode)}
@@ -230,23 +249,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <DropdownMenuRadioItem
                   value="expanded"
                   onClick={() => setOpen(true)}
-                  className="text-xs flex items-center justify-between"
+                  className="text-xs"
                 >
                   Expandido
                 </DropdownMenuRadioItem>
-
                 <DropdownMenuRadioItem
                   value="collapsed"
                   onClick={() => setOpen(false)}
-                  className="text-xs flex items-center justify-between"
+                  className="text-xs"
                 >
                   Contraído
                 </DropdownMenuRadioItem>
-
                 <DropdownMenuRadioItem
                   value="hover"
                   onClick={() => setOpen(false)}
-                  className="text-xs flex items-center justify-between"
+                  className="text-xs"
                 >
                   Expandir al pasar el mouse
                 </DropdownMenuRadioItem>
