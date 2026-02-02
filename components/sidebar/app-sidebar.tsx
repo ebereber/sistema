@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChartNoAxesColumnDecreasing,
   ChevronRight,
   Lightbulb,
   Package,
@@ -102,6 +103,12 @@ const NAV_ITEMS = [
       },
       { title: "Pagos", url: "/pagos", permission: "purchases:read" },
     ],
+  },
+  {
+    title: "Reportes",
+    url: "/reportes",
+    icon: ChartNoAxesColumnDecreasing,
+    permission: "settings:write",
   },
   {
     title: "Configuración",

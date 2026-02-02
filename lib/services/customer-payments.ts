@@ -1,3 +1,4 @@
+import { applyDataScope, type UserScope } from "@/lib/auth/data-scope";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeRelation } from "@/lib/supabase/types";
 
@@ -125,6 +126,7 @@ export interface GetCustomerPaymentsResult {
  */
 export async function getCustomerPayments(
   params: GetCustomerPaymentsParams = {},
+  scope?: UserScope,
 ): Promise<GetCustomerPaymentsResult> {
   const supabase = createClient();
 
@@ -138,7 +140,6 @@ export async function getCustomerPayments(
     pageSize = 20,
   } = params;
 
-  // Query payments
   let query = supabase
     .from("customer_payments")
     .select(
@@ -154,6 +155,11 @@ export async function getCustomerPayments(
     )
     .order("payment_date", { ascending: false })
     .order("created_at", { ascending: false });
+
+  // Aplicar visibilidad de datos
+  if (scope) {
+    query = applyDataScope(query, scope, { userColumn: "created_by" });
+  }
 
   // Filters
   if (search) {

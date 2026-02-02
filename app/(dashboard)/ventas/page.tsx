@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/tooltip";
 import { CancelNCDialog } from "@/components/ventas/cancel-nc-dialog";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useCurrentUser } from "@/lib/auth/user-provider";
 import {
   getSales,
   type GetSalesParams,
@@ -80,6 +81,7 @@ import { cn } from "@/lib/utils";
 
 export default function VentasPage() {
   const router = useRouter();
+  const { user, isLoading: isUserLoading } = useCurrentUser();
 
   // Data states
   const [sales, setSales] = useState<SaleListItem[]>([]);
@@ -138,7 +140,27 @@ export default function VentasPage() {
       if (minAmount) params.minAmount = parseFloat(minAmount);
       if (maxAmount) params.maxAmount = parseFloat(maxAmount);
 
-      const result = await getSales(params);
+      console.log(
+        "SCOPE:",
+        user
+          ? {
+              visibility: user.dataVisibilityScope,
+              userId: user.id,
+              locationIds: user.locationIds,
+            }
+          : "sin scope",
+      );
+
+      const result = await getSales(
+        params,
+        user
+          ? {
+              visibility: user.dataVisibilityScope,
+              userId: user.id,
+              locationIds: user.locationIds,
+            }
+          : undefined,
+      );
 
       setSales(result.data);
       setTotalCount(result.count);
@@ -157,11 +179,13 @@ export default function VentasPage() {
     dateTo,
     minAmount,
     maxAmount,
+    user,
   ]);
 
   useEffect(() => {
+    if (isUserLoading) return;
     loadSales();
-  }, [loadSales]);
+  }, [loadSales, isUserLoading]);
 
   // Reset to first page when filters change
   useEffect(() => {

@@ -10,6 +10,9 @@ interface CurrentUser {
   email: string;
   name: string | null;
   active: boolean;
+  maxDiscountPercentage: number;
+  dataVisibilityScope: "own" | "assigned_locations" | "all";
+  locationIds: string[];
   role: {
     id: string;
     name: string;
@@ -55,7 +58,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from("users")
         .select(
-          "id, email, name, active, role:roles!users_role_id_fkey(id, name, is_system, permissions, special_actions)",
+          `
+    id, email, name, active, max_discount_percentage, data_visibility_scope,
+    user_locations(location_id),
+    role:roles!users_role_id_fkey(id, name, is_system, permissions, special_actions)
+  `,
         )
         .eq("id", authUser.id)
         .single();
@@ -79,6 +86,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         email: data.email,
         name: data.name,
         active: data.active ?? true,
+        maxDiscountPercentage: data.max_discount_percentage ?? 0,
+        dataVisibilityScope:
+          (data.data_visibility_scope as CurrentUser["dataVisibilityScope"]) ??
+          "own",
+
+        locationIds:
+          (data.user_locations as { location_id: string }[])?.map(
+            (ul) => ul.location_id,
+          ) || [],
         role: role
           ? {
               ...role,

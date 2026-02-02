@@ -1,3 +1,4 @@
+import { applyDataScope, type UserScope } from "@/lib/auth/data-scope";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeRelation } from "@/lib/supabase/types";
 import type {
@@ -651,6 +652,7 @@ export interface GetSalesResult {
  */
 export async function getSales(
   params: GetSalesParams = {},
+  scope?: UserScope,
 ): Promise<GetSalesResult> {
   const supabase = createClient();
 
@@ -678,7 +680,7 @@ export async function getSales(
       voucher_type,
       total,
       amount_paid,
-    due_date,
+      due_date,
       related_sale_id,
       customer:customers(id, name),
       seller:users!sales_seller_id_fkey(id, name),
@@ -688,6 +690,11 @@ export async function getSales(
     )
     .order("sale_date", { ascending: false })
     .order("created_at", { ascending: false });
+
+  // Aplicar visibilidad de datos
+  if (scope) {
+    query = applyDataScope(query, scope, { userColumn: "seller_id" });
+  }
 
   // Search filter (sale number)
   if (search) {

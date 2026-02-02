@@ -1,3 +1,4 @@
+import { applyDataScope, type UserScope } from "@/lib/auth/data-scope";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -74,7 +75,10 @@ export interface PurchasePaymentAllocation {
   methods: string[];
 }
 
-export async function getPurchases(params: GetPurchasesParams = {}): Promise<{
+export async function getPurchases(
+  params: GetPurchasesParams = {},
+  scope?: UserScope,
+): Promise<{
   data: Purchase[];
   count: number;
   totalPages: number;
@@ -90,14 +94,17 @@ export async function getPurchases(params: GetPurchasesParams = {}): Promise<{
     search,
   } = params;
 
-  let query = supabase.from("purchases").select(
-    `
-      *,
-      supplier:suppliers(id, name, tax_id),
-      location:locations(id, name)
-    `,
-    { count: "exact" },
-  );
+  let query = supabase
+    .from("purchases")
+    .select(
+      `*, supplier:suppliers(id, name, tax_id), location:locations(id, name)`,
+      { count: "exact" },
+    );
+
+  // Aplicar visibilidad de datos
+  if (scope) {
+    query = applyDataScope(query, scope, { userColumn: "user_id" });
+  }
 
   if (status) {
     query = query.eq("status", status);

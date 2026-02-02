@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useCurrentUser } from "@/lib/auth/user-provider";
 import {
   getCustomerPayments,
   type CustomerPaymentListItem,
@@ -55,6 +56,7 @@ import { toast } from "sonner";
 
 export default function CobranzasPage() {
   const router = useRouter();
+  const { user, isLoading: isUserLoading } = useCurrentUser();
 
   // Data states
   const [payments, setPayments] = useState<CustomerPaymentListItem[]>([]);
@@ -80,7 +82,9 @@ export default function CobranzasPage() {
   const debouncedSearch = useDebounce(search, 300);
 
   // Load payments
+
   const loadPayments = useCallback(async () => {
+    if (isUserLoading) return;
     setIsLoading(true);
     try {
       const params: GetCustomerPaymentsParams = {
@@ -92,7 +96,16 @@ export default function CobranzasPage() {
       if (dateFrom) params.dateFrom = dateFrom;
       if (dateTo) params.dateTo = dateTo;
 
-      const result = await getCustomerPayments(params);
+      const result = await getCustomerPayments(
+        params,
+        user
+          ? {
+              visibility: user.dataVisibilityScope,
+              userId: user.id,
+              locationIds: user.locationIds,
+            }
+          : undefined,
+      );
 
       setPayments(result.data);
       setTotalCount(result.count);
@@ -103,11 +116,12 @@ export default function CobranzasPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearch, dateFrom, dateTo]);
+  }, [currentPage, debouncedSearch, dateFrom, dateTo, user, isUserLoading]);
 
   useEffect(() => {
+    if (isUserLoading) return;
     loadPayments();
-  }, [loadPayments]);
+  }, [loadPayments, isUserLoading]);
 
   // Reset to first page when filters change
   useEffect(() => {

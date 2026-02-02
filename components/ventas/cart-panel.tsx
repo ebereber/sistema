@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useCurrentUser } from "@/lib/auth/user-provider";
 import type { CashRegister } from "@/lib/services/cash-registers";
 import { getCashRegisters } from "@/lib/services/cash-registers";
 import {
@@ -131,6 +132,7 @@ export function CartPanel({
   const [selectedCashRegisterId, setSelectedCashRegisterId] = useState<
     string | null
   >(null);
+  const { user } = useCurrentUser();
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
@@ -660,6 +662,7 @@ export function CartPanel({
         onOpenChange={setDiscountDialogOpen}
         items={items}
         globalDiscount={globalDiscount}
+        maxDiscountPercentage={user?.maxDiscountPercentage ?? 0}
         onApplyItemDiscount={onApplyItemDiscount}
         onApplyGlobalDiscount={onGlobalDiscountChange}
       />
