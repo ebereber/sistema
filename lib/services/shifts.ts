@@ -51,6 +51,12 @@ export interface CloseShiftData {
 export async function getActiveShift(): Promise<Shift | null> {
   const supabase = createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
   const { data, error } = await supabase
     .from("cash_register_shifts")
     .select(
@@ -64,8 +70,7 @@ export async function getActiveShift(): Promise<Shift | null> {
     `,
     )
     .eq("status", "open")
-    .order("opened_at", { ascending: false })
-    .limit(1)
+    .eq("opened_by", user.id)
     .maybeSingle();
 
   if (error) throw error;
@@ -148,8 +153,10 @@ export async function getShiftSummary(shiftId: string): Promise<ShiftSummary> {
 
   // Get payment methods for these sales via allocations
   const saleIds = (salesData || []).map((s) => s.id);
-  let methodsBySale: Record<string, { method_name: string; amount: number }[]> =
-    {};
+  const methodsBySale: Record<
+    string,
+    { method_name: string; amount: number }[]
+  > = {};
 
   if (saleIds.length > 0) {
     const { data: allocations } = await supabase

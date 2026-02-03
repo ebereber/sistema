@@ -85,10 +85,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { SupplierDialog } from "@/components/proveedores/supplier-dialog";
-import {
-  getCashRegisters,
-  type CashRegister,
-} from "@/lib/services/cash-registers";
+import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
 import {
   createSupplierPayment,
   getPendingPurchases,
@@ -133,7 +130,7 @@ export default function NuevoPagoPage() {
 
   // Data from DB
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
 
   // Form state
@@ -161,22 +158,21 @@ export default function NuevoPagoPage() {
 
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  const { cashRegisters, isLoading: isLoadingRegisters } = useUserCashRegisters(
+    (registers) => {
+      if (registers.length > 0) {
+        setDialogCashRegisterId(registers[0].id);
+      }
+    },
+  );
+
   // Load initial data
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [suppliersData, cashRegistersData] = await Promise.all([
-          getSuppliers({ active: true }),
-          getCashRegisters(),
-        ]);
+        const suppliersData = await getSuppliers({ active: true });
         setSuppliers(suppliersData);
-        setCashRegisters(cashRegistersData);
-
-        // Set default cash register (use first one)
-        if (cashRegistersData.length > 0) {
-          setDialogCashRegisterId(cashRegistersData[0].id);
-        }
 
         // If purchaseId in URL, load that purchase and pre-select
         if (purchaseIdFromUrl && !initialLoadDone) {
@@ -184,15 +180,12 @@ export default function NuevoPagoPage() {
           const purchase = await getPurchaseById(purchaseIdFromUrl);
 
           if (purchase && purchase.supplier_id) {
-            // Set supplier
             setSelectedSupplierId(purchase.supplier_id);
 
-            // Load pending purchases for this supplier
             const pendingPurchases = await getPendingPurchases(
               purchase.supplier_id,
             );
 
-            // Map and pre-select the purchase from URL
             setPurchases(
               pendingPurchases.map((p) => ({
                 ...p,
@@ -210,6 +203,7 @@ export default function NuevoPagoPage() {
         setIsLoading(false);
       }
     }
+
     loadData();
   }, [purchaseIdFromUrl, initialLoadDone]);
 
@@ -399,7 +393,9 @@ export default function NuevoPagoPage() {
   const filteredPurchases = purchases.filter(
     (p) =>
       p.voucher_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.purchase_number || "").toLowerCase().includes(searchQuery.toLowerCase()),
+      (p.purchase_number || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()),
   );
 
   // Submit
@@ -1013,7 +1009,9 @@ export default function NuevoPagoPage() {
                   {cashRegisters.map((cr) => (
                     <SelectItem key={cr.id} value={cr.id}>
                       {cr.name}
-                      {(cr as Record<string, unknown>).is_default ? " (Principal)" : ""}
+                      {(cr as Record<string, unknown>).is_default
+                        ? " (Principal)"
+                        : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -213,3 +213,29 @@ export async function getActiveCashRegisters(): Promise<CashRegister[]> {
 
   return (data || []) as unknown as CashRegister[];
 }
+
+// Obtener cajas por múltiples ubicaciones (para usuarios con acceso limitado)
+export async function getCashRegistersByLocationIds(
+  locationIds: string[],
+): Promise<CashRegister[]> {
+  const supabase = createClient();
+
+  if (locationIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("cash_registers")
+    .select(
+      `
+      *,
+      location:locations(id, name),
+      point_of_sale:point_of_sale(id, name, number)
+    `,
+    )
+    .in("location_id", locationIds)
+    .eq("status", "active")
+    .order("name");
+
+  if (error) throw error;
+
+  return (data || []) as unknown as CashRegister[];
+}

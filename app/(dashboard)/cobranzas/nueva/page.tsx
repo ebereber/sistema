@@ -47,7 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getCashRegisters } from "@/lib/services/cash-registers";
+import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
 import {
   createCustomerPayment,
   getPendingSaleById,
@@ -134,7 +134,7 @@ export default function NuevaCobranzaPage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(
     [],
   );
-  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+
   const [addedMethods, setAddedMethods] = useState<AddedPaymentMethod[]>([]);
 
   const [dialogMethodOpen, setDialogMethodOpen] = useState(false);
@@ -145,17 +145,25 @@ export default function NuevaCobranzaPage() {
     reference: "",
     cash_register_id: "",
   });
-
+  const { cashRegisters, isLoading: isLoadingRegisters } = useUserCashRegisters(
+    (registers) => {
+      if (registers.length > 0) {
+        setNewMethod((prev) => ({
+          ...prev,
+          cash_register_id: registers[0].id,
+        }));
+      }
+    },
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load initial data
   useEffect(() => {
     async function loadData() {
       try {
-        const [customersData, methodsData, registersData] = await Promise.all([
+        const [customersData, methodsData] = await Promise.all([
           getCustomers(),
           getPaymentMethods({ isActive: true, availability: "VENTAS" }),
-          getCashRegisters(),
         ]);
 
         setCustomers(
@@ -173,15 +181,6 @@ export default function NuevaCobranzaPage() {
             requires_reference: m.requires_reference,
           })),
         );
-        setCashRegisters(registersData);
-
-        // Set default cash register
-        if (registersData.length > 0) {
-          setNewMethod((prev) => ({
-            ...prev,
-            cash_register_id: registersData[0].id,
-          }));
-        }
       } catch (error) {
         console.error("Error loading data:", error);
         toast.error("Error al cargar datos");

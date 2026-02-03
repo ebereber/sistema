@@ -13,20 +13,26 @@ import {
 import { Label } from "@/components/ui/label";
 import { getLastClosedShift } from "@/lib/services/shifts";
 import { useEffect, useState } from "react";
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 interface OpenShiftDialogProps {
-  cashRegisterId?: string;
-  cashRegisterName?: string;
+  cashRegisters: { id: string; name: string }[];
+  selectedCashRegisterId: string | null;
+  onCashRegisterChange: (id: string) => void;
   onOpenShift?: (openingAmount: number) => Promise<void>;
-  onChangeCashRegister?: () => void;
   trigger?: React.ReactNode;
 }
 
 export function OpenShiftDialog({
-  cashRegisterId,
-  cashRegisterName = "Caja Principal",
+  cashRegisters,
+  selectedCashRegisterId,
+  onCashRegisterChange,
   onOpenShift,
-  onChangeCashRegister,
   trigger,
 }: OpenShiftDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,14 +42,18 @@ export function OpenShiftDialog({
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false);
   const [showEditAmount, setShowEditAmount] = useState(false);
 
-  // Load previous shift amount when dialog opens
+  const selectedCashRegister = cashRegisters.find(
+    (cr) => cr.id === selectedCashRegisterId,
+  );
+
+  // Load previous shift amount when dialog opens or cash register changes
   useEffect(() => {
     async function loadPreviousAmount() {
-      if (!isOpen || !cashRegisterId) return;
+      if (!isOpen || !selectedCashRegisterId) return;
 
       setIsLoadingPrevious(true);
       try {
-        const lastShift = await getLastClosedShift(cashRegisterId);
+        const lastShift = await getLastClosedShift(selectedCashRegisterId);
         if (
           lastShift?.left_in_cash !== null &&
           lastShift?.left_in_cash !== undefined
@@ -64,7 +74,7 @@ export function OpenShiftDialog({
     }
 
     loadPreviousAmount();
-  }, [isOpen, cashRegisterId]);
+  }, [isOpen, selectedCashRegisterId]);
 
   const handleOpenShift = async () => {
     if (onOpenShift) {
@@ -112,16 +122,43 @@ export function OpenShiftDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Abrir turno - {cashRegisterName}</DialogTitle>
+          <DialogTitle>Abrir turno</DialogTitle>
         </DialogHeader>
 
-        <div className="py-6">
+        <div className="py-6 space-y-4">
+          {/* Selector de caja */}
+          {cashRegisters.length > 1 && (
+            <div className="space-y-2">
+              <Label>Caja</Label>
+              <Select
+                value={selectedCashRegisterId || ""}
+                onValueChange={onCashRegisterChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar caja" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashRegisters.map((cr) => (
+                    <SelectItem key={cr.id} value={cr.id}>
+                      {cr.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {cashRegisters.length === 1 && (
+            <p className="text-sm text-muted-foreground text-center">
+              {selectedCashRegister?.name}
+            </p>
+          )}
+
           {isLoadingPrevious ? (
             <div className="flex items-center justify-center py-8">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : previousAmount !== null && !showEditAmount ? (
-            // Show previous amount with confirm option
             <div className="flex flex-col items-center space-y-4 text-center">
               <div>
                 <p className="text-sm text-muted-foreground">Monto inicial</p>
@@ -134,7 +171,6 @@ export function OpenShiftDialog({
               </div>
             </div>
           ) : (
-            // Show input for manual amount
             <div className="space-y-2">
               <Label htmlFor="openingAmount">Efectivo contado</Label>
               <CurrencyInput
@@ -152,7 +188,7 @@ export function OpenShiftDialog({
           )}
         </div>
 
-        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           {previousAmount !== null && !showEditAmount ? (
             <>
               <Button
@@ -167,16 +203,12 @@ export function OpenShiftDialog({
               </Button>
             </>
           ) : (
-            <>
-              {onChangeCashRegister && (
-                <Button variant="outline" onClick={onChangeCashRegister}>
-                  Cambiar caja
-                </Button>
-              )}
-              <Button onClick={handleOpenShift} disabled={isSubmitting}>
-                {isSubmitting ? "Abriendo..." : "Abrir turno"}
-              </Button>
-            </>
+            <Button
+              onClick={handleOpenShift}
+              disabled={isSubmitting || !selectedCashRegisterId}
+            >
+              {isSubmitting ? "Abriendo..." : "Abrir turno"}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

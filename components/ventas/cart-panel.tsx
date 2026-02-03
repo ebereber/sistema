@@ -27,9 +27,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
 import { useCurrentUser } from "@/lib/auth/user-provider";
-import type { CashRegister } from "@/lib/services/cash-registers";
-import { getCashRegisters } from "@/lib/services/cash-registers";
 import {
   type CartItem as CartItemType,
   type CartTotals,
@@ -42,10 +41,10 @@ import {
   calculateCartTotals,
   formatPrice,
 } from "@/lib/validations/sale";
-import { useEffect } from "react";
 import { toast } from "sonner";
 import { Kbd } from "../ui/kbd";
 import { Separator } from "../ui/separator";
+import { Spinner } from "../ui/spinner";
 import { ActiveShiftDialog } from "./active-shift-dialog";
 import { AddNoteDialog } from "./add-note-dialog";
 import { CartItem } from "./cart-item";
@@ -56,6 +55,7 @@ import { DiscountDialog } from "./discount-dialog";
 import { OpenShiftDialog } from "./open-shift-dialog";
 import { ReturnItem } from "./return-item";
 import { SaveQuoteDialog } from "./save-quote-dialog";
+
 interface CartPanelProps {
   items: CartItemType[];
   customer: SelectedCustomer;
@@ -128,11 +128,20 @@ export function CartPanel({
     removeCash,
     refetch: refetchShift,
   } = useActiveShift();
-  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+
   const [selectedCashRegisterId, setSelectedCashRegisterId] = useState<
     string | null
   >(null);
   const { user } = useCurrentUser();
+  const { cashRegisters, isLoading: isLoadingRegisters } = useUserCashRegisters(
+    (registers) => {
+      console.log("Intentando abrir caja:", selectedCashRegisterId);
+      console.log("Cajas disponibles:", cashRegisters);
+      if (registers.length > 0) {
+        setSelectedCashRegisterId(registers[0].id);
+      }
+    },
+  );
   // Calculate totals
   const totals: CartTotals = calculateCartTotals(items, globalDiscount);
 
@@ -156,25 +165,6 @@ export function CartPanel({
   const formatShortDate = (date: Date) => {
     return format(date, "d/M/yy", { locale: es });
   };
-
-  // Load cash registers
-  useEffect(() => {
-    async function loadCashRegisters() {
-      try {
-        // Por ahora cargamos todas, después filtraremos por ubicación del usuario
-        const registers = await getCashRegisters();
-        setCashRegisters(registers);
-
-        // Si hay una sola caja, seleccionarla por defecto
-        if (registers.length === 1) {
-          setSelectedCashRegisterId(registers[0].id);
-        }
-      } catch (error) {
-        console.error("Error loading cash registers:", error);
-      }
-    }
-    loadCashRegisters();
-  }, []);
 
   // Handlers
   const handleOpenShift = async (openingAmount: number) => {
@@ -237,7 +227,9 @@ export function CartPanel({
           <h2 className="text-sm font-semibold">
             {shift?.cash_register?.name || "Sin caja"}
           </h2>
-          {shift && summary ? (
+          {isShiftLoading ? (
+            <Spinner />
+          ) : shift && summary ? (
             <ActiveShiftDialog
               shift={shift}
               summary={summary}
@@ -257,10 +249,12 @@ export function CartPanel({
             />
           ) : (
             <OpenShiftDialog
-              cashRegisterName={
-                cashRegisters.find((cr) => cr.id === selectedCashRegisterId)
-                  ?.name || "Caja"
-              }
+              cashRegisters={cashRegisters.map((cr) => ({
+                id: cr.id,
+                name: cr.name,
+              }))}
+              selectedCashRegisterId={selectedCashRegisterId}
+              onCashRegisterChange={setSelectedCashRegisterId}
               onOpenShift={handleOpenShift}
               trigger={
                 <Button
@@ -550,10 +544,12 @@ export function CartPanel({
                 </Button>
               ) : (
                 <OpenShiftDialog
-                  cashRegisterName={
-                    cashRegisters.find((cr) => cr.id === selectedCashRegisterId)
-                      ?.name || "Caja Principal"
-                  }
+                  cashRegisters={cashRegisters.map((cr) => ({
+                    id: cr.id,
+                    name: cr.name,
+                  }))}
+                  selectedCashRegisterId={selectedCashRegisterId}
+                  onCashRegisterChange={setSelectedCashRegisterId}
                   onOpenShift={handleOpenShift}
                   trigger={
                     <Button
@@ -630,11 +626,12 @@ export function CartPanel({
                 </Button>
               ) : (
                 <OpenShiftDialog
-                  cashRegisterId={selectedCashRegisterId || undefined}
-                  cashRegisterName={
-                    cashRegisters.find((cr) => cr.id === selectedCashRegisterId)
-                      ?.name || "Caja Principal"
-                  }
+                  cashRegisters={cashRegisters.map((cr) => ({
+                    id: cr.id,
+                    name: cr.name,
+                  }))}
+                  selectedCashRegisterId={selectedCashRegisterId}
+                  onCashRegisterChange={setSelectedCashRegisterId}
                   onOpenShift={handleOpenShift}
                   trigger={
                     <Button className="mt-4 w-full" size="lg">
