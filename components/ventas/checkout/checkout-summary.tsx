@@ -10,8 +10,9 @@ import {
   type ExchangeTotals,
   type GlobalDiscount,
 } from "@/lib/validations/sale";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { CreditNotesSelector } from "./credit-notes-selector";
+import { LocationSelector } from "./location-selector-dialog";
 import type { AvailableCreditNote, CheckoutView } from "./types";
 import { VencimientoSelect } from "./vencimiento-select";
 
@@ -46,6 +47,10 @@ interface CheckoutSummaryProps {
   onDueDateChange: (value: string) => void;
   pendingAmount: number;
   totalPaid: number;
+  location: { id: string; name: string } | null;
+  onLocationChange: (location: { id: string; name: string }) => void;
+  saleDate: Date;
+  onSaleDateChange: (date: Date) => void;
 }
 
 export function CheckoutSummary({
@@ -73,6 +78,10 @@ export function CheckoutSummary({
   onDueDateChange,
   pendingAmount,
   totalPaid,
+  location,
+  onLocationChange,
+  saleDate,
+  onSaleDateChange,
 }: CheckoutSummaryProps) {
   const canSubmit = (() => {
     if (isSubmitting) return false;
@@ -110,18 +119,12 @@ export function CheckoutSummary({
 
   return (
     <div className="sticky top-0 flex shrink-0 flex-col space-y-6 self-start w-full max-w-md">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Principal</span>
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto gap-1.5 p-0 text-muted-foreground"
-        >
-          <Pencil className="size-3.5" />
-          <span className="sr-only">Editar ubicación</span>
-        </Button>
-      </div>
+      <LocationSelector
+        location={location}
+        onLocationChange={onLocationChange}
+        saleDate={saleDate}
+        onSaleDateChange={onSaleDateChange}
+      />
 
       <div className="space-y-3">
         <RadioGroup

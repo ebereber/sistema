@@ -563,7 +563,8 @@ export default function NuevaVentaPage() {
         exchangeData={exchangeData}
         itemsToReturn={itemsToReturn}
         exchangeTotals={exchangeTotals}
-        shiftId={shift?.id || null}
+        shift={shift}
+        onSaleDateChange={handleSaleDateChange}
       />
     </div>
   );

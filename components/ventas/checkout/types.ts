@@ -1,4 +1,5 @@
 import type { AvailableCreditNote } from "@/lib/services/credit-note-applications";
+import { Shift } from "@/lib/services/shifts";
 import type {
   CartItem,
   ExchangeData,
@@ -126,7 +127,9 @@ export interface CheckoutDialogProps {
   exchangeData?: ExchangeData | null;
   itemsToReturn?: ExchangeItem[];
   exchangeTotals?: ExchangeTotals;
-  shiftId: string | null;
+  /* shiftId: string | null; */
+  shift: Shift | null;
+  onSaleDateChange: (date: Date) => void;
 }
 
 // Re-export types used by child components

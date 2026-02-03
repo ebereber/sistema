@@ -13,6 +13,7 @@ import {
   type PaymentInsert,
   type SaleItemInsert,
 } from "@/lib/services/sales";
+import { Shift } from "@/lib/services/shifts";
 import { parseArgentineCurrency } from "@/lib/utils/currency";
 import {
   calculateCartTotals,
@@ -49,7 +50,8 @@ interface UseCheckoutProps {
   exchangeData?: ExchangeData | null;
   itemsToReturn: ExchangeItem[];
   exchangeTotals?: ExchangeTotals;
-  shiftId: string | null;
+  shift: Shift | null;
+  onSaleDateChange: (date: Date) => void;
 }
 
 export function useCheckout({
@@ -65,7 +67,8 @@ export function useCheckout({
   exchangeData,
   itemsToReturn,
   exchangeTotals,
-  shiftId,
+  shift,
+  onSaleDateChange,
 }: UseCheckoutProps) {
   // Calculate totals from cart
   const totals = calculateCartTotals(cartItems, globalDiscount);
@@ -162,15 +165,33 @@ export function useCheckout({
   }, [open]);
 
   // Load location
+  // Load location from shift or fallback to main
   useEffect(() => {
     async function loadLocation() {
+      // Si hay turno abierto, usar la ubicación de su caja
+      if (shift?.cash_register?.location_id) {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("locations")
+          .select("id, name")
+          .eq("id", shift.cash_register.location_id)
+          .single();
+
+        if (data) {
+          setLocation(data);
+          return;
+        }
+      }
+
+      // Fallback: ubicación principal
       const loc = await getMainLocation();
       setLocation(loc);
     }
     if (open) {
       loadLocation();
     }
-  }, [open]);
+  }, [open, shift]);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -536,7 +557,7 @@ export function useCheckout({
           saleDate,
           note: note || undefined,
           globalDiscount,
-          shiftId,
+          shiftId: shift?.id ?? null,
         });
 
         setExchangeResult(result);
@@ -591,7 +612,7 @@ export function useCheckout({
           | "CANCELLED",
         voucher_type: selectedVoucher,
         sale_date: saleDate.toISOString(),
-        shift_id: shiftId,
+        shift_id: shift?.id ?? null,
         due_date: calculateDueDate(),
         amount_paid: isPending ? totalPaid : total,
       };
@@ -683,9 +704,11 @@ export function useCheckout({
     setSelectedVoucher,
     saleNumber,
     location,
+    setLocation,
     paymentMethods,
     isLoadingMethods,
     exchangeResult,
+    onSaleDateChange,
 
     // Totals
     totals,

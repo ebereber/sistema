@@ -39,7 +39,8 @@ export function CheckoutDialog({
   exchangeData,
   itemsToReturn = [],
   exchangeTotals,
-  shiftId,
+  shift,
+  onSaleDateChange,
 }: CheckoutDialogProps) {
   const checkout = useCheckout({
     open,
@@ -54,7 +55,8 @@ export function CheckoutDialog({
     exchangeData,
     itemsToReturn,
     exchangeTotals,
-    shiftId,
+    shift,
+    onSaleDateChange,
   });
 
   return (
@@ -265,6 +267,10 @@ export function CheckoutDialog({
                   onDueDateChange={checkout.setDueDate}
                   pendingAmount={checkout.pendingAmount}
                   totalPaid={checkout.totalPaid}
+                  location={checkout.location}
+                  onLocationChange={checkout.setLocation}
+                  saleDate={saleDate}
+                  onSaleDateChange={onSaleDateChange}
                 />
               </div>
             </form>
