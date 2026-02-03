@@ -85,20 +85,13 @@ import {
   type Purchase,
 } from "@/lib/services/purchases";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
+import {
+  usePurchaseFormStore,
+  type PurchaseItem,
+} from "@/lib/store/purchase-form-store";
 import { SupplierDialog } from "../proveedores/supplier-dialog";
 import { FileUpload } from "../ui/file-upload";
 import { ProductSearchDialog } from "./product-search-dialog";
-
-// Types
-interface PurchaseItem {
-  id: string;
-  productId: string | null;
-  name: string;
-  sku: string;
-  quantity: number;
-  unitCost: number;
-  type: "product" | "custom";
-}
 
 interface PurchaseFormProps {
   mode: "create" | "edit";
@@ -121,19 +114,8 @@ export function PurchaseForm({
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Form state
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
-  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [voucherType, setVoucherType] = useState("90");
-  const [voucherNumber, setVoucherNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
-  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
-  const [items, setItems] = useState<PurchaseItem[]>([]);
-  const [productsReceived, setProductsReceived] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [accountingDate, setAccountingDate] = useState<Date>(new Date());
-  const [taxCategory, setTaxCategory] = useState("");
-  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  // Store state
+  const store = usePurchaseFormStore();
 
   // UI state
   const [openSupplier, setOpenSupplier] = useState(false);
@@ -144,19 +126,19 @@ export function PurchaseForm({
   // Populate form with initial data (edit mode) or duplicate data
   const populateForm = useCallback(
     (data: Purchase) => {
-      setSelectedSupplierId(data.supplier_id);
-      setSelectedLocationId(data.location_id || "");
-      setVoucherType(data.voucher_type);
-      setVoucherNumber(mode === "edit" ? data.voucher_number : ""); // Clear voucher number when duplicating
-      setInvoiceDate(new Date(data.invoice_date));
-      setDueDate(data.due_date ? new Date(data.due_date) : undefined);
-      setProductsReceived(data.products_received);
-      setNotes(data.notes || "");
-      setAccountingDate(
+      store.setSupplierId(data.supplier_id);
+      store.setLocationId(data.location_id || "");
+      store.setVoucherType(data.voucher_type);
+      store.setVoucherNumber(mode === "edit" ? data.voucher_number : ""); // Clear voucher number when duplicating
+      store.setInvoiceDate(new Date(data.invoice_date));
+      store.setDueDate(data.due_date ? new Date(data.due_date) : undefined);
+      store.setProductsReceived(data.products_received);
+      store.setNotes(data.notes || "");
+      store.setAccountingDate(
         data.accounting_date ? new Date(data.accounting_date) : new Date(),
       );
-      setTaxCategory(data.tax_category || "");
-      setAttachmentUrl(data.attachment_url || null);
+      store.setTaxCategory(data.tax_category || "");
+      store.setAttachmentUrl(data.attachment_url || null);
 
       // Populate items
       if (data.items && data.items.length > 0) {
@@ -169,10 +151,10 @@ export function PurchaseForm({
           unitCost: Number(item.unit_cost),
           type: item.type as "product" | "custom",
         }));
-        setItems(formItems);
+        store.setItems(formItems);
       }
     },
-    [mode],
+    [mode, store],
   );
 
   // Load data
@@ -193,39 +175,40 @@ export function PurchaseForm({
       );
       setLocations(locationsData);
 
-      // Set default location
-      const mainLocation = locationsData.find((l) => l.is_main);
-      if (mainLocation && !initialData && !duplicateFrom) {
-        setSelectedLocationId(mainLocation.id);
-      } else if (locationsData.length > 0 && !initialData && !duplicateFrom) {
-        setSelectedLocationId(locationsData[0].id);
+      // Set default location (only if no persisted state and not editing/duplicating)
+      if (
+        !initialData &&
+        !duplicateFrom &&
+        !fromPurchaseOrder &&
+        !store.selectedLocationId
+      ) {
+        const mainLocation = locationsData.find((l) => l.is_main);
+        if (mainLocation) {
+          store.setLocationId(mainLocation.id);
+        } else if (locationsData.length > 0) {
+          store.setLocationId(locationsData[0].id);
+        }
       }
 
-      // Populate form if editing or duplicating
-      if (initialData) {
-        populateForm(initialData);
-      } else if (duplicateFrom) {
-        populateForm(duplicateFrom);
-      }
-      // Populate form if editing or duplicating
+      // Populate form if editing or duplicating (overrides persisted state)
       if (initialData) {
         populateForm(initialData);
       } else if (duplicateFrom) {
         populateForm(duplicateFrom);
       } else if (fromPurchaseOrder) {
-        setSelectedSupplierId(fromPurchaseOrder.supplier_id);
-        setSelectedLocationId(
+        store.setSupplierId(fromPurchaseOrder.supplier_id);
+        store.setLocationId(
           fromPurchaseOrder.location_id ||
             locationsData.find((l) => l.is_main)?.id ||
             "",
         );
-        setProductsReceived(true);
-        setNotes(
+        store.setProductsReceived(true);
+        store.setNotes(
           fromPurchaseOrder.notes
             ? `OC ${fromPurchaseOrder.order_number} — ${fromPurchaseOrder.notes}`
             : `OC ${fromPurchaseOrder.order_number}`,
         );
-        setItems(
+        store.setItems(
           fromPurchaseOrder.items.map((item) => ({
             id: `po-${item.id}-${Date.now()}`,
             productId: item.product_id,
@@ -237,23 +220,25 @@ export function PurchaseForm({
           })),
         );
       }
+      // If none of the above, the persisted state from the store is used automatically
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Error al cargar datos");
     } finally {
       setIsLoading(false);
     }
-  }, [initialData, duplicateFrom, populateForm]);
+  }, [initialData, duplicateFrom, fromPurchaseOrder, populateForm, store]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Calculations
   const calculateSubtotal = (item: PurchaseItem) =>
     item.quantity * item.unitCost;
   const calculateTotal = () =>
-    items.reduce((sum, item) => sum + calculateSubtotal(item), 0);
+    store.items.reduce((sum, item) => sum + calculateSubtotal(item), 0);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("es-AR", {
@@ -265,7 +250,7 @@ export function PurchaseForm({
   // Handlers
   const handleAddSelectedProducts = (selectedProducts: Product[]) => {
     const newItems = selectedProducts
-      .filter((p) => !items.some((i) => i.productId === p.id))
+      .filter((p) => !store.items.some((i) => i.productId === p.id))
       .map((p) => ({
         id: `product-${p.id}-${Date.now()}`,
         productId: p.id,
@@ -276,84 +261,60 @@ export function PurchaseForm({
         type: "product" as const,
       }));
 
-    setItems([...items, ...newItems]);
+    store.addItems(newItems);
   };
 
   const handleAddCustomItem = () => {
-    const newId = `custom-${Date.now()}`;
-    setItems([
-      ...items,
-      {
-        id: newId,
-        productId: null,
-        name: "",
-        sku: "",
-        quantity: 1,
-        unitCost: 0,
-        type: "custom",
-      },
-    ]);
+    store.addCustomItem();
   };
 
   const handleRemoveItem = (itemId: string) => {
-    setItems(items.filter((item) => item.id !== itemId));
+    store.removeItem(itemId);
   };
 
   const handleQuantityChange = (itemId: string, quantity: number) => {
-    setItems(
-      items.map((item) =>
-        item.id === itemId
-          ? { ...item, quantity: Math.max(1, quantity) }
-          : item,
-      ),
-    );
+    store.updateItemQuantity(itemId, quantity);
   };
 
   const handleCostChange = (itemId: string, cost: string) => {
     const numericCost = parseFloat(cost.replace(/[^0-9.]/g, "")) || 0;
-    setItems(
-      items.map((item) =>
-        item.id === itemId ? { ...item, unitCost: numericCost } : item,
-      ),
-    );
+    store.updateItemCost(itemId, numericCost);
   };
 
   const handleNameChange = (itemId: string, name: string) => {
-    setItems(
-      items.map((item) => (item.id === itemId ? { ...item, name } : item)),
-    );
+    store.updateItemName(itemId, name);
   };
 
   const handleSupplierCreated = (supplier: Supplier) => {
-    // Agregar a la lista y ordenar
+    // Add to list and sort
     setSuppliers((prev) =>
       [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)),
     );
-    // Seleccionarlo
-    setSelectedSupplierId(supplier.id);
-    // Cerrar el popover de proveedores
+    // Select it
+    store.setSupplierId(supplier.id);
+    // Close supplier popover
     setOpenSupplier(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedSupplierId) {
+    if (!store.selectedSupplierId) {
       toast.error("Seleccioná un proveedor");
       return;
     }
 
-    if (!voucherNumber.trim()) {
+    if (!store.voucherNumber.trim()) {
       toast.error("Ingresá el número de factura");
       return;
     }
 
-    if (items.length === 0) {
+    if (store.items.length === 0) {
       toast.error("Agregá al menos un producto");
       return;
     }
 
-    if (productsReceived && !selectedLocationId) {
+    if (store.productsReceived && !store.selectedLocationId) {
       toast.error("Seleccioná una ubicación para recibir los productos");
       return;
     }
@@ -364,13 +325,14 @@ export function PurchaseForm({
       // Check for duplicate (only for create or if voucher number changed in edit)
       const shouldCheckDuplicate =
         mode === "create" ||
-        (mode === "edit" && initialData?.voucher_number !== voucherNumber);
+        (mode === "edit" &&
+          initialData?.voucher_number !== store.voucherNumber);
 
       if (shouldCheckDuplicate) {
         const isDuplicate = await checkDuplicatePurchase(
-          selectedSupplierId,
-          voucherType,
-          voucherNumber,
+          store.selectedSupplierId,
+          store.voucherType,
+          store.voucherNumber,
           mode === "edit" ? initialData?.id : undefined,
         );
 
@@ -385,32 +347,34 @@ export function PurchaseForm({
 
       const total = calculateTotal();
 
-      const purchaseItems: CreatePurchaseItemData[] = items.map((item) => ({
-        product_id: item.productId,
-        name: item.name,
-        sku: item.sku || null,
-        quantity: item.quantity,
-        unit_cost: item.unitCost,
-        subtotal: item.quantity * item.unitCost,
-        type: item.type,
-      }));
+      const purchaseItems: CreatePurchaseItemData[] = store.items.map(
+        (item) => ({
+          product_id: item.productId,
+          name: item.name,
+          sku: item.sku || null,
+          quantity: item.quantity,
+          unit_cost: item.unitCost,
+          subtotal: item.quantity * item.unitCost,
+          type: item.type,
+        }),
+      );
 
       const purchaseData = {
-        supplier_id: selectedSupplierId,
-        location_id: productsReceived ? selectedLocationId : null,
-        voucher_type: voucherType,
-        voucher_number: voucherNumber,
-        invoice_date: format(invoiceDate, "yyyy-MM-dd"),
-        due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
-        accounting_date: format(accountingDate, "yyyy-MM-dd"),
+        supplier_id: store.selectedSupplierId,
+        location_id: store.productsReceived ? store.selectedLocationId : null,
+        voucher_type: store.voucherType,
+        voucher_number: store.voucherNumber,
+        invoice_date: format(store.invoiceDate, "yyyy-MM-dd"),
+        due_date: store.dueDate ? format(store.dueDate, "yyyy-MM-dd") : null,
+        accounting_date: format(store.accountingDate, "yyyy-MM-dd"),
         subtotal: total,
         discount: 0,
         tax: 0,
         total: total,
-        products_received: productsReceived,
-        notes: notes || null,
-        tax_category: taxCategory || null,
-        attachment_url: attachmentUrl,
+        products_received: store.productsReceived,
+        notes: store.notes || null,
+        tax_category: store.taxCategory || null,
+        attachment_url: store.attachmentUrl,
         purchase_order_id: fromPurchaseOrder?.id || null,
       };
 
@@ -422,6 +386,8 @@ export function PurchaseForm({
         toast.success("Compra creada correctamente");
       }
 
+      // Clear store after successful submission
+      store.clear();
       router.push("/compras");
     } catch (error) {
       console.error("Error saving purchase:", error);
@@ -435,7 +401,9 @@ export function PurchaseForm({
     }
   };
 
-  const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
+  const selectedSupplier = suppliers.find(
+    (s) => s.id === store.selectedSupplierId,
+  );
   const pageTitle = mode === "edit" ? "Editar compra" : "Nueva compra";
   const submitButtonText =
     mode === "edit"
@@ -512,14 +480,14 @@ export function PurchaseForm({
                                 key={supplier.id}
                                 value={supplier.name}
                                 onSelect={() => {
-                                  setSelectedSupplierId(supplier.id);
+                                  store.setSupplierId(supplier.id);
                                   setOpenSupplier(false);
                                 }}
                               >
                                 <div
                                   className={cn(
                                     "mr-2 flex h-4 w-4 items-center justify-center rounded-[4px] border border-input",
-                                    selectedSupplierId === supplier.id
+                                    store.selectedSupplierId === supplier.id
                                       ? "bg-primary text-primary-foreground"
                                       : "[&_svg]:invisible",
                                   )}
@@ -541,7 +509,10 @@ export function PurchaseForm({
                 <div className="flex gap-4">
                   <div className="flex-1 space-y-2">
                     <Label>Tipo de comprobante *</Label>
-                    <Select value={voucherType} onValueChange={setVoucherType}>
+                    <Select
+                      value={store.voucherType}
+                      onValueChange={store.setVoucherType}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -556,8 +527,8 @@ export function PurchaseForm({
                     <Label>Nº factura *</Label>
                     <Input
                       placeholder="Ingresá el número"
-                      value={voucherNumber}
-                      onChange={(e) => setVoucherNumber(e.target.value)}
+                      value={store.voucherNumber}
+                      onChange={(e) => store.setVoucherNumber(e.target.value)}
                     />
                   </div>
                 </div>
@@ -577,7 +548,7 @@ export function PurchaseForm({
                       className="w-full justify-start text-left font-normal active:scale-100"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(invoiceDate, "d 'de' MMMM 'de' yyyy", {
+                      {format(store.invoiceDate, "d 'de' MMMM 'de' yyyy", {
                         locale: es,
                       })}
                     </Button>
@@ -585,8 +556,8 @@ export function PurchaseForm({
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={invoiceDate}
-                      onSelect={(date) => date && setInvoiceDate(date)}
+                      selected={store.invoiceDate}
+                      onSelect={(date) => date && store.setInvoiceDate(date)}
                       locale={es}
                     />
                   </PopoverContent>
@@ -602,8 +573,8 @@ export function PurchaseForm({
                       className="w-full justify-start text-left font-normal active:scale-100"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate
-                        ? format(dueDate, "d 'de' MMMM 'de' yyyy", {
+                      {store.dueDate
+                        ? format(store.dueDate, "d 'de' MMMM 'de' yyyy", {
                             locale: es,
                           })
                         : "Seleccionar fecha"}
@@ -612,8 +583,8 @@ export function PurchaseForm({
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={dueDate}
-                      onSelect={(date) => setDueDate(date)}
+                      selected={store.dueDate}
+                      onSelect={(date) => store.setDueDate(date)}
                       locale={es}
                     />
                   </PopoverContent>
@@ -624,7 +595,7 @@ export function PurchaseForm({
         </div>
 
         {/* Tabla de productos */}
-        {selectedSupplierId && (
+        {store.selectedSupplierId && (
           <>
             <Card>
               <CardContent className="space-y-4 px-4 py-4">
@@ -645,7 +616,7 @@ export function PurchaseForm({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item) => (
+                    {store.items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           {item.type === "product" ? (
@@ -710,7 +681,7 @@ export function PurchaseForm({
                         <div className="flex gap-2">
                           <ProductSearchDialog
                             products={products}
-                            excludedProductIds={items
+                            excludedProductIds={store.items
                               .filter((i) => i.productId)
                               .map((i) => i.productId!)}
                             onProductsSelected={handleAddSelectedProducts}
@@ -738,9 +709,9 @@ export function PurchaseForm({
                 <div className="flex items-center gap-3 pt-4">
                   <Checkbox
                     id="products-received"
-                    checked={productsReceived}
+                    checked={store.productsReceived}
                     onCheckedChange={(checked) =>
-                      setProductsReceived(checked as boolean)
+                      store.setProductsReceived(checked as boolean)
                     }
                   />
                   <Label htmlFor="products-received" className="cursor-pointer">
@@ -748,12 +719,12 @@ export function PurchaseForm({
                   </Label>
                 </div>
 
-                {productsReceived && (
+                {store.productsReceived && (
                   <div className="space-y-2">
                     <Label>Ubicación de recepción *</Label>
                     <Select
-                      value={selectedLocationId}
-                      onValueChange={setSelectedLocationId}
+                      value={store.selectedLocationId}
+                      onValueChange={store.setLocationId}
                     >
                       <SelectTrigger className="w-64">
                         <SelectValue placeholder="Seleccionar ubicación" />
@@ -812,7 +783,7 @@ export function PurchaseForm({
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 {format(
-                                  accountingDate,
+                                  store.accountingDate,
                                   "d 'de' MMMM 'de' yyyy",
                                   { locale: es },
                                 )}
@@ -824,9 +795,9 @@ export function PurchaseForm({
                             >
                               <Calendar
                                 mode="single"
-                                selected={accountingDate}
+                                selected={store.accountingDate}
                                 onSelect={(date) =>
-                                  date && setAccountingDate(date)
+                                  date && store.setAccountingDate(date)
                                 }
                                 locale={es}
                               />
@@ -837,8 +808,8 @@ export function PurchaseForm({
                         <div className="flex items-center justify-between gap-4">
                           <Label>Rubro IVA</Label>
                           <Select
-                            value={taxCategory}
-                            onValueChange={setTaxCategory}
+                            value={store.taxCategory}
+                            onValueChange={store.setTaxCategory}
                           >
                             <SelectTrigger className="w-full max-w-[250px]">
                               <SelectValue placeholder="Seleccioná un rubro" />
@@ -862,8 +833,8 @@ export function PurchaseForm({
                           <Label>Notas</Label>
                           <Textarea
                             placeholder="Agregá notas sobre esta compra…"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
+                            value={store.notes}
+                            onChange={(e) => store.setNotes(e.target.value)}
                             className="max-w-[250px]"
                             rows={2}
                           />
@@ -871,8 +842,8 @@ export function PurchaseForm({
 
                         <div className="pt-4">
                           <FileUpload
-                            value={attachmentUrl}
-                            onChange={setAttachmentUrl}
+                            value={store.attachmentUrl}
+                            onChange={store.setAttachmentUrl}
                             onUpload={uploadPurchaseAttachment}
                             maxSize={5}
                           />
@@ -925,7 +896,7 @@ export function PurchaseForm({
                       type="submit"
                       size="lg"
                       className="h-12 w-full text-base"
-                      disabled={isSubmitting || items.length === 0}
+                      disabled={isSubmitting || store.items.length === 0}
                     >
                       {submitButtonText}
                     </Button>

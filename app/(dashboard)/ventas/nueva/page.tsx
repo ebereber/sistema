@@ -27,10 +27,9 @@ import {
   getSaleForExchange,
   getSaleItemsForDuplicate,
 } from "@/lib/services/sales";
+import { useSaleCartStore } from "@/lib/store/sale-cart-store";
 import {
   type CartItem,
-  type ExchangeData,
-  type ExchangeItem,
   type ExchangeTotals,
   type GlobalDiscount,
   type ItemDiscount,
@@ -47,24 +46,36 @@ export default function NuevaVentaPage() {
   const exchangeProcessed = useRef(false);
   const quoteProcessed = useRef(false);
   const productSearchRef = useRef<ProductSearchPanelRef>(null);
-  // Cart state
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [customer, setCustomer] = useState<SelectedCustomer>(DEFAULT_CUSTOMER);
-  const [globalDiscount, setGlobalDiscount] = useState<GlobalDiscount | null>(
-    null,
-  );
+
+  // Store state
+  const {
+    cartItems,
+    customer,
+    globalDiscount,
+    note,
+    saleDate,
+    isExchangeMode,
+    exchangeData,
+    itemsToReturn,
+    setCartItems,
+    setCustomer,
+    setGlobalDiscount,
+    setNote,
+    setSaleDate,
+    addItem,
+    removeItem,
+    updateQuantity,
+    applyItemDiscount,
+    setExchangeMode,
+    updateReturnQuantity,
+    removeReturnItem,
+    clear,
+  } = useSaleCartStore();
+
   const { shift } = useActiveShift();
-  // Additional cart state
-  const [note, setNote] = useState("");
-  const [saleDate, setSaleDate] = useState(new Date());
 
-  // Checkout state
+  // Checkout state (UI-only, no persistence needed)
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-
-  // Exchange mode state
-  const [isExchangeMode, setIsExchangeMode] = useState(false);
-  const [exchangeData, setExchangeData] = useState<ExchangeData | null>(null);
-  const [itemsToReturn, setItemsToReturn] = useState<ExchangeItem[]>([]);
 
   // Load duplicate sale items if duplicateId is present
   useEffect(() => {
@@ -108,7 +119,7 @@ export default function NuevaVentaPage() {
 
       loadDuplicateItems();
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, setCartItems]);
 
   // Load exchange data if exchangeId is present
   useEffect(() => {
@@ -123,15 +134,13 @@ export default function NuevaVentaPage() {
 
           if (data) {
             // Set exchange mode
-            setIsExchangeMode(true);
-            setExchangeData({
+            setExchangeMode(true, {
               originalSaleId: data.originalSaleId,
               originalSaleNumber: data.originalSaleNumber,
               customerId: data.customerId,
               customerName: data.customerName,
               itemsToReturn: data.items,
-            });
-            setItemsToReturn(data.items);
+            }, data.items);
 
             // Set customer from original sale
             setCustomer({
@@ -162,7 +171,7 @@ export default function NuevaVentaPage() {
 
       loadExchangeData();
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, setExchangeMode, setCustomer]);
 
   // Load quote items if quoteId is present
   useEffect(() => {
@@ -203,7 +212,7 @@ export default function NuevaVentaPage() {
 
       loadQuote();
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, setCartItems, setGlobalDiscount, setNote, setCustomer]);
 
   // Calculate exchange totals
   const exchangeTotals: ExchangeTotals = useMemo(() => {
@@ -227,80 +236,62 @@ export default function NuevaVentaPage() {
 
   // Exchange handlers
   const handleCancelExchange = useCallback(() => {
-    setIsExchangeMode(false);
-    setExchangeData(null);
-    setItemsToReturn([]);
-    setCartItems([]);
-    setCustomer(DEFAULT_CUSTOMER);
-    setGlobalDiscount(null);
-    setNote("");
+    clear();
     router.replace("/ventas/nueva", { scroll: false });
     toast.info("Modo cambio cancelado");
-  }, [router]);
+  }, [router, clear]);
 
   const handleReturnQuantityChange = useCallback(
     (id: string, quantity: number) => {
-      setItemsToReturn((items) =>
-        items.map((item) =>
-          item.id === id
-            ? { ...item, quantity: Math.min(quantity, item.maxQuantity) }
-            : item,
-        ),
-      );
+      updateReturnQuantity(id, quantity);
     },
-    [],
+    [updateReturnQuantity],
   );
 
   const handleRemoveReturnItem = useCallback((id: string) => {
-    setItemsToReturn((items) => items.filter((item) => item.id !== id));
-  }, []);
+    removeReturnItem(id);
+  }, [removeReturnItem]);
 
   // Add product to cart
   const handleAddProduct = useCallback(
     (product: ProductForSale) => {
-      setCartItems((items) => {
-        // Check if product already exists in cart
-        const existingIndex = items.findIndex(
-          (item) => item.productId === product.id,
-        );
+      // Check if product already exists in cart
+      const existingItem = cartItems.find(
+        (item) => item.productId === product.id,
+      );
 
-        if (existingIndex >= 0) {
-          // Increment quantity
-          const updated = [...items];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + 1,
-          };
-          return updated;
-        }
+      if (existingItem) {
+        // addItem handles incrementing for existing products
+        addItem(existingItem);
+        toast(`${product.name} agregado al carrito`);
+        return;
+      }
 
-        // Calculate adjusted price based on customer's price list
-        const adjustedPrice = getAdjustedPrice(
-          product.price,
-          customer.priceListAdjustmentType,
-          customer.priceListAdjustment,
-        );
+      // Calculate adjusted price based on customer's price list
+      const adjustedPrice = getAdjustedPrice(
+        product.price,
+        customer.priceListAdjustmentType,
+        customer.priceListAdjustment,
+      );
 
-        // Add new item
-        const newItem: CartItem = {
-          id: generateCartItemId(),
-          productId: product.id,
-          name: product.name,
-          sku: product.sku,
-          price: adjustedPrice,
-          basePrice: product.price,
-          quantity: 1,
-          taxRate: product.taxRate,
-          discount: null,
-          imageUrl: product.imageUrl,
-        };
+      // Add new item
+      const newItem: CartItem = {
+        id: generateCartItemId(),
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        price: adjustedPrice,
+        basePrice: product.price,
+        quantity: 1,
+        taxRate: product.taxRate,
+        discount: null,
+        imageUrl: product.imageUrl,
+      };
 
-        return [...items, newItem];
-      });
-
+      addItem(newItem);
       toast(`${product.name} agregado al carrito`);
     },
-    [customer.priceListAdjustment, customer.priceListAdjustmentType],
+    [customer.priceListAdjustment, customer.priceListAdjustmentType, cartItems, addItem],
   );
 
   // Add custom item to cart
@@ -319,32 +310,28 @@ export default function NuevaVentaPage() {
         imageUrl: null,
       };
 
-      setCartItems((items) => [...items, customItem]);
+      addItem(customItem);
       toast(`${name} agregado al carrito`);
     },
-    [],
+    [addItem],
   );
 
   // Update item quantity
   const handleQuantityChange = useCallback((id: string, quantity: number) => {
-    setCartItems((items) =>
-      items.map((item) => (item.id === id ? { ...item, quantity } : item)),
-    );
-  }, []);
+    updateQuantity(id, quantity);
+  }, [updateQuantity]);
 
   // Remove item from cart
   const handleRemoveItem = useCallback((id: string) => {
-    setCartItems((items) => items.filter((item) => item.id !== id));
-  }, []);
+    removeItem(id);
+  }, [removeItem]);
 
   // Apply item discount
   const handleApplyItemDiscount = useCallback(
     (id: string, discount: ItemDiscount | null) => {
-      setCartItems((items) =>
-        items.map((item) => (item.id === id ? { ...item, discount } : item)),
-      );
+      applyItemDiscount(id, discount);
     },
-    [],
+    [applyItemDiscount],
   );
 
   const handleCustomerChange = useCallback(
@@ -360,16 +347,14 @@ export default function NuevaVentaPage() {
 
       setCustomer(newCustomer);
 
-      // AGREGAR ESTO: Recalcular precios si cambió la lista
+      // Recalculate prices if price list changed
       if (priceListChanged && cartItems.length > 0) {
-        setCartItems((items) =>
-          items.map((item) => {
-            // Solo recalcular productos, NO items personalizados
+        setCartItems(
+          cartItems.map((item) => {
+            // Only recalculate products, NOT custom items
             if (!item.productId) return item;
 
-            // Obtener precio base del producto (necesitamos guardarlo)
-            // Por ahora usamos el precio actual
-            const basePrice = item.price; // TODO: guardar base_price original
+            const basePrice = item.price;
 
             const newPrice = getAdjustedPrice(
               basePrice,
@@ -388,7 +373,7 @@ export default function NuevaVentaPage() {
         toast.info(message);
       }
     },
-    [customer, cartItems.length],
+    [customer, cartItems, setCustomer, setCartItems],
   );
 
   // Change global discount
@@ -396,28 +381,25 @@ export default function NuevaVentaPage() {
     (discount: GlobalDiscount | null) => {
       setGlobalDiscount(discount);
     },
-    [],
+    [setGlobalDiscount],
   );
 
   // Change note
   const handleNoteChange = useCallback((newNote: string) => {
     setNote(newNote);
-  }, []);
+  }, [setNote]);
 
   // Change sale date
   const handleSaleDateChange = useCallback((date: Date) => {
     setSaleDate(date);
     toast.info(`Fecha cambiada a ${date.toLocaleDateString("es-AR")}`);
-  }, []);
+  }, [setSaleDate]);
 
   // Clear cart
   const handleClearCart = useCallback(() => {
-    setCartItems([]);
-    setGlobalDiscount(null);
-    setNote("");
+    clear();
     toast("Carrito vaciado");
-    setCustomer(DEFAULT_CUSTOMER);
-  }, []);
+  }, [clear]);
 
   // Continue to checkout
   const handleContinue = useCallback(() => {
@@ -434,7 +416,7 @@ export default function NuevaVentaPage() {
   // Handle sale success - clean up after confirmed sale
   const handleSaleSuccess = useCallback(
     (saleNumber: string) => {
-      // Actualizar stock localmente ANTES de limpiar el carrito
+      // Update stock locally BEFORE clearing the cart
       if (productSearchRef.current && cartItems.length > 0) {
         productSearchRef.current.updateStock(
           cartItems.map((item) => ({
@@ -444,21 +426,13 @@ export default function NuevaVentaPage() {
         );
       }
 
-      // Limpiar estado de venta normal
-      setCartItems([]);
-      setGlobalDiscount(null);
-      setNote("");
-      setCustomer(DEFAULT_CUSTOMER);
+      // Clear all state
+      clear();
       setCheckoutOpen(false);
-
-      // Limpiar estado de exchange
-      setIsExchangeMode(false);
-      setExchangeData(null);
-      setItemsToReturn([]);
 
       toast.success(`Venta confirmada: ${saleNumber}`);
     },
-    [cartItems],
+    [cartItems, clear],
   );
 
   return (

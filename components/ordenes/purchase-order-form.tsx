@@ -59,22 +59,13 @@ import {
   type CreatePurchaseOrderItemData,
   type PurchaseOrderWithDetails,
 } from "@/lib/services/purchase-orders";
+import { usePurchaseOrderFormStore } from "@/lib/store/purchase-order-store";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface OrderItem {
-  id: string;
-  productId: string | null;
-  name: string;
-  sku: string;
-  quantity: number;
-  unitCost: number;
-  type: "product" | "custom";
-}
 
 interface PurchaseOrderFormProps {
   mode: "create" | "edit";
@@ -97,46 +88,68 @@ export function PurchaseOrderForm({
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Form state
-  const [selectedSupplierId, setSelectedSupplierId] = useState("");
-  const [selectedLocationId, setSelectedLocationId] = useState("");
-  const [orderDate, setOrderDate] = useState<Date>(new Date());
-  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<
-    Date | undefined
-  >(undefined);
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [notes, setNotes] = useState("");
+  // Form state (from store)
+  const {
+    selectedSupplierId,
+    setSupplierId: setSelectedSupplierId,
+    selectedLocationId,
+    setLocationId: setSelectedLocationId,
+    orderDate,
+    setOrderDate,
+    expectedDeliveryDate,
+    setExpectedDeliveryDate,
+    items,
+    setItems,
+    addCustomItem,
+    removeItem,
+    updateItemQuantity,
+    updateItemCost,
+    updateItemName,
+    notes,
+    setNotes,
+    clear,
+  } = usePurchaseOrderFormStore();
 
   // UI state
   const [openSupplier, setOpenSupplier] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Populate form with initial data (edit mode)
-  const populateForm = useCallback((data: PurchaseOrderWithDetails) => {
-    setSelectedSupplierId(data.supplier_id);
-    setSelectedLocationId(data.location_id || "");
-    setOrderDate(new Date(data.order_date));
-    setExpectedDeliveryDate(
-      data.expected_delivery_date
-        ? new Date(data.expected_delivery_date)
-        : undefined,
-    );
-    setNotes(data.notes || "");
-
-    if (data.items?.length > 0) {
-      setItems(
-        data.items.map((item) => ({
-          id: item.id,
-          productId: item.product_id,
-          name: item.name,
-          sku: item.sku || "",
-          quantity: item.quantity,
-          unitCost: Number(item.unit_cost),
-          type: item.type as "product" | "custom",
-        })),
+  const populateForm = useCallback(
+    (data: PurchaseOrderWithDetails) => {
+      setSelectedSupplierId(data.supplier_id);
+      setSelectedLocationId(data.location_id || "");
+      setOrderDate(new Date(data.order_date));
+      setExpectedDeliveryDate(
+        data.expected_delivery_date
+          ? new Date(data.expected_delivery_date)
+          : undefined,
       );
-    }
-  }, []);
+      setNotes(data.notes || "");
+
+      if (data.items?.length > 0) {
+        setItems(
+          data.items.map((item) => ({
+            id: item.id,
+            productId: item.product_id,
+            name: item.name,
+            sku: item.sku || "",
+            quantity: item.quantity,
+            unitCost: Number(item.unit_cost),
+            type: item.type as "product" | "custom",
+          })),
+        );
+      }
+    },
+    [
+      setSelectedSupplierId,
+      setSelectedLocationId,
+      setOrderDate,
+      setExpectedDeliveryDate,
+      setNotes,
+      setItems,
+    ],
+  );
 
   // Load data
   const loadData = useCallback(async () => {
@@ -156,13 +169,13 @@ export function PurchaseOrderForm({
       );
       setLocations(locationsData);
 
-      if (!initialData) {
+      if (initialData) {
+        populateForm(initialData);
+      } else if (!selectedLocationId) {
         const mainLocation = locationsData.find((l) => l.is_main);
         if (mainLocation) setSelectedLocationId(mainLocation.id);
         else if (locationsData.length > 0)
           setSelectedLocationId(locationsData[0].id);
-      } else {
-        populateForm(initialData);
       }
     } catch (error) {
       console.error("Error loading data:", error);
@@ -170,14 +183,16 @@ export function PurchaseOrderForm({
     } finally {
       setIsLoading(false);
     }
-  }, [initialData, populateForm]);
+  }, [initialData, populateForm, selectedLocationId, setSelectedLocationId]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Calculations
-  const calculateSubtotal = (item: OrderItem) => item.quantity * item.unitCost;
+  const calculateSubtotal = (item: { quantity: number; unitCost: number }) =>
+    item.quantity * item.unitCost;
   const calculateTotal = () =>
     items.reduce((sum, item) => sum + calculateSubtotal(item), 0);
 
@@ -204,48 +219,9 @@ export function PurchaseOrderForm({
     setItems([...items, ...newItems]);
   };
 
-  const handleAddCustomItem = () => {
-    setItems([
-      ...items,
-      {
-        id: `custom-${Date.now()}`,
-        productId: null,
-        name: "",
-        sku: "",
-        quantity: 1,
-        unitCost: 0,
-        type: "custom",
-      },
-    ]);
-  };
-
-  const handleRemoveItem = (itemId: string) => {
-    setItems(items.filter((item) => item.id !== itemId));
-  };
-
-  const handleQuantityChange = (itemId: string, quantity: number) => {
-    setItems(
-      items.map((item) =>
-        item.id === itemId
-          ? { ...item, quantity: Math.max(1, quantity) }
-          : item,
-      ),
-    );
-  };
-
   const handleCostChange = (itemId: string, cost: string) => {
     const numericCost = parseFloat(cost.replace(/[^0-9.]/g, "")) || 0;
-    setItems(
-      items.map((item) =>
-        item.id === itemId ? { ...item, unitCost: numericCost } : item,
-      ),
-    );
-  };
-
-  const handleNameChange = (itemId: string, name: string) => {
-    setItems(
-      items.map((item) => (item.id === itemId ? { ...item, name } : item)),
-    );
+    updateItemCost(itemId, numericCost);
   };
 
   const handleSupplierCreated = (supplier: Supplier) => {
@@ -294,10 +270,12 @@ export function PurchaseOrderForm({
       if (mode === "edit" && initialData) {
         await updatePurchaseOrder(initialData.id, orderData, orderItems);
         toast.success("Orden actualizada");
+        clear();
         router.push(`/ordenes/${initialData.id}`);
       } else {
         const order = await createPurchaseOrder(orderData, orderItems);
         toast.success("Orden creada");
+        clear();
         router.push(`/ordenes/${order.id}`);
       }
     } catch (error) {
@@ -549,7 +527,7 @@ export function PurchaseOrderForm({
                                 placeholder="Nombre del ítem"
                                 value={item.name}
                                 onChange={(e) =>
-                                  handleNameChange(item.id, e.target.value)
+                                  updateItemName(item.id, e.target.value)
                                 }
                               />
                             )}
@@ -560,7 +538,7 @@ export function PurchaseOrderForm({
                               min="1"
                               value={item.quantity}
                               onChange={(e) =>
-                                handleQuantityChange(
+                                updateItemQuantity(
                                   item.id,
                                   parseInt(e.target.value) || 1,
                                 )
@@ -587,7 +565,7 @@ export function PurchaseOrderForm({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 opacity-0 transition-all group-hover:opacity-100"
-                              onClick={() => handleRemoveItem(item.id)}
+                              onClick={() => removeItem(item.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -611,7 +589,7 @@ export function PurchaseOrderForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleAddCustomItem}
+                    onClick={addCustomItem}
                   >
                     Ítem personalizado
                   </Button>
