@@ -1,7 +1,13 @@
 "use client";
 
 import { Loader2, Package, Search } from "lucide-react";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,37 +31,41 @@ interface ProductSearchPanelProps {
   onProductSelect: (product: ProductForSale) => void;
 }
 
-export const ProductSearchPanel = forwardRef<ProductSearchPanelRef, ProductSearchPanelProps>(
-  ({ onProductSelect }, ref) => {
-    const [search, setSearch] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-    const [products, setProducts] = useState<ProductForSale[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSearching, setIsSearching] = useState(false);
+export const ProductSearchPanel = forwardRef<
+  ProductSearchPanelRef,
+  ProductSearchPanelProps
+>(({ onProductSelect }, ref) => {
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductForSale[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
 
-    const debouncedSearch = useDebounce(search, 300);
-    const roundingType: PriceRoundingType = "multiples_100";
+  const debouncedSearch = useDebounce(search, 300);
+  const roundingType: PriceRoundingType = "multiples_100";
 
-    // Exponer función para actualizar stock
-    useImperativeHandle(ref, () => ({
-      updateStock: (soldItems) => {
-        setProducts((prev) =>
-          prev.map((product) => {
-            const soldItem = soldItems.find((item) => item.productId === product.id);
-            if (soldItem) {
-              return {
-                ...product,
-                stockQuantity: Math.max(0, product.stockQuantity - soldItem.quantity),
-              };
-            }
-            return product;
-          })
-        );
-      },
-    }));
+  // Exponer función para actualizar stock
+  useImperativeHandle(ref, () => ({
+    updateStock: (soldItems) => {
+      setProducts((prev) =>
+        prev.map((product) => {
+          const soldItem = soldItems.find(
+            (item) => item.productId === product.id,
+          );
+          if (soldItem) {
+            return {
+              ...product,
+              stockQuantity: product.stockQuantity - soldItem.quantity,
+            };
+          }
+          return product;
+        }),
+      );
+    },
+  }));
 
-    // Load categories on mount
+  // Load categories on mount
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -192,7 +202,6 @@ export const ProductSearchPanel = forwardRef<ProductSearchPanelRef, ProductSearc
       </ScrollArea>
     </div>
   );
-  }
-);
+});
 
 ProductSearchPanel.displayName = "ProductSearchPanel";

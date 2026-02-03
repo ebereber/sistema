@@ -1327,3 +1327,69 @@ export async function cancelCreditNote(
 
   if (updateError) throw updateError;
 }
+
+export interface StockCheckResult {
+  productId: string;
+  productName: string;
+  sku: string;
+  requested: number;
+  available: number;
+  shortage: number;
+}
+
+export async function checkStockAvailability(
+  items: {
+    productId: string | null;
+    name: string;
+    sku: string;
+    quantity: number;
+  }[],
+  locationId: string,
+): Promise<StockCheckResult[]> {
+  const supabase = createClient();
+
+  // Filtrar solo productos reales (no custom items)
+  const productIds = items
+    .filter((item) => item.productId !== null)
+    .map((item) => item.productId as string);
+
+  if (productIds.length === 0) return [];
+
+  // Obtener stock de la ubicación
+  const { data: stockData, error } = await supabase
+    .from("stock")
+    .select("product_id, quantity")
+    .eq("location_id", locationId)
+    .in("product_id", productIds);
+
+  if (error) throw error;
+
+  // Crear mapa de stock
+  const stockMap = new Map<string, number>();
+  (stockData || []).forEach((s) => {
+    stockMap.set(s.product_id, s.quantity);
+  });
+
+  // Verificar cada item
+  const shortages: StockCheckResult[] = [];
+
+  items.forEach((item) => {
+    if (!item.productId) return; // Skip custom items
+
+    const available = stockMap.get(item.productId) ?? 0;
+    const shortage = item.quantity - available;
+
+    if (shortage > 0) {
+      shortages.push({
+        productId: item.productId,
+        productName: item.name,
+        sku: item.sku,
+        requested: item.quantity,
+        available,
+        shortage,
+      });
+    }
+  });
+
+  return shortages;
+}

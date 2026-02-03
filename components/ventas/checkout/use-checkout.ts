@@ -13,6 +13,11 @@ import {
   type PaymentInsert,
   type SaleItemInsert,
 } from "@/lib/services/sales";
+
+import {
+  checkStockAvailability,
+  type StockCheckResult,
+} from "@/lib/services/sales";
 import { Shift } from "@/lib/services/shifts";
 import { parseArgentineCurrency } from "@/lib/utils/currency";
 import {
@@ -27,7 +32,7 @@ import {
   type SelectedCustomer,
 } from "@/lib/validations/sale";
 import { DollarSign } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ICON_MAP,
@@ -126,6 +131,10 @@ export function useCheckout({
   // Check if there are any discounts
   const hasItemDiscounts = totals.itemDiscounts > 0;
   const hasGlobalDiscount = totals.globalDiscount > 0;
+
+  const [stockShortages, setStockShortages] = useState<StockCheckResult[]>([]);
+  const [showStockWarning, setShowStockWarning] = useState(false);
+  const skipStockCheckRef = useRef(false);
 
   // Load payment methods
   useEffect(() => {
@@ -489,6 +498,33 @@ export function useCheckout({
       toast.error("No se pudo obtener la ubicación");
       return;
     }
+
+    // Verificar stock (solo si no se pidió saltar)
+    if (!skipStockCheckRef.current) {
+      try {
+        const shortages = await checkStockAvailability(
+          cartItems.map((item) => ({
+            productId: item.productId,
+            name: item.name,
+            sku: item.sku,
+            quantity: item.quantity,
+          })),
+          location.id,
+        );
+
+        if (shortages.length > 0) {
+          setStockShortages(shortages);
+          setShowStockWarning(true);
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking stock:", error);
+        // Si falla la verificación, continuar con la venta
+      }
+    }
+
+    // Resetear para próxima venta
+    skipStockCheckRef.current = false;
     try {
       setIsSubmitting(true);
 
@@ -694,6 +730,18 @@ export function useCheckout({
     }
   };
 
+  const handleConfirmWithShortage = () => {
+    setShowStockWarning(false);
+    setStockShortages([]);
+    skipStockCheckRef.current = true;
+    handleConfirm();
+  };
+
+  const handleCancelShortage = () => {
+    setShowStockWarning(false);
+    setStockShortages([]);
+  };
+
   return {
     // State
     currentView,
@@ -739,6 +787,11 @@ export function useCheckout({
     totalPaid,
     isAddingPartialPayment,
     setIsAddingPartialPayment,
+
+    stockShortages,
+    showStockWarning,
+    handleConfirmWithShortage,
+    handleCancelShortage,
 
     // Card payments
     selectedCardType,

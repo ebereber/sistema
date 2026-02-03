@@ -324,7 +324,6 @@ export function CheckoutSummary({
           size="lg"
           className="h-12 w-full text-base font-medium"
           disabled={!canSubmit}
-          onClick={onSubmit}
         >
           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isSubmitting

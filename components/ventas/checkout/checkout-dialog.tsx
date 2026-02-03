@@ -23,6 +23,7 @@ import { PaymentCardForm, PaymentCardSelect } from "./payment-card-form";
 import { PaymentMethodsList } from "./payment-methods-list";
 import { PaymentReferenceForm } from "./payment-reference-form";
 import { PaymentSplit } from "./payment-split";
+import { StockWarningDialog } from "./stock-warning-dialog";
 import type { CheckoutDialogProps } from "./types";
 import { useCheckout } from "./use-checkout";
 
@@ -277,6 +278,13 @@ export function CheckoutDialog({
           </>
         )}
       </SheetContent>
+      <StockWarningDialog
+        open={checkout.showStockWarning}
+        shortages={checkout.stockShortages}
+        locationName={checkout.location?.name || ""}
+        onConfirm={checkout.handleConfirmWithShortage}
+        onCancel={checkout.handleCancelShortage}
+      />
     </Sheet>
   );
 }
