@@ -1,6 +1,7 @@
 import "server-only"
 
 import { supabaseAdmin } from "@/lib/supabase/admin"
+import { normalizeRelation } from "@/lib/supabase/types"
 import { cacheLife, cacheTag } from "next/cache"
 import type { Category } from "./categories"
 import type {
@@ -8,6 +9,7 @@ import type {
   GetProductsParams,
   Product,
 } from "./products"
+import type { ProductForSale } from "./sales"
 
 export async function getCachedProducts(
   params: GetProductsParams = {},
@@ -183,4 +185,128 @@ export async function getCachedAllProductIds(
 
   if (error) throw error
   return data?.map((p) => p.id) || []
+}
+
+export async function getCachedAllProductsForPOS(): Promise<ProductForSale[]> {
+  "use cache"
+  cacheTag("products")
+  cacheLife("minutes")
+
+  const { data, error } = await supabaseAdmin
+    .from("products")
+    .select(
+      `
+      id,
+      name,
+      sku,
+      barcode,
+      price,
+      tax_rate,
+      stock_quantity,
+      image_url,
+      category_id,
+      category:categories(name)
+    `,
+    )
+    .eq("active", true)
+    .in("visibility", ["SALES_AND_PURCHASES", "SALES_ONLY"])
+    .order("name", { ascending: true })
+
+  if (error) throw error
+
+  return (data || []).map((product) => ({
+    id: product.id,
+    name: product.name,
+    sku: product.sku,
+    barcode: product.barcode,
+    price: product.price,
+    taxRate: product.tax_rate,
+    stockQuantity: product.stock_quantity ?? 0,
+    imageUrl: product.image_url,
+    categoryId: product.category_id,
+    categoryName: normalizeRelation(product.category)?.name || null,
+  }))
+}
+
+export async function getCachedTopSellingProducts(
+  limit: number = 20,
+): Promise<ProductForSale[]> {
+  "use cache"
+  cacheTag("sales", "products")
+  cacheLife("hours")
+
+  // Get recent sale items to determine top sellers
+  const { data, error } = await supabaseAdmin
+    .from("sale_items")
+    .select(
+      `
+      product_id,
+      quantity,
+      product:products(
+        id,
+        name,
+        sku,
+        barcode,
+        price,
+        tax_rate,
+        stock_quantity,
+        image_url,
+        category_id,
+        active,
+        visibility,
+        category:categories(name)
+      )
+    `,
+    )
+    .not("product_id", "is", null)
+    .limit(1000)
+
+  if (error) throw error
+
+  // Group by product_id and sum quantities
+  const counts = new Map<
+    string,
+    { count: number; product: (typeof data)[number]["product"] }
+  >()
+  for (const item of data || []) {
+    if (!item.product_id || !item.product) continue
+    const product = Array.isArray(item.product)
+      ? item.product[0]
+      : item.product
+    if (!product || !product.active) continue
+    if (
+      product.visibility !== "SALES_AND_PURCHASES" &&
+      product.visibility !== "SALES_ONLY"
+    )
+      continue
+
+    const existing = counts.get(item.product_id)
+    if (existing) {
+      existing.count += item.quantity
+    } else {
+      counts.set(item.product_id, { count: item.quantity, product })
+    }
+  }
+
+  return Array.from(counts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((x) => {
+      const p = x.product as Record<string, unknown>
+      const category = normalizeRelation(
+        p.category as { name: string } | { name: string }[] | null,
+      )
+      return {
+        id: p.id as string,
+        name: p.name as string,
+        sku: p.sku as string,
+        barcode: p.barcode as string | null,
+        price: p.price as number,
+        taxRate: p.tax_rate as number,
+        stockQuantity: (p.stock_quantity as number) ?? 0,
+        imageUrl: p.image_url as string | null,
+        categoryId: p.category_id as string | null,
+        categoryName: category?.name || null,
+      }
+    })
 }

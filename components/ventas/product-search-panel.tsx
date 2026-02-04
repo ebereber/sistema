@@ -1,122 +1,133 @@
-"use client";
+"use client"
 
-import { Loader2, Package, Search } from "lucide-react";
+import { Package, Search, TrendingUp } from "lucide-react"
 import {
   forwardRef,
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useState,
-} from "react";
+} from "react"
 
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDebounce } from "@/hooks/use-debounce";
-import { getCategories, type Category } from "@/lib/services/categories";
-import {
-  searchProductsForSale,
-  type ProductForSale,
-} from "@/lib/services/sales";
-import { applyPriceRounding, PriceRoundingType } from "@/lib/utils/currency";
-import { ProductItem } from "./product-item";
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { Category } from "@/lib/services/categories"
+import type { ProductForSale } from "@/lib/services/sales"
+import { applyPriceRounding, PriceRoundingType } from "@/lib/utils/currency"
+import { ProductItem } from "./product-item"
 
 export interface ProductSearchPanelRef {
   updateStock: (
     soldItems: { productId: string | null; quantity: number }[],
-  ) => void;
+  ) => void
 }
 
 interface ProductSearchPanelProps {
-  onProductSelect: (product: ProductForSale) => void;
+  allProducts: ProductForSale[]
+  topSellingProducts: ProductForSale[]
+  categories: Category[]
+  onProductSelect: (product: ProductForSale) => void
 }
 
 export const ProductSearchPanel = forwardRef<
   ProductSearchPanelRef,
   ProductSearchPanelProps
->(({ onProductSelect }, ref) => {
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [products, setProducts] = useState<ProductForSale[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
+>(({ allProducts, topSellingProducts, categories, onProductSelect }, ref) => {
+  const [search, setSearch] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [products, setProducts] = useState<ProductForSale[]>(allProducts)
 
-  const debouncedSearch = useDebounce(search, 300);
-  const roundingType: PriceRoundingType = "multiples_100";
+  const roundingType: PriceRoundingType = "multiples_100"
 
-  // Exponer función para actualizar stock
+  // Keep products in sync when server data changes
+  useEffect(() => {
+    setProducts(allProducts)
+  }, [allProducts])
+
+  // Expose function to update stock locally after a sale
   useImperativeHandle(ref, () => ({
     updateStock: (soldItems) => {
       setProducts((prev) =>
         prev.map((product) => {
           const soldItem = soldItems.find(
             (item) => item.productId === product.id,
-          );
+          )
           if (soldItem) {
             return {
               ...product,
               stockQuantity: product.stockQuantity - soldItem.quantity,
-            };
+            }
           }
-          return product;
+          return product
         }),
-      );
+      )
     },
-  }));
+  }))
 
-  // Load categories on mount
-  useEffect(() => {
-    async function loadCategories() {
-      try {
-        const data = await getCategories();
-        setCategories(data);
-      } catch (error) {
-        console.error("Error loading categories:", error);
-      }
-    }
-    loadCategories();
-  }, []);
+  // Client-side filtering with useMemo -- instant results
+  const displayedProducts = useMemo(() => {
+    const searchTerm = search.trim().toLowerCase()
 
-  // Load products when search or category changes
-  useEffect(() => {
-    async function loadProducts() {
-      setIsSearching(true);
-      try {
-        const data = await searchProductsForSale({
-          search: debouncedSearch || undefined,
-          categoryId: selectedCategory || undefined,
-        });
-        const productsWithRoundedPrices = data.map((product) => ({
-          ...product,
-          price: applyPriceRounding(product.price, roundingType),
-        }));
-        setProducts(productsWithRoundedPrices);
-      } catch (error) {
-        console.error("Error loading products:", error);
-      } finally {
-        setIsSearching(false);
-        setIsLoading(false);
+    // No filters active: show top selling
+    if (!searchTerm && !selectedCategory) {
+      if (topSellingProducts.length > 0) {
+        return topSellingProducts.map((p) => ({
+          ...p,
+          // Use fresh stock data from products state
+          stockQuantity:
+            products.find((sp) => sp.id === p.id)?.stockQuantity ??
+            p.stockQuantity,
+          price: applyPriceRounding(
+            products.find((sp) => sp.id === p.id)?.price ?? p.price,
+            roundingType,
+          ),
+        }))
       }
+      return []
     }
-    loadProducts();
-  }, [debouncedSearch, selectedCategory]);
+
+    return products
+      .filter((product) => {
+        const matchesSearch =
+          !searchTerm ||
+          product.name.toLowerCase().includes(searchTerm) ||
+          product.sku?.toLowerCase().includes(searchTerm) ||
+          product.barcode?.toLowerCase().includes(searchTerm)
+
+        const matchesCategory =
+          !selectedCategory || product.categoryId === selectedCategory
+
+        return matchesSearch && matchesCategory
+      })
+      .map((p) => ({
+        ...p,
+        price: applyPriceRounding(p.price, roundingType),
+      }))
+  }, [products, topSellingProducts, search, selectedCategory, roundingType])
 
   // Handle keyboard shortcut for search focus
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-        e.preventDefault();
-        document.getElementById("pos-product-search")?.focus();
+        e.preventDefault()
+        document.getElementById("pos-product-search")?.focus()
       }
     }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
 
   const handleCategoryChange = useCallback((value: string) => {
-    setSelectedCategory(value === "all" ? null : value);
-  }, []);
+    setSelectedCategory(value === "all" ? null : value)
+  }, [])
+
+  const hasFilters = search.trim() || selectedCategory
+  const showTopSellingHeader =
+    !hasFilters && topSellingProducts.length > 0 && displayedProducts.length > 0
+  const showEmptyPrompt =
+    !hasFilters && topSellingProducts.length === 0
 
   return (
     <div className="flex h-full flex-col  ">
@@ -132,9 +143,6 @@ export const ProductSearchPanel = forwardRef<
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-16 h-12"
           />
-          {/* <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
-            {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}F
-          </kbd> */}
         </div>
       </div>
 
@@ -167,15 +175,19 @@ export const ProductSearchPanel = forwardRef<
       {/* Products list */}
       <ScrollArea className="flex-1 h-full pr-4 py-2">
         <div className="">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          {showEmptyPrompt ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-4 rounded-full bg-muted p-4">
+                <Search className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="mb-2 font-semibold">
+                Busca un producto o selecciona una categoria
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Usa la barra de busqueda o los filtros de categoria
+              </p>
             </div>
-          ) : isSearching ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : products.length === 0 ? (
+          ) : displayedProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="mb-4 rounded-full bg-muted p-4">
                 <Package className="h-8 w-8 text-muted-foreground" />
@@ -183,13 +195,19 @@ export const ProductSearchPanel = forwardRef<
               <h3 className="mb-2 font-semibold">Sin productos</h3>
               <p className="text-sm text-muted-foreground">
                 {search
-                  ? "No se encontraron productos con esa búsqueda"
+                  ? "No se encontraron productos con esa busqueda"
                   : "No hay productos disponibles"}
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {products.map((product) => (
+              {showTopSellingHeader && (
+                <div className="flex items-center gap-2 px-1 pb-1 text-sm font-medium text-muted-foreground">
+                  <TrendingUp className="size-4" />
+                  Mas vendidos
+                </div>
+              )}
+              {displayedProducts.map((product) => (
                 <ProductItem
                   key={product.id}
                   product={product}
@@ -201,7 +219,7 @@ export const ProductSearchPanel = forwardRef<
         </div>
       </ScrollArea>
     </div>
-  );
-});
+  )
+})
 
-ProductSearchPanel.displayName = "ProductSearchPanel";
+ProductSearchPanel.displayName = "ProductSearchPanel"

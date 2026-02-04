@@ -28,6 +28,7 @@ export interface SearchProductsParams {
 
 /**
  * Search products optimized for POS (only active products visible in sales)
+ * @deprecated Migrated to getCachedAllProductsForPOS in products-cached.ts + client-side filtering
  */
 export async function searchProductsForSale(
   params: SearchProductsParams = {},
