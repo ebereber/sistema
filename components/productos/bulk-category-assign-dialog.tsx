@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-import { bulkAssignCategory, type BulkFilters } from "@/lib/services/products";
+import { bulkAssignCategoryAction } from "@/lib/actions/products";
+import type { BulkFilters } from "@/lib/services/products";
 
 interface BulkCategoryAssignDialogProps {
   selectedIds: string[];
@@ -45,7 +46,7 @@ export function BulkCategoryAssignDialog({
   async function handleSubmit() {
     setIsLoading(true);
     try {
-      const updated = await bulkAssignCategory({
+      const updated = await bulkAssignCategoryAction({
         productIds: allSelected ? undefined : selectedIds,
         filters: allSelected ? filters : undefined,
         categoryId,

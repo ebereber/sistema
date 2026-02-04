@@ -19,10 +19,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import {
-  bulkArchive,
-  getProductStatusCounts,
-  type BulkFilters,
-} from "@/lib/services/products";
+  bulkArchiveAction,
+  getProductStatusCountsAction,
+} from "@/lib/actions/products";
+import type { BulkFilters } from "@/lib/services/products";
 
 interface BulkArchiveDialogProps {
   selectedIds: string[];
@@ -58,7 +58,7 @@ export function BulkArchiveDialog({
     async function loadCounts() {
       setIsCountingLoading(true);
       try {
-        const counts = await getProductStatusCounts({
+        const counts = await getProductStatusCountsAction({
           productIds: allSelected ? undefined : selectedIds,
           filters: allSelected ? filters : undefined,
         });
@@ -90,7 +90,7 @@ export function BulkArchiveDialog({
 
     setIsLoading(true);
     try {
-      const updated = await bulkArchive({
+      const updated = await bulkArchiveAction({
         productIds: allSelected ? undefined : selectedIds,
         filters: allSelected ? filters : undefined,
         archive: action === "archive",

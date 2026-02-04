@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/select";
 
 import { createClient } from "@/lib/supabase/client";
-import { bulkUpdatePrices, type BulkFilters } from "@/lib/services/products";
+import { bulkUpdatePricesAction } from "@/lib/actions/products";
+import type { BulkFilters } from "@/lib/services/products";
 
 interface BulkPriceUpdateDialogProps {
   selectedIds: string[];
@@ -69,7 +70,7 @@ export function BulkPriceUpdateDialog({
         return;
       }
 
-      const updated = await bulkUpdatePrices({
+      const updated = await bulkUpdatePricesAction({
         productIds: allSelected ? undefined : selectedIds,
         filters: allSelected ? filters : undefined,
         operation,

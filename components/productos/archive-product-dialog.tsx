@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import {
-  archiveProduct,
-  activateProduct,
-  type Product,
-} from "@/lib/services/products";
+  archiveProductAction,
+  activateProductAction,
+} from "@/lib/actions/products";
+import type { Product } from "@/lib/services/products";
 
 interface ArchiveProductDialogProps {
   product: Product;
@@ -38,12 +38,12 @@ export function ArchiveProductDialog({
     setIsLoading(true);
     try {
       if (isActive) {
-        await archiveProduct(product.id);
+        await archiveProductAction(product.id);
         toast.success("Producto archivado", {
           description: `${product.name} fue archivado correctamente`,
         });
       } else {
-        await activateProduct(product.id);
+        await activateProductAction(product.id);
         toast.success("Producto activado", {
           description: `${product.name} fue activado correctamente`,
         });

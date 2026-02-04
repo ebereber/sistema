@@ -16,11 +16,11 @@ import {
 } from "@/components/ui/dialog";
 
 import {
-  bulkDelete,
-  checkProductsWithReferences,
-  getAllProductIds,
-  type BulkFilters,
-} from "@/lib/services/products";
+  bulkDeleteAction,
+  checkProductsWithReferencesAction,
+  getAllProductIdsAction,
+} from "@/lib/actions/products";
+import type { BulkFilters } from "@/lib/services/products";
 
 interface BulkDeleteDialogProps {
   selectedIds: string[];
@@ -56,10 +56,10 @@ export function BulkDeleteDialog({
       let idsToCheck = selectedIds;
 
       if (allSelected && filters) {
-        idsToCheck = await getAllProductIds(filters);
+        idsToCheck = await getAllProductIdsAction(filters);
       }
 
-      const result = await checkProductsWithReferences(idsToCheck);
+      const result = await checkProductsWithReferencesAction(idsToCheck);
       setCanDelete(result.canDelete.length);
       setHasReferences(result.hasReferences.length);
     } catch (error) {
@@ -78,7 +78,7 @@ export function BulkDeleteDialog({
   async function handleSubmit() {
     setIsLoading(true);
     try {
-      const result = await bulkDelete({
+      const result = await bulkDeleteAction({
         productIds: allSelected ? undefined : selectedIds,
         filters: allSelected ? filters : undefined,
       });

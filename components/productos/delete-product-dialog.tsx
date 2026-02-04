@@ -14,7 +14,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { deleteProduct, type Product } from "@/lib/services/products";
+import { deleteProductAction } from "@/lib/actions/products";
+import type { Product } from "@/lib/services/products";
 
 interface DeleteProductDialogProps {
   product: Product;
@@ -32,7 +33,7 @@ export function DeleteProductDialog({
   async function handleConfirm() {
     setIsLoading(true);
     try {
-      await deleteProduct(product.id);
+      await deleteProductAction(product.id);
 
       toast.success("Producto eliminado", {
         description: `${product.name} fue eliminado correctamente`,

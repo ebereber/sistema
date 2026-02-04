@@ -18,7 +18,8 @@ import { Input } from "@/components/ui/input";
 
 import { createClient } from "@/lib/supabase/client";
 import { getLocations, type Location } from "@/lib/services/locations";
-import { updateProductStock, type Product } from "@/lib/services/products";
+import { updateProductStockAction } from "@/lib/actions/products";
+import type { Product } from "@/lib/services/products";
 
 interface StockManagementDialogProps {
   product: Product;
@@ -95,7 +96,7 @@ export function StockManagementDialog({
         return;
       }
 
-      await updateProductStock(product.id, {
+      await updateProductStockAction(product.id, {
         stockByLocation: Object.entries(stockByLocation).map(
           ([location_id, quantity]) => ({
             location_id,

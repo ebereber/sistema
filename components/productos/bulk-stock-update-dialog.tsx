@@ -26,7 +26,8 @@ import {
 
 import { createClient } from "@/lib/supabase/client";
 import { getLocations, type Location } from "@/lib/services/locations";
-import { bulkUpdateStock, type BulkFilters } from "@/lib/services/products";
+import { bulkUpdateStockAction } from "@/lib/actions/products";
+import type { BulkFilters } from "@/lib/services/products";
 
 interface BulkStockUpdateDialogProps {
   selectedIds: string[];
@@ -103,7 +104,7 @@ export function BulkStockUpdateDialog({
         return;
       }
 
-      const updated = await bulkUpdateStock({
+      const updated = await bulkUpdateStockAction({
         productIds: allSelected ? undefined : selectedIds,
         filters: allSelected ? filters : undefined,
         locationId,

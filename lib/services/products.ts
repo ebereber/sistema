@@ -55,6 +55,7 @@ export interface GetProductsResult {
 
 /**
  * Get products with filters and pagination
+ * @deprecated Use getCachedProducts from products-cached.ts instead
  */
 export async function getProducts(params: GetProductsParams = {}): Promise<GetProductsResult> {
   const supabase = createClient()
@@ -126,6 +127,7 @@ export async function getProducts(params: GetProductsParams = {}): Promise<GetPr
 
 /**
  * Get product by ID with relations
+ * @deprecated Use getCachedProductById from products-cached.ts instead
  */
 export async function getProductById(id: string): Promise<Product> {
   const supabase = createClient()
@@ -152,6 +154,7 @@ export async function getProductById(id: string): Promise<Product> {
 
 /**
  * Create a new product with stock and history
+ * @deprecated Use createProductAction from lib/actions/products.ts instead
  */
 export async function createProduct(data: {
   product: ProductInsert
@@ -220,6 +223,7 @@ export async function createProduct(data: {
 
 /**
  * Update a product with stock and history tracking
+ * @deprecated Use updateProductAction from lib/actions/products.ts instead
  */
 export async function updateProduct(
   id: string,
@@ -321,6 +325,7 @@ export async function updateProduct(
 
 /**
  * Archive a product (soft delete)
+ * @deprecated Use archiveProductAction from lib/actions/products.ts instead
  */
 export async function archiveProduct(id: string): Promise<void> {
   const supabase = createClient()
@@ -335,6 +340,7 @@ export async function archiveProduct(id: string): Promise<void> {
 
 /**
  * Activate a product
+ * @deprecated Use activateProductAction from lib/actions/products.ts instead
  */
 export async function activateProduct(id: string): Promise<void> {
   const supabase = createClient()
@@ -425,6 +431,7 @@ export async function deleteProductImage(imageUrl: string): Promise<void> {
 
 /**
  * Check if SKU is unique
+ * @deprecated Use isSkuUniqueAction from lib/actions/products.ts instead
  */
 export async function isSkuUnique(sku: string, excludeId?: string): Promise<boolean> {
   const supabase = createClient()
@@ -443,6 +450,7 @@ export async function isSkuUnique(sku: string, excludeId?: string): Promise<bool
 
 /**
  * Check if barcode is unique
+ * @deprecated Use isBarcodeUniqueAction from lib/actions/products.ts instead
  */
 export async function isBarcodeUnique(
   barcode: string,
@@ -464,6 +472,7 @@ export async function isBarcodeUnique(
 
 /**
  * Update product stock from stock management dialog
+ * @deprecated Use updateProductStockAction from lib/actions/products.ts instead
  */
 export async function updateProductStock(
   productId: string,
@@ -521,6 +530,7 @@ export async function updateProductStock(
 
 /**
  * Delete a product permanently or archive if it has references
+ * @deprecated Use deleteProductAction from lib/actions/products.ts instead
  */
 export async function deleteProduct(id: string): Promise<void> {
   const supabase = createClient()
@@ -560,6 +570,7 @@ export async function deleteProduct(id: string): Promise<void> {
 
 /**
  * Get all product IDs matching filters (for "Select all" functionality)
+ * @deprecated Use getAllProductIdsAction from lib/actions/products.ts instead
  */
 export async function getAllProductIds(filters: BulkFilters): Promise<string[]> {
   const supabase = createClient()
@@ -598,6 +609,7 @@ export async function getAllProductIds(filters: BulkFilters): Promise<string[]> 
 
 /**
  * Bulk update prices
+ * @deprecated Use bulkUpdatePricesAction from lib/actions/products.ts instead
  */
 export async function bulkUpdatePrices(params: {
   productIds?: string[]
@@ -674,6 +686,7 @@ export async function bulkUpdatePrices(params: {
 
 /**
  * Bulk update stock
+ * @deprecated Use bulkUpdateStockAction from lib/actions/products.ts instead
  */
 export async function bulkUpdateStock(params: {
   productIds?: string[]
@@ -758,6 +771,7 @@ export async function bulkUpdateStock(params: {
 
 /**
  * Bulk assign category
+ * @deprecated Use bulkAssignCategoryAction from lib/actions/products.ts instead
  */
 export async function bulkAssignCategory(params: {
   productIds?: string[]
@@ -788,6 +802,7 @@ export async function bulkAssignCategory(params: {
 
 /**
  * Get product status counts (active vs inactive) for bulk operations
+ * @deprecated Use getProductStatusCountsAction from lib/actions/products.ts instead
  */
 export async function getProductStatusCounts(params: {
   productIds?: string[]
@@ -821,6 +836,7 @@ export async function getProductStatusCounts(params: {
 /**
  * Bulk archive/activate products
  * Only updates products that actually need to change state
+ * @deprecated Use bulkArchiveAction from lib/actions/products.ts instead
  */
 export async function bulkArchive(params: {
   productIds?: string[]
@@ -856,6 +872,7 @@ export async function bulkArchive(params: {
 
 /**
  * Check which products have references (for bulk delete preview)
+ * @deprecated Use checkProductsWithReferencesAction from lib/actions/products.ts instead
  */
 export async function checkProductsWithReferences(productIds: string[]): Promise<{
   canDelete: string[]
@@ -886,6 +903,7 @@ export async function checkProductsWithReferences(productIds: string[]): Promise
 
 /**
  * Bulk delete products (archives those with references)
+ * @deprecated Use bulkDeleteAction from lib/actions/products.ts instead
  */
 export async function bulkDelete(params: {
   productIds?: string[]
