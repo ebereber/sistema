@@ -66,9 +66,9 @@ import {
 import { cn } from "@/lib/utils";
 
 import { DeletePurchaseDialog } from "@/components/compras/delete-purchase-dialog";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { Purchase } from "@/lib/services/purchases";
 import type { Supplier } from "@/lib/services/suppliers";
-import { useDebounce } from "@/hooks/use-debounce";
 
 type TimeUnit = "days" | "weeks" | "months";
 
@@ -122,7 +122,10 @@ export function ComprasPageClient({
       isFirstRender.current = false;
       return;
     }
-    updateSearchParams({ search: debouncedSearch || undefined, page: undefined });
+    updateSearchParams({
+      search: debouncedSearch || undefined,
+      page: undefined,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
@@ -301,7 +304,10 @@ export function ComprasPageClient({
                           className="ml-2 h-3 w-3 hover:opacity-70"
                           onClick={(e) => {
                             e.stopPropagation();
-                            updateSearchParams({ status: undefined, page: undefined });
+                            updateSearchParams({
+                              status: undefined,
+                              page: undefined,
+                            });
                           }}
                         />
                       </>
@@ -369,7 +375,10 @@ export function ComprasPageClient({
                           <CommandGroup>
                             <CommandItem
                               onSelect={() =>
-                                updateSearchParams({ status: undefined, page: undefined })
+                                updateSearchParams({
+                                  status: undefined,
+                                  page: undefined,
+                                })
                               }
                               className="cursor-pointer justify-center text-center"
                             >
@@ -405,7 +414,10 @@ export function ComprasPageClient({
                           className="ml-2 h-3 w-3 hover:opacity-70"
                           onClick={(e) => {
                             e.stopPropagation();
-                            updateSearchParams({ supplier: undefined, page: undefined });
+                            updateSearchParams({
+                              supplier: undefined,
+                              page: undefined,
+                            });
                           }}
                         />
                       </>
@@ -444,7 +456,10 @@ export function ComprasPageClient({
                           <CommandGroup>
                             <CommandItem
                               onSelect={() =>
-                                updateSearchParams({ supplier: undefined, page: undefined })
+                                updateSearchParams({
+                                  supplier: undefined,
+                                  page: undefined,
+                                })
                               }
                               className="cursor-pointer justify-center text-center"
                             >
@@ -476,7 +491,10 @@ export function ComprasPageClient({
                         className="ml-2 h-3 w-3 hover:opacity-70"
                         onClick={(e) => {
                           e.stopPropagation();
-                          updateSearchParams({ dateFrom: undefined, page: undefined });
+                          updateSearchParams({
+                            dateFrom: undefined,
+                            page: undefined,
+                          });
                         }}
                       />
                     )}
@@ -558,7 +576,12 @@ export function ComprasPageClient({
 
         {/* Table */}
         <div className="space-y-4">
-          <div className={cn("overflow-hidden rounded-lg border", isPending && "opacity-60")}>
+          <div
+            className={cn(
+              "overflow-hidden rounded-lg border",
+              isPending && "opacity-60",
+            )}
+          >
             <Table>
               <TableHeader>
                 <TableRow>
@@ -730,7 +753,10 @@ export function ComprasPageClient({
                 disabled={currentFilters.page === 1}
                 onClick={() =>
                   updateSearchParams({
-                    page: currentFilters.page > 2 ? String(currentFilters.page - 1) : undefined,
+                    page:
+                      currentFilters.page > 2
+                        ? String(currentFilters.page - 1)
+                        : undefined,
                   })
                 }
               >
@@ -741,7 +767,9 @@ export function ComprasPageClient({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                disabled={currentFilters.page === totalPages || totalPages === 0}
+                disabled={
+                  currentFilters.page === totalPages || totalPages === 0
+                }
                 onClick={() =>
                   updateSearchParams({ page: String(currentFilters.page + 1) })
                 }
@@ -753,10 +781,10 @@ export function ComprasPageClient({
                 variant="outline"
                 size="icon"
                 className="hidden h-8 w-8 lg:flex"
-                disabled={currentFilters.page === totalPages || totalPages === 0}
-                onClick={() =>
-                  updateSearchParams({ page: String(totalPages) })
+                disabled={
+                  currentFilters.page === totalPages || totalPages === 0
                 }
+                onClick={() => updateSearchParams({ page: String(totalPages) })}
               >
                 <span className="sr-only">Ir a la última página</span>
                 <ChevronsRight className="h-4 w-4" />

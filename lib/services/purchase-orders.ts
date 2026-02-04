@@ -82,6 +82,7 @@ export type UpdatePurchaseOrderData = CreatePurchaseOrderData;
 export interface GetPurchaseOrdersFilters {
   search?: string;
   statuses?: string[];
+  supplierId?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;

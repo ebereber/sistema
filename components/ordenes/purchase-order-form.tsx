@@ -54,10 +54,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { getLocations, type Location } from "@/lib/services/locations";
 import { getProducts, type Product } from "@/lib/services/products";
 import {
-  createPurchaseOrder,
-  updatePurchaseOrder,
-  type CreatePurchaseOrderItemData,
-  type PurchaseOrderWithDetails,
+  createPurchaseOrderAction,
+  updatePurchaseOrderAction,
+} from "@/lib/actions/purchase-orders";
+import type {
+  CreatePurchaseOrderItemData,
+  PurchaseOrderWithDetails,
 } from "@/lib/services/purchase-orders";
 import { usePurchaseOrderFormStore } from "@/lib/store/purchase-order-store";
 import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
@@ -268,12 +270,12 @@ export function PurchaseOrderForm({
       };
 
       if (mode === "edit" && initialData) {
-        await updatePurchaseOrder(initialData.id, orderData, orderItems);
+        await updatePurchaseOrderAction(initialData.id, orderData, orderItems);
         toast.success("Orden actualizada");
         clear();
         router.push(`/ordenes/${initialData.id}`);
       } else {
-        const order = await createPurchaseOrder(orderData, orderItems);
+        const order = await createPurchaseOrderAction(orderData, orderItems);
         toast.success("Orden creada");
         clear();
         router.push(`/ordenes/${order.id}`);
