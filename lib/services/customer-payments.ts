@@ -122,7 +122,7 @@ export interface GetCustomerPaymentsResult {
 // =====================================================
 
 /**
- * Get customer payments list with filters and pagination
+ * @deprecated Migrated to getCachedCustomerPayments in customer-payments-cached.ts
  */
 export async function getCustomerPayments(
   params: GetCustomerPaymentsParams = {},
@@ -273,7 +273,7 @@ export async function getCustomerPayments(
 }
 
 /**
- * Get customer payment by ID with all details
+ * @deprecated Migrated to getCachedCustomerPaymentById in customer-payments-cached.ts
  */
 export async function getCustomerPaymentById(
   id: string,
@@ -437,7 +437,7 @@ export async function getPendingSaleById(
 }
 
 /**
- * Create a new customer payment (RCB)
+ * @deprecated Migrated to createCustomerPaymentAction in lib/actions/customer-payments.ts
  */
 export async function createCustomerPayment(
   data: CreateCustomerPaymentData,
@@ -535,7 +535,7 @@ export async function createCustomerPayment(
 }
 
 /**
- * Cancel a customer payment
+ * @deprecated Migrated to cancelCustomerPaymentAction in lib/actions/customer-payments.ts
  */
 export async function cancelCustomerPayment(id: string): Promise<void> {
   const supabase = createClient();
@@ -598,7 +598,7 @@ export async function cancelCustomerPayment(id: string): Promise<void> {
 }
 
 /**
- * Update payment notes
+ * @deprecated Migrated to updateCustomerPaymentNotesAction in lib/actions/customer-payments.ts
  */
 export async function updateCustomerPaymentNotes(
   id: string,

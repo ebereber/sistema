@@ -48,8 +48,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
+import { createCustomerPaymentAction } from "@/lib/actions/customer-payments";
 import {
-  createCustomerPayment,
   getPendingSaleById,
   getPendingSales,
   type PaymentAllocation,
@@ -396,7 +396,7 @@ export default function NuevaCobranzaPage() {
         cash_register_id: m.cash_register_id || undefined,
       }));
 
-      const payment = await createCustomerPayment(
+      const payment = await createCustomerPaymentAction(
         {
           customer_id: selectedCustomer.id,
           payment_date: `${paymentDate}T12:00:00`,
