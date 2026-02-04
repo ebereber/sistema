@@ -1,35 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
 import {
-  MoreVertical,
-  Eye,
-  ShoppingCart,
   Archive,
   ArchiveRestore,
+  Badge,
+  Eye,
+  MoreVertical,
+  Plus,
+  ShoppingCart,
   Trash2,
   Users,
-  Plus,
-  Badge,
-} from "lucide-react"
+} from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,22 +23,39 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-import { CustomerDialog } from "./customer-dialog"
-import type { Customer } from "@/lib/services/customers"
+import type { Customer } from "@/lib/services/customers";
+import { cn } from "@/lib/utils";
+import { CustomerDialog } from "./customer-dialog";
 
 interface CustomerTableProps {
-  customers: Customer[]
-  isLoading?: boolean
-  onArchive: (id: string) => void
-  onUnarchive: (id: string) => void
-  onDelete: (id: string) => void
-  onSuccess: () => void
+  customers: Customer[];
+  isLoading?: boolean;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
+  onDelete: (id: string) => void;
+  onSuccess: () => void;
 }
 
-type DialogType = "archive" | "unarchive" | "delete" | null
+type DialogType = "archive" | "unarchive" | "delete" | null;
 
 export function CustomerTable({
   customers,
@@ -64,44 +65,49 @@ export function CustomerTable({
   onDelete,
   onSuccess,
 }: CustomerTableProps) {
-  const [dialogType, setDialogType] = useState<DialogType>(null)
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [dialogType, setDialogType] = useState<DialogType>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null,
+  );
 
-  function formatDocument(taxIdType: string | null, taxId: string | null): string {
-    if (!taxId) return "-"
-    return `${taxIdType || "DOC"} ${taxId}`
+  function formatDocument(
+    taxIdType: string | null,
+    taxId: string | null,
+  ): string {
+    if (!taxId) return "-";
+    return `${taxIdType || "DOC"} ${taxId}`;
   }
 
   function formatPhone(phone: string | null): string {
-    if (!phone) return "-"
-    return phone
+    if (!phone) return "-";
+    return phone;
   }
 
   function openDialog(type: DialogType, customer: Customer) {
-    setDialogType(type)
-    setSelectedCustomer(customer)
+    setDialogType(type);
+    setSelectedCustomer(customer);
   }
 
   function closeDialog() {
-    setDialogType(null)
-    setSelectedCustomer(null)
+    setDialogType(null);
+    setSelectedCustomer(null);
   }
 
   function handleConfirm() {
-    if (!selectedCustomer) return
+    if (!selectedCustomer) return;
 
     switch (dialogType) {
       case "archive":
-        onArchive(selectedCustomer.id)
-        break
+        onArchive(selectedCustomer.id);
+        break;
       case "unarchive":
-        onUnarchive(selectedCustomer.id)
-        break
+        onUnarchive(selectedCustomer.id);
+        break;
       case "delete":
-        onDelete(selectedCustomer.id)
-        break
+        onDelete(selectedCustomer.id);
+        break;
     }
-    closeDialog()
+    closeDialog();
   }
 
   if (isLoading) {
@@ -136,7 +142,7 @@ export function CustomerTable({
           </TableBody>
         </Table>
       </div>
-    )
+    );
   }
 
   if (customers.length === 0) {
@@ -161,7 +167,7 @@ export function CustomerTable({
           }
         />
       </div>
-    )
+    );
   }
 
   return (
@@ -178,7 +184,13 @@ export function CustomerTable({
           </TableHeader>
           <TableBody>
             {customers.map((customer) => (
-              <TableRow key={customer.id}>
+              <TableRow
+                key={customer.id}
+                className={cn(
+                  "cursor-pointer",
+                  !customer.active && "opacity-50",
+                )}
+              >
                 <TableCell className="font-medium">{customer.name}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDocument(customer.tax_id_type, customer.tax_id)}
@@ -242,15 +254,18 @@ export function CustomerTable({
       </div>
 
       {/* Archive Dialog */}
-      <AlertDialog open={dialogType === "archive"} onOpenChange={(open) => !open && closeDialog()}>
+      <AlertDialog
+        open={dialogType === "archive"}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               ¿Estás seguro que querés archivar este cliente?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción archivará el cliente &quot;{selectedCustomer?.name}&quot;.
-              Podés desarchivarlo en cualquier momento.
+              Esta acción archivará el cliente &quot;{selectedCustomer?.name}
+              &quot;. Podés desarchivarlo en cualquier momento.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -266,15 +281,18 @@ export function CustomerTable({
       </AlertDialog>
 
       {/* Unarchive Dialog */}
-      <AlertDialog open={dialogType === "unarchive"} onOpenChange={(open) => !open && closeDialog()}>
+      <AlertDialog
+        open={dialogType === "unarchive"}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               ¿Estás seguro que querés desarchivar este cliente?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción desarchivará el cliente &quot;{selectedCustomer?.name}&quot;
-              y volverá a estar disponible.
+              Esta acción desarchivará el cliente &quot;{selectedCustomer?.name}
+              &quot; y volverá a estar disponible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -287,14 +305,17 @@ export function CustomerTable({
       </AlertDialog>
 
       {/* Delete Dialog */}
-      <AlertDialog open={dialogType === "delete"} onOpenChange={(open) => !open && closeDialog()}>
+      <AlertDialog
+        open={dialogType === "delete"}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar cliente?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción eliminará permanentemente a{" "}
-              <span className="font-semibold">{selectedCustomer?.name}</span> y no se
-              puede deshacer.
+              <span className="font-semibold">{selectedCustomer?.name}</span> y
+              no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -309,5 +330,5 @@ export function CustomerTable({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

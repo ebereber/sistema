@@ -102,7 +102,7 @@ export async function createCustomer(
 /**
  * Update a customer
  */
-export async function updateCustomer(
+/* export async function updateCustomer(
   id: string,
   customer: CustomerUpdate,
 ): Promise<Customer> {
@@ -117,8 +117,9 @@ export async function updateCustomer(
 
   if (error) throw error;
   return data;
-}
+} */
 
+// DEPRECATED: migrated to cached/actions
 /**
  * Archive a customer (soft delete)
  */
@@ -133,6 +134,7 @@ export async function archiveCustomer(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// DEPRECATED: migrated to cached/actions
 /**
  * Unarchive a customer (restore)
  */
@@ -147,6 +149,7 @@ export async function unarchiveCustomer(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// DEPRECATED: migrated to cached/actions
 /**
  * Delete a customer permanently
  */
@@ -178,6 +181,7 @@ export async function getSellers(): Promise<Seller[]> {
   return data || [];
 }
 
+// DEPRECATED: migrated to cached/actions
 /**
  * Get customer sales statistics
  */
@@ -213,6 +217,7 @@ export async function getCustomerStats(customerId: string): Promise<{
   };
 }
 
+// DEPRECATED: migrated to cached/actions
 /**
  * Get recent sales for a customer
  */

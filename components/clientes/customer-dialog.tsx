@@ -41,10 +41,12 @@ import { FiscalInfoDialog } from "@/components/proveedores/fiscal-info-dialog";
 import { CommercialInfoDialog } from "./commercial-info-dialog";
 
 import {
-  createCustomer,
+  createCustomerAction,
+  updateCustomerAction,
+} from "@/lib/actions/customers";
+import {
   getCustomerById,
   getSellers,
-  updateCustomer,
   type Customer,
   type Seller,
 } from "@/lib/services/customers";
@@ -231,10 +233,10 @@ export function CustomerDialog({
       let customer: Customer;
 
       if (mode === "create") {
-        customer = await createCustomer(customerData);
+        customer = await createCustomerAction(customerData);
         toast.success("Cliente creado correctamente");
       } else {
-        customer = await updateCustomer(customerId!, customerData);
+        customer = await updateCustomerAction(customerId!, customerData);
         toast.success("Cliente actualizado correctamente");
       }
 
@@ -545,7 +547,8 @@ export function CustomerDialog({
                     {isLoading && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {submitButtonText || (mode === "create" ? "Crear Cliente" : "Guardar Cambios")}
+                    {submitButtonText ||
+                      (mode === "create" ? "Crear Cliente" : "Guardar Cambios")}
                   </Button>
                 </DialogFooter>
               </form>
