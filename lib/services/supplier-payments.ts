@@ -59,7 +59,7 @@ export interface GetPaymentsParams {
   limit?: number;
 }
 
-// Get payments with filters
+// DEPRECATED: migrated to cached — use getCachedSupplierPayments from supplier-payments-cached.ts
 export async function getSupplierPayments(params: GetPaymentsParams = {}) {
   const supabase = createClient();
   const {
@@ -122,7 +122,7 @@ export async function getSupplierPayments(params: GetPaymentsParams = {}) {
   return { data: (data || []) as SupplierPayment[], count: count || 0 };
 }
 
-// Get single payment by ID
+// DEPRECATED: migrated to cached — use getCachedSupplierPaymentById from supplier-payments-cached.ts
 export async function getSupplierPaymentById(
   id: string,
 ): Promise<SupplierPayment | null> {
@@ -196,7 +196,7 @@ async function generatePaymentNumber(): Promise<string> {
   return data;
 }
 
-// Create payment
+// DEPRECATED: migrated to actions — use createSupplierPaymentAction from lib/actions/supplier-payments.ts
 export async function createSupplierPayment(
   paymentData: CreatePaymentData,
   allocations: CreatePaymentAllocation[],
@@ -313,7 +313,7 @@ export async function createSupplierPayment(
   return payment as unknown as SupplierPayment;
 }
 
-// Cancel payment
+// DEPRECATED: migrated to actions — use cancelSupplierPaymentAction from lib/actions/supplier-payments.ts
 export async function cancelSupplierPayment(id: string): Promise<void> {
   const supabase = createClient();
 
@@ -389,7 +389,7 @@ export async function cancelSupplierPayment(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// Update payment notes
+// DEPRECATED: migrated to actions — use updatePaymentNotesAction from lib/actions/supplier-payments.ts
 export async function updatePaymentNotes(
   id: string,
   notes: string | null,
