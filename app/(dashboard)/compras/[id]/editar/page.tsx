@@ -1,54 +1,62 @@
-"use client";
+import { Suspense } from "react"
+import { redirect, notFound } from "next/navigation"
 
-import { PurchaseForm } from "@/components/compras/purchase-form";
-import { Skeleton } from "@/components/ui/skeleton";
-import { getPurchaseById, type Purchase } from "@/lib/services/purchases";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton"
 
-export default function EditarCompraPage() {
-  const params = useParams();
-  const router = useRouter();
-  const purchaseId = params.id as string;
+import { getServerUser } from "@/lib/auth/get-server-user"
+import {
+  getCachedPurchaseById,
+  getCachedLocations,
+  getCachedProducts,
+} from "@/lib/services/purchases-cached"
+import { getCachedSuppliers } from "@/lib/services/suppliers-cached"
+import { PurchaseForm } from "@/components/compras/purchase-form"
 
-  const [purchase, setPurchase] = useState<Purchase | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default async function EditarCompraPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  return (
+    <Suspense fallback={<EditSkeleton />}>
+      <EditarCompraContent id={id} />
+    </Suspense>
+  )
+}
 
-  useEffect(() => {
-    async function loadPurchase() {
-      try {
-        const data = await getPurchaseById(purchaseId);
-        if (data) {
-          setPurchase(data);
-        } else {
-          toast.error("Compra no encontrada");
-          router.push("/compras");
-        }
-      } catch (error) {
-        console.error("Error loading purchase:", error);
-        toast.error("Error al cargar la compra");
-        router.push("/compras");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadPurchase();
-  }, [purchaseId, router]);
+async function EditarCompraContent({ id }: { id: string }) {
+  const user = await getServerUser()
+  if (!user) redirect("/login")
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto space-y-6 p-6">
-        <Skeleton className="h-10 w-48" />
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
-        </div>
+  const [purchase, suppliers, products, locations] = await Promise.all([
+    getCachedPurchaseById(id),
+    getCachedSuppliers(),
+    getCachedProducts(),
+    getCachedLocations(),
+  ])
+
+  if (!purchase) notFound()
+
+  return (
+    <PurchaseForm
+      mode="edit"
+      initialData={purchase}
+      initialSuppliers={suppliers}
+      initialProducts={products}
+      initialLocations={locations}
+    />
+  )
+}
+
+function EditSkeleton() {
+  return (
+    <div className="container mx-auto space-y-6 p-6">
+      <Skeleton className="h-10 w-48" />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Skeleton className="h-48" />
+        <Skeleton className="h-48" />
       </div>
-    );
-  }
-
-  if (!purchase) return null;
-
-  return <PurchaseForm mode="edit" initialData={purchase} />;
+    </div>
+  )
 }

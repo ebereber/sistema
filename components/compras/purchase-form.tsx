@@ -98,6 +98,9 @@ interface PurchaseFormProps {
   initialData?: Purchase;
   duplicateFrom?: Purchase;
   fromPurchaseOrder?: PurchaseOrderWithDetails;
+  initialSuppliers?: Supplier[];
+  initialProducts?: Product[];
+  initialLocations?: Location[];
 }
 
 export function PurchaseForm({
@@ -105,6 +108,9 @@ export function PurchaseForm({
   initialData,
   duplicateFrom,
   fromPurchaseOrder,
+  initialSuppliers,
+  initialProducts,
+  initialLocations,
 }: PurchaseFormProps) {
   const router = useRouter();
 
@@ -161,10 +167,13 @@ export function PurchaseForm({
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Use server-provided data if available, otherwise fetch from client
       const [suppliersData, productsResult, locationsData] = await Promise.all([
-        getSuppliers({ active: true }),
-        getProducts(),
-        getLocations(),
+        initialSuppliers
+          ? Promise.resolve(initialSuppliers)
+          : getSuppliers({ active: true }),
+        initialProducts ? Promise.resolve(initialProducts) : getProducts(),
+        initialLocations ? Promise.resolve(initialLocations) : getLocations(),
       ]);
 
       setSuppliers(suppliersData);
@@ -227,7 +236,16 @@ export function PurchaseForm({
     } finally {
       setIsLoading(false);
     }
-  }, [initialData, duplicateFrom, fromPurchaseOrder, populateForm, store]);
+  }, [
+    initialData,
+    duplicateFrom,
+    fromPurchaseOrder,
+    populateForm,
+    store,
+    initialLocations,
+    initialProducts,
+    initialSuppliers,
+  ]);
 
   useEffect(() => {
     loadData();
@@ -382,6 +400,8 @@ export function PurchaseForm({
         await updatePurchase(initialData.id, purchaseData, purchaseItems);
         toast.success("Compra actualizada correctamente");
       } else {
+        console.log("purchaseData:", purchaseData);
+        console.log("purchaseItems:", purchaseItems);
         await createPurchase(purchaseData, purchaseItems);
         toast.success("Compra creada correctamente");
       }

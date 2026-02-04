@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { deletePurchase } from "@/lib/services/purchases";
+import { deletePurchaseAction } from "@/lib/actions/purchases";
 
 interface DeletePurchaseDialogProps {
   open: boolean;
@@ -39,7 +39,7 @@ export function DeletePurchaseDialog({
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await deletePurchase(purchaseId);
+      await deletePurchaseAction(purchaseId);
       toast.success("Compra eliminada correctamente");
       onOpenChange(false);
       onSuccess?.();
