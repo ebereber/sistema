@@ -526,6 +526,7 @@ export interface SaleWithDetails {
 
 /**
  * Get sale by ID with all relations
+ * @deprecated Migrated to getCachedSaleById in sales-cached.ts
  */
 export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
   const supabase = createClient();
@@ -584,6 +585,7 @@ export async function getSaleById(id: string): Promise<SaleWithDetails | null> {
 
 /**
  * Update sale notes
+ * @deprecated Migrated to updateSaleNotesAction in actions/sales.ts
  */
 export async function updateSaleNotes(
   id: string,
@@ -649,6 +651,7 @@ export interface GetSalesResult {
 
 /**
  * Get sales list with filters and pagination
+ * @deprecated Migrated to getCachedSales in sales-cached.ts
  */
 export async function getSales(
   params: GetSalesParams = {},
@@ -1252,6 +1255,9 @@ export async function createExchange(
   };
 }
 
+/**
+ * @deprecated Migrated to cancelCreditNoteAction in actions/sales.ts
+ */
 export async function cancelCreditNote(
   creditNoteId: string,
   revertStock: boolean,

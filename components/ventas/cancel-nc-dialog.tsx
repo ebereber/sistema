@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cancelCreditNoteAction } from "@/lib/actions/sales";
 import type { SaleListItem } from "@/lib/services/sales";
-import { cancelCreditNote } from "@/lib/services/sales";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -38,7 +38,7 @@ export function CancelNCDialog({
     try {
       setIsSubmitting(true);
 
-      await cancelCreditNote(creditNote.id, stockOption === "revert");
+      await cancelCreditNoteAction(creditNote.id, stockOption === "revert");
 
       toast.success("Nota de crédito anulada correctamente");
       onSuccess();
