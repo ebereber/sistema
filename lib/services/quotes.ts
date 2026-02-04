@@ -124,6 +124,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
 // Read (list)
 // -------------------------------------------------------------------
 
+// DEPRECATED: migrated to cached — use getCachedQuotes from quotes-cached.ts
 export async function getQuotes(
   filters?: GetQuotesFilters,
 ): Promise<GetQuotesResult> {
@@ -163,6 +164,7 @@ export async function getQuotes(
 // Read (single)
 // -------------------------------------------------------------------
 
+// DEPRECATED: migrated to cached — use getCachedQuoteById from quotes-cached.ts
 export async function getQuoteById(id: string): Promise<Quote> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -179,6 +181,7 @@ export async function getQuoteById(id: string): Promise<Quote> {
 // Delete (soft)
 // -------------------------------------------------------------------
 
+// DEPRECATED: migrated to actions — use deleteQuoteAction from lib/actions/quotes.ts
 export async function deleteQuote(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
