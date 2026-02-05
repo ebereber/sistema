@@ -6,6 +6,7 @@ import {
   Building2,
   DollarSign,
   FolderOpen,
+  Link2,
   MapPin,
   Menu,
   Settings,
@@ -27,6 +28,7 @@ const menuItems = [
   { id: "categorias", label: "Categorías", icon: FolderOpen },
   { id: "listas-precios", label: "Listas de Precios", icon: DollarSign },
   { id: "colaboradores", label: "Colaboradores", icon: Users },
+  { id: "integraciones", label: "Integraciones", icon: Link2 },
 ];
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {

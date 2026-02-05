@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   experimental: {
     useCache: true,
+    serverActions: {
+      allowedOrigins: ["7fdtm4f2-3000.brs.devtunnels.ms", "localhost:3000"],
+    },
   },
   images: {
     remotePatterns: [
@@ -11,6 +14,10 @@ const nextConfig: NextConfig = {
         hostname: "gwnahktmcvocyewnvjkg.supabase.co",
         port: "",
         pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "**.mitiendanube.com",
       },
     ],
   },

@@ -1782,6 +1782,74 @@ export type Database = {
         }
         Relationships: []
       }
+      tiendanube_product_map: {
+        Row: {
+          id: string
+          last_synced_at: string | null
+          local_product_id: string
+          store_id: string
+          tiendanube_product_id: number
+          tiendanube_variant_id: number | null
+        }
+        Insert: {
+          id?: string
+          last_synced_at?: string | null
+          local_product_id: string
+          store_id: string
+          tiendanube_product_id: number
+          tiendanube_variant_id?: number | null
+        }
+        Update: {
+          id?: string
+          last_synced_at?: string | null
+          local_product_id?: string
+          store_id?: string
+          tiendanube_product_id?: number
+          tiendanube_variant_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tiendanube_product_map_local_product_id_fkey"
+            columns: ["local_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tiendanube_stores: {
+        Row: {
+          access_token: string
+          connected_at: string | null
+          id: string
+          scope: string | null
+          store_id: string
+          store_name: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string | null
+          id?: string
+          scope?: string | null
+          store_id: string
+          store_name?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string | null
+          id?: string
+          scope?: string | null
+          store_id?: string
+          store_name?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_cash_registers: {
         Row: {
           cash_register_id: string
