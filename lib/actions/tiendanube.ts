@@ -446,25 +446,9 @@ export async function importTiendanubeOrderAction(
     if (itemsError) throw itemsError;
   }
 
-  // Decrement stock for mapped products
-  if (locationId) {
-    for (const item of saleItems) {
-      if (item.product_id && item.quantity > 0) {
-        try {
-          await supabaseAdmin.rpc("decrease_stock", {
-            p_product_id: item.product_id,
-            p_location_id: locationId,
-            p_quantity: item.quantity,
-          });
-        } catch (stockErr) {
-          console.error(
-            `Error decreasing stock for product ${item.product_id}:`,
-            stockErr,
-          );
-        }
-      }
-    }
-  }
+  // NOTE: Stock is NOT decremented here. The product/updated webhook from
+  // Tiendanube will set the stock to the correct value, avoiding double
+  // decrement when both order/created and product/updated fire.
 
   // Save the order mapping for idempotency
   await supabaseAdmin.from("tiendanube_order_map").insert({

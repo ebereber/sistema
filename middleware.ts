@@ -19,9 +19,9 @@ export async function middleware(request: NextRequest) {
 
   // Assets y API: no chequear
   if (
-    /* pathname.startsWith("/_next") || */
-    pathname.startsWith("/api") /* ||
-    pathname.includes(".") */
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.includes(".")
   ) {
     return NextResponse.next();
   }
