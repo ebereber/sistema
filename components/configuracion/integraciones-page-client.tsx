@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   AlertTriangle,
+  Bell,
   CheckCircle2,
   ExternalLink,
   Link2Off,
@@ -44,6 +45,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   disconnectTiendanubeStoreAction,
+  registerWebhooksAction,
   syncProductsFromTiendanubeAction,
 } from "@/lib/actions/tiendanube";
 import type { Tables } from "@/lib/supabase/types";
@@ -63,6 +65,7 @@ export function IntegracionesPageClient({
 }: IntegracionesPageClientProps) {
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRegisteringWebhooks, setIsRegisteringWebhooks] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
 
@@ -95,6 +98,38 @@ export function IntegracionesPageClient({
       });
     } finally {
       setIsSyncing(false);
+    }
+  }
+
+  async function handleRegisterWebhooks() {
+    if (!initialStore) return;
+
+    setIsRegisteringWebhooks(true);
+    try {
+      const results = await registerWebhooksAction(initialStore.store_id);
+      const successes = results.filter((r) => r.success).length;
+      const failures = results.filter((r) => !r.success);
+
+      if (failures.length > 0) {
+        console.log("Webhook failures:", failures);
+        toast.warning("Webhooks registrados parcialmente", {
+          description: `${successes} registrados, ${failures.length} fallaron`,
+        });
+      } else {
+        toast.success("Webhooks registrados", {
+          description: `${successes} webhooks registrados correctamente`,
+        });
+      }
+
+      router.refresh();
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
+      toast.error("Error al registrar webhooks", {
+        description: errorMessage,
+      });
+    } finally {
+      setIsRegisteringWebhooks(false);
     }
   }
 
@@ -195,6 +230,22 @@ export function IntegracionesPageClient({
                     </span>
                     <Badge variant="secondary">{syncedProductsCount}</Badge>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Webhooks
+                    </span>
+                    {initialStore.webhooks_registered ? (
+                      <Badge
+                        variant="outline"
+                        className="border-green-600 text-green-600"
+                      >
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        Activos
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">No registrados</Badge>
+                    )}
+                  </div>
                 </div>
 
                 {/* Actions */}
@@ -209,9 +260,22 @@ export function IntegracionesPageClient({
                     ) : (
                       <RefreshCw className="mr-2 h-4 w-4" />
                     )}
-                    {isSyncing
-                      ? "Sincronizando..."
-                      : "Sincronizar productos"}
+                    {isSyncing ? "Sincronizando..." : "Sincronizar productos"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleRegisterWebhooks}
+                    disabled={isRegisteringWebhooks}
+                    className="w-full"
+                  >
+                    {isRegisteringWebhooks ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Bell className="mr-2 h-4 w-4" />
+                    )}
+                    {isRegisteringWebhooks
+                      ? "Registrando..."
+                      : "Registrar webhooks"}
                   </Button>
                   <Button
                     variant="outline"

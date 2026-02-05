@@ -1782,6 +1782,38 @@ export type Database = {
         }
         Relationships: []
       }
+      tiendanube_order_map: {
+        Row: {
+          id: string
+          imported_at: string | null
+          local_sale_id: string
+          store_id: string
+          tiendanube_order_id: number
+        }
+        Insert: {
+          id?: string
+          imported_at?: string | null
+          local_sale_id: string
+          store_id: string
+          tiendanube_order_id: number
+        }
+        Update: {
+          id?: string
+          imported_at?: string | null
+          local_sale_id?: string
+          store_id?: string
+          tiendanube_order_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tiendanube_order_map_local_sale_id_fkey"
+            columns: ["local_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tiendanube_product_map: {
         Row: {
           id: string
@@ -1827,6 +1859,7 @@ export type Database = {
           store_name: string | null
           updated_at: string | null
           user_id: string
+          webhooks_registered: boolean | null
         }
         Insert: {
           access_token: string
@@ -1837,6 +1870,7 @@ export type Database = {
           store_name?: string | null
           updated_at?: string | null
           user_id: string
+          webhooks_registered?: boolean | null
         }
         Update: {
           access_token?: string
@@ -1847,6 +1881,7 @@ export type Database = {
           store_name?: string | null
           updated_at?: string | null
           user_id?: string
+          webhooks_registered?: boolean | null
         }
         Relationships: []
       }

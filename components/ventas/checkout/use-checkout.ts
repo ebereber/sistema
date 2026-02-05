@@ -18,6 +18,7 @@ import {
   checkStockAvailability,
   type StockCheckResult,
 } from "@/lib/services/sales";
+import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
 import { Shift } from "@/lib/services/shifts";
 import { parseArgentineCurrency } from "@/lib/utils/currency";
 import {
@@ -673,6 +674,16 @@ export function useCheckout({
         for (const [creditNoteId, amount] of selectedCreditNotes.entries()) {
           await applyCreditNoteToSale(creditNoteId, sale.id, amount);
         }
+      }
+
+      // Sync stock to Tiendanube (non-blocking, fire-and-forget)
+      const productIds = items
+        .map((item) => item.product_id)
+        .filter((id): id is string => id !== null);
+      if (productIds.length > 0) {
+        syncSaleStockToTiendanube(productIds).catch((err) => {
+          console.error("Error syncing stock to Tiendanube:", err);
+        });
       }
 
       setSaleNumber(sale.sale_number);

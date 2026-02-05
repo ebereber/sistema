@@ -1,7 +1,7 @@
-import { supabaseAdmin } from "@/lib/supabase/admin"
-import { revalidateTag } from "next/cache"
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { revalidateTag } from "next/cache";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * POST /api/tiendanube/webhooks
@@ -11,17 +11,17 @@ import type { NextRequest } from "next/server"
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const body = await request.json();
 
-    const storeId = body.store_id ? String(body.store_id) : null
-    const event = body.event as string | undefined
-    const entityId = body.id as number | undefined
+    const storeId = body.store_id ? String(body.store_id) : null;
+    const event = body.event as string | undefined;
+    const entityId = body.id as number | undefined;
 
     if (!storeId || !event) {
       return NextResponse.json(
         { error: "Missing store_id or event" },
         { status: 400 },
-      )
+      );
     }
 
     // Verify that this store exists in our database
@@ -29,45 +29,67 @@ export async function POST(request: NextRequest) {
       .from("tiendanube_stores")
       .select("id, user_id")
       .eq("store_id", storeId)
-      .maybeSingle()
+      .maybeSingle();
 
     if (!store) {
-      return NextResponse.json(
-        { error: "Store not found" },
-        { status: 404 },
-      )
+      return NextResponse.json({ error: "Store not found" }, { status: 404 });
     }
 
     switch (event) {
-      case "orders/created":
-      case "orders/paid":
-        // Revalidate sales-related caches
-        revalidateTag("sales", "minutes")
-        break
-
-      case "products/updated":
+      case "order/created":
         if (entityId) {
-          await handleProductUpdated(storeId, entityId, store.user_id)
+          try {
+            // Idempotency: check if order was already imported
+            const { data: existingOrder } = await supabaseAdmin
+              .from("tiendanube_order_map")
+              .select("id")
+              .eq("store_id", storeId)
+              .eq("tiendanube_order_id", entityId)
+              .maybeSingle();
+
+            if (!existingOrder) {
+              const { importTiendanubeOrderAction } =
+                await import("@/lib/actions/tiendanube");
+              await importTiendanubeOrderAction(
+                storeId,
+                entityId,
+                store.user_id,
+              );
+            }
+          } catch (err) {
+            console.error(`Webhook: Error importing order ${entityId}:`, err);
+          }
         }
-        revalidateTag("products", "minutes")
-        break
+        revalidateTag("sales", "minutes");
+        break;
+
+      case "order/paid":
+        revalidateTag("sales", "minutes");
+        break;
+
+      case "product/updated":
+        if (entityId) {
+          await handleProductUpdated(storeId, entityId, store.user_id);
+        }
+        revalidateTag("products", "minutes");
+        break;
 
       case "app/uninstalled":
-        await handleAppUninstalled(storeId)
-        break
+        await handleAppUninstalled(storeId);
+        break;
 
       default:
         // Unknown event, acknowledge but do nothing
-        break
+        break;
     }
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Tiendanube webhook error:", error)
+    console.error("Tiendanube webhook error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
-    )
+    );
   }
 }
 
@@ -79,7 +101,7 @@ async function handleProductUpdated(
   tiendanubeProductId: number,
   userId: string,
 ) {
-  const { extractI18n, parsePrice } = await import("@/lib/tiendanube")
+  const { extractI18n, parsePrice } = await import("@/lib/tiendanube");
 
   // Check if we have a mapping for this product
   const { data: mapping } = await supabaseAdmin
@@ -87,17 +109,17 @@ async function handleProductUpdated(
     .select("local_product_id")
     .eq("store_id", storeId)
     .eq("tiendanube_product_id", tiendanubeProductId)
-    .maybeSingle()
+    .maybeSingle();
 
-  if (!mapping) return // Product not synced, nothing to do
+  if (!mapping) return; // Product not synced, nothing to do
 
   // Fetch the updated product from Tiendanube
-  const { getTiendanubeProduct } = await import("@/lib/services/tiendanube")
+  const { getTiendanubeProduct } = await import("@/lib/services/tiendanube");
 
   try {
-    const tnProduct = await getTiendanubeProduct(storeId, tiendanubeProductId)
-    const variant = tnProduct.variants[0]
-    if (!variant) return
+    const tnProduct = await getTiendanubeProduct(storeId, tiendanubeProductId);
+    const variant = tnProduct.variants[0];
+    if (!variant) return;
 
     // Update local product
     await supabaseAdmin
@@ -114,7 +136,7 @@ async function handleProductUpdated(
         stock_quantity: variant.stock ?? 0,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", mapping.local_product_id)
+      .eq("id", mapping.local_product_id);
 
     // Update stock in main location
     const { data: mainLocation } = await supabaseAdmin
@@ -122,7 +144,7 @@ async function handleProductUpdated(
       .select("id")
       .eq("is_main", true)
       .eq("active", true)
-      .maybeSingle()
+      .maybeSingle();
 
     if (mainLocation && variant.stock != null) {
       const { data: stockRecord } = await supabaseAdmin
@@ -130,11 +152,11 @@ async function handleProductUpdated(
         .select("id, quantity")
         .eq("product_id", mapping.local_product_id)
         .eq("location_id", mainLocation.id)
-        .maybeSingle()
+        .maybeSingle();
 
-      const newQty = variant.stock
-      const oldQty = stockRecord?.quantity ?? 0
-      const diff = newQty - oldQty
+      const newQty = variant.stock;
+      const oldQty = stockRecord?.quantity ?? 0;
+      const diff = newQty - oldQty;
 
       if (stockRecord) {
         await supabaseAdmin
@@ -143,13 +165,13 @@ async function handleProductUpdated(
             quantity: newQty,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", stockRecord.id)
+          .eq("id", stockRecord.id);
       } else {
         await supabaseAdmin.from("stock").insert({
           product_id: mapping.local_product_id,
           location_id: mainLocation.id,
           quantity: newQty,
-        })
+        });
       }
 
       if (diff !== 0) {
@@ -161,7 +183,7 @@ async function handleProductUpdated(
           reason: "Webhook de Tiendanube: producto actualizado",
           reference_type: "TIENDANUBE_SYNC",
           created_by: userId,
-        })
+        });
       }
     }
 
@@ -170,12 +192,12 @@ async function handleProductUpdated(
       .from("tiendanube_product_map")
       .update({ last_synced_at: new Date().toISOString() })
       .eq("store_id", storeId)
-      .eq("tiendanube_product_id", tiendanubeProductId)
+      .eq("tiendanube_product_id", tiendanubeProductId);
   } catch (error) {
     console.error(
       `Webhook: Error syncing product ${tiendanubeProductId}:`,
       error,
-    )
+    );
   }
 }
 
@@ -187,13 +209,13 @@ async function handleAppUninstalled(storeId: string) {
   await supabaseAdmin
     .from("tiendanube_product_map")
     .delete()
-    .eq("store_id", storeId)
+    .eq("store_id", storeId);
 
   // Delete store connection
   await supabaseAdmin
     .from("tiendanube_stores")
     .delete()
-    .eq("store_id", storeId)
+    .eq("store_id", storeId);
 
-  revalidateTag("tiendanube", "minutes")
+  revalidateTag("tiendanube", "minutes");
 }

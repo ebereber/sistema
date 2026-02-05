@@ -1,3 +1,4 @@
+import { registerWebhooksAction } from "@/lib/actions/tiendanube"
 import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import type { TiendanubeTokenResponse } from "@/types/tiendanube"
@@ -120,6 +121,18 @@ export async function GET(request: NextRequest) {
       }
     } catch {
       // Non-critical: store name fetch failed, continue
+    }
+
+    // Register webhooks automatically (non-blocking)
+    try {
+      await registerWebhooksAction(storeId)
+      await supabaseAdmin
+        .from("tiendanube_stores")
+        .update({ webhooks_registered: true })
+        .eq("store_id", storeId)
+    } catch (webhookError) {
+      console.error("Error registering webhooks:", webhookError)
+      // Non-critical: webhooks can be registered manually later
     }
 
     return NextResponse.redirect(

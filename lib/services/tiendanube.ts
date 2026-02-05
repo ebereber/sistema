@@ -69,6 +69,16 @@ export async function getTiendanubeOrders(
 }
 
 /**
+ * Get a single order from Tiendanube by ID.
+ */
+export async function getTiendanubeOrder(
+  storeId: string,
+  orderId: number,
+): Promise<TiendanubeOrder> {
+  return tiendanubeFetch<TiendanubeOrder>(storeId, `orders/${orderId}`)
+}
+
+/**
  * Create an order in Tiendanube.
  */
 export async function createTiendanubeOrder(
