@@ -21,9 +21,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
-  createPaymentMethod,
-  updatePaymentMethod,
-} from "@/lib/services/payment-methods";
+  createPaymentMethodAction,
+  updatePaymentMethodAction,
+} from "@/lib/actions/payment-methods";
 import {
   paymentMethodSchema,
   type PaymentMethodFormInput,
@@ -85,7 +85,7 @@ export function PaymentMethodForm({
 
       if (paymentMethod) {
         // EDITAR
-        await updatePaymentMethod(paymentMethod.id, {
+        await updatePaymentMethodAction(paymentMethod.id, {
           name: data.name,
           availability: data.availability ?? "VENTAS_Y_COMPRAS",
           fee_percentage: data.fee_percentage ?? 0,
@@ -96,7 +96,7 @@ export function PaymentMethodForm({
         toast.success("Medio de pago actualizado");
       } else {
         // CREAR
-        await createPaymentMethod({
+        await createPaymentMethodAction({
           name: data.name,
           type: data.type,
           icon,
@@ -319,7 +319,7 @@ export function PaymentMethodForm({
             disabled={isSubmitting}
           >
             {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
-            Crear Medio de Pago
+            {paymentMethod ? "Guardar Cambios" : "Crear Medio de Pago"}
           </Button>
         </div>
       </form>

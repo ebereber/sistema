@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  ArchiveRestore,
   ChevronDown,
   Landmark,
   MapPin,
@@ -53,6 +54,7 @@ import { LocationSheet } from "./location-sheet";
 interface LocationCardProps {
   location: Location;
   onArchive: (id: string) => void;
+  onRestore: (id: string) => void;
   onDelete: (id: string) => void;
   onSuccess: () => void;
 }
@@ -62,6 +64,7 @@ export function LocationCard({
   onArchive,
   onDelete,
   onSuccess,
+  onRestore,
 }: LocationCardProps) {
   const [posOpen, setPosOpen] = useState(true);
   const [colaboradoresOpen, setColaboradoresOpen] = useState(false);
@@ -69,6 +72,7 @@ export function LocationCard({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
 
+  const isArchived = !location.active;
   const hasAssignedPOS =
     location.points_of_sale && location.points_of_sale.length > 0;
 
@@ -84,7 +88,7 @@ export function LocationCard({
 
   return (
     <>
-      <Card className="p-4 gap-4 px-0">
+      <Card className={`p-4 gap-4 px-0 ${isArchived ? "opacity-60" : ""}`}>
         <CardHeader className="flex flex-row items-center px-4 justify-between ">
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-muted-foreground" />
@@ -93,6 +97,14 @@ export function LocationCard({
             </CardTitle>
           </div>
           <div className="flex gap-2">
+            {isArchived && (
+              <Badge
+                variant="outline"
+                className="text-xs text-amber-600 border-amber-600"
+              >
+                Archivada
+              </Badge>
+            )}
             {location.is_main && (
               <Badge variant="secondary" className="text-xs">
                 Principal
@@ -108,7 +120,7 @@ export function LocationCard({
               <DropdownMenuContent align="end">
                 <LocationSheet
                   mode="edit"
-                  locationId={location.id}
+                  location={location}
                   onSuccess={onSuccess}
                   trigger={
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -118,10 +130,17 @@ export function LocationCard({
                   }
                 />
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setArchiveDialogOpen(true)}>
-                  <Archive className="mr-2 h-4 w-4" />
-                  Archivar
-                </DropdownMenuItem>
+                {isArchived ? (
+                  <DropdownMenuItem onClick={() => onRestore(location.id)}>
+                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                    Restaurar
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => setArchiveDialogOpen(true)}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archivar
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => setDeleteDialogOpen(true)}
                   className="text-destructive focus:text-destructive"

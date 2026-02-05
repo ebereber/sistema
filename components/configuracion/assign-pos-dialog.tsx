@@ -29,10 +29,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
 import {
-  assignPOSToLocation,
-  getAvailablePOS,
-  type PointOfSale,
-} from "@/lib/services/point-of-sale";
+  assignPOSToLocationAction,
+  getAvailablePOSAction,
+} from "@/lib/actions/point-of-sale";
+import { type PointOfSale } from "@/lib/services/point-of-sale";
 
 interface AssignPOSDialogProps {
   locationId: string;
@@ -66,7 +66,7 @@ export function AssignPOSDialog({
   async function loadAvailablePOS() {
     setIsLoading(true);
     try {
-      const data = await getAvailablePOS(locationId);
+      const data = await getAvailablePOSAction(locationId);
       setAvailable(data.available);
       setAssignedToOther(data.assignedToOther);
     } catch (error: unknown) {
@@ -95,7 +95,7 @@ export function AssignPOSDialog({
   async function performAssignment(pos: PointOfSale) {
     setIsLoading(true);
     try {
-      await assignPOSToLocation(pos.id, locationId);
+      await assignPOSToLocationAction(pos.id, locationId);
       toast.success(`Punto de venta #${pos.number} asignado correctamente`);
       setOpen(false);
       setSearchQuery("");

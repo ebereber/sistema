@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { deletePaymentMethod } from '@/lib/services/payment-methods'
+import { deletePaymentMethodAction } from '@/lib/actions/payment-methods'
 import type { PaymentMethod } from '@/types/payment-method'
 
 interface DeleteConfirmationDialogProps {
@@ -34,7 +34,7 @@ export function DeleteConfirmationDialog({
   async function handleDelete() {
     setIsDeleting(true)
     try {
-      await deletePaymentMethod(paymentMethod.id)
+      await deletePaymentMethodAction(paymentMethod.id)
       toast.success('Medio de pago eliminado')
       onOpenChange(false)
       onSuccess()

@@ -17,13 +17,12 @@ import {
 } from "@/components/ui/sheet";
 
 import {
-  createCategory,
-  createSubcategory,
-  getSubcategories,
-  updateCategory,
-  updateCategoryWithSubs,
-  type CategoryWithChildren,
-} from "@/lib/services/categories";
+  createCategoryAction,
+  createSubcategoryAction,
+  updateCategoryAction,
+  updateCategoryWithSubsAction,
+} from "@/lib/actions/categories";
+import { type CategoryWithChildren } from "@/lib/services/categories";
 
 type SheetMode =
   | "create" // New category + optional subcategories
@@ -67,13 +66,9 @@ export function CategoryFormSheet({
       setSubcategories([]);
     } else if (mode === "edit-parent" && category) {
       setName(category.name);
-      // Load existing subcategories
-      setIsLoading(true);
-      getSubcategories(category.id)
-        .then((subs) => {
-          setSubcategories(subs.map((s) => ({ id: s.id, name: s.name })));
-        })
-        .finally(() => setIsLoading(false));
+      setSubcategories(
+        (category.children || []).map((s) => ({ id: s.id, name: s.name })),
+      );
     } else if (mode === "edit-sub" && category) {
       setName(category.name);
       setSubcategories([]);
@@ -101,16 +96,19 @@ export function CategoryFormSheet({
 
   async function handleSubmit() {
     setIsLoading(true);
-
+    const finalSubcategories = [...subcategories];
+    if (newSubName.trim() && showSubcategories) {
+      finalSubcategories.push({ name: newSubName.trim() });
+    }
     try {
       if (mode === "create") {
         if (!name.trim()) {
           toast.error("Ingresá el nombre de la categoría");
           return;
         }
-        await createCategory({
+        await createCategoryAction({
           name: name.trim(),
-          subcategories: subcategories.map((s) => s.name).filter(Boolean),
+          subcategories: finalSubcategories.map((s) => s.name).filter(Boolean),
         });
         toast.success("Categoría creada");
       } else if (mode === "edit-parent" && category) {
@@ -118,10 +116,10 @@ export function CategoryFormSheet({
           toast.error("Ingresá el nombre de la categoría");
           return;
         }
-        await updateCategoryWithSubs(
+        await updateCategoryWithSubsAction(
           category.id,
           name.trim(),
-          subcategories.filter((s) => s.name.trim()),
+          finalSubcategories.filter((s) => s.name.trim()),
         );
         toast.success("Categoría actualizada");
       } else if (mode === "edit-sub" && category) {
@@ -129,14 +127,14 @@ export function CategoryFormSheet({
           toast.error("Ingresá el nombre");
           return;
         }
-        await updateCategory(category.id, name.trim());
+        await updateCategoryAction(category.id, name.trim());
         toast.success("Subcategoría actualizada");
       } else if (mode === "add-sub" && category) {
         if (!name.trim()) {
           toast.error("Ingresá el nombre de la subcategoría");
           return;
         }
-        await createSubcategory(category.id, name.trim());
+        await createSubcategoryAction(category.id, name.trim());
         toast.success("Subcategoría creada");
       }
 

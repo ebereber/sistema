@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Plus, Loader2 } from "lucide-react"
@@ -40,22 +40,21 @@ import {
   ADJUSTMENT_TYPES,
 } from "@/lib/validations/price-list"
 import {
-  createPriceList,
-  updatePriceList,
-  getPriceListById,
-  type PriceList,
-} from "@/lib/services/price-lists"
+  createPriceListAction,
+  updatePriceListAction,
+} from "@/lib/actions/price-lists"
+import { type PriceList } from "@/lib/services/price-lists"
 
 interface PriceListDialogProps {
   mode: "create" | "edit"
-  priceListId?: string
+  priceList?: PriceList
   trigger?: React.ReactNode
   onSuccess?: (priceList: PriceList) => void
 }
 
 export function PriceListDialog({
   mode,
-  priceListId,
+  priceList: priceListData,
   trigger,
   onSuccess,
 }: PriceListDialogProps) {
@@ -78,33 +77,22 @@ export function PriceListDialog({
   const isAutomatic = form.watch("is_automatic")
   const includesTax = form.watch("includes_tax")
 
-  // Load price list data in edit mode
-  useEffect(() => {
-    if (open && mode === "edit" && priceListId) {
-      loadPriceList()
-    }
-  }, [open, mode, priceListId])
-
-  async function loadPriceList() {
-    if (!priceListId) return
-
-    setIsLoading(true)
-    try {
-      const priceList = await getPriceListById(priceListId)
+  // Populate form when opening in edit mode
+  function handleOpenChange(newOpen: boolean) {
+    setOpen(newOpen)
+    if (newOpen && mode === "edit" && priceListData) {
       form.reset({
-        name: priceList.name,
-        description: priceList.description || "",
-        is_automatic: priceList.is_automatic ?? true,
-        adjustment_type: (priceList.adjustment_type ?? "AUMENTO") as "AUMENTO" | "DESCUENTO",
-        adjustment_percentage: priceList.adjustment_percentage ?? 0,
-        includes_tax: priceList.includes_tax ?? true,
-        active: priceList.active ?? true,
+        name: priceListData.name,
+        description: priceListData.description || "",
+        is_automatic: priceListData.is_automatic ?? true,
+        adjustment_type: (priceListData.adjustment_type ?? "AUMENTO") as "AUMENTO" | "DESCUENTO",
+        adjustment_percentage: priceListData.adjustment_percentage ?? 0,
+        includes_tax: priceListData.includes_tax ?? true,
+        active: priceListData.active ?? true,
       })
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      toast.error("Error al cargar la lista de precios", { description: errorMessage })
-    } finally {
-      setIsLoading(false)
+    }
+    if (!newOpen) {
+      resetForm()
     }
   }
 
@@ -112,7 +100,7 @@ export function PriceListDialog({
     setIsLoading(true)
 
     try {
-      const priceListData = {
+      const payload = {
         name: data.name,
         description: data.description || null,
         is_automatic: data.is_automatic ?? true,
@@ -125,10 +113,10 @@ export function PriceListDialog({
       let priceList: PriceList
 
       if (mode === "create") {
-        priceList = await createPriceList(priceListData)
+        priceList = await createPriceListAction(payload)
         toast.success("Lista de precios creada correctamente")
       } else {
-        priceList = await updatePriceList(priceListId!, priceListData)
+        priceList = await updatePriceListAction(priceListData!.id, payload)
         toast.success("Lista de precios actualizada correctamente")
       }
 
@@ -158,13 +146,6 @@ export function PriceListDialog({
     })
   }
 
-  function handleOpenChange(newOpen: boolean) {
-    setOpen(newOpen)
-    if (!newOpen) {
-      resetForm()
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -182,12 +163,7 @@ export function PriceListDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {isLoading && mode === "edit" ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <Form {...form}>
+        <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               {/* Nombre */}
               <FormField
@@ -328,7 +304,6 @@ export function PriceListDialog({
               </DialogFooter>
             </form>
           </Form>
-        )}
       </DialogContent>
     </Dialog>
   )

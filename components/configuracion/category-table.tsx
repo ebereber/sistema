@@ -61,11 +61,11 @@ export function CategoryTable({
   }
 
   // Group: only show root categories (level 0), subcategories are nested
-  const rootCategories = categories.filter((c) => (c.level || 0) === 0);
+  const rootCategories = categories;
 
-  function getSubcategories(parentId: string): CategoryWithChildren[] {
+  /*   function getSubcategories(parentId: string): CategoryWithChildren[] {
     return categories.filter((c) => c.parent_id === parentId);
-  }
+  } */
 
   function toggleExpanded(id: string) {
     setExpandedIds((prev) => {
@@ -90,7 +90,7 @@ export function CategoryTable({
         </TableHeader>
         <TableBody>
           {rootCategories.map((category) => {
-            const subs = getSubcategories(category.id);
+            const subs = category.children || [];
             const hasSubs = subs.length > 0;
             const isExpanded = expandedIds.has(category.id);
 

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -30,11 +30,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import {
-  createLocation,
-  getLocationById,
-  updateLocation,
-  type Location,
-} from "@/lib/services/locations";
+  createLocationAction,
+  updateLocationAction,
+} from "@/lib/actions/locations";
+import { type Location } from "@/lib/services/locations";
 import {
   locationSchema,
   type LocationFormInput,
@@ -42,14 +41,14 @@ import {
 
 interface LocationSheetProps {
   mode: "create" | "edit";
-  locationId?: string;
+  location?: Location;
   trigger?: React.ReactNode;
   onSuccess?: (location: Location) => void;
 }
 
 export function LocationSheet({
   mode,
-  locationId,
+  location,
   trigger,
   onSuccess,
 }: LocationSheetProps) {
@@ -66,36 +65,6 @@ export function LocationSheet({
     },
   });
 
-  // Load location data in edit mode
-  useEffect(() => {
-    if (open && mode === "edit" && locationId) {
-      loadLocation();
-    }
-  }, [open, mode, locationId]);
-
-  async function loadLocation() {
-    if (!locationId) return;
-
-    setIsLoading(true);
-    try {
-      const location = await getLocationById(locationId);
-      form.reset({
-        name: location.name,
-        address: location.address || "",
-        is_main: location.is_main ?? false,
-        active: location.active ?? true,
-      });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al cargar la ubicación", {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function onSubmit(data: LocationFormInput) {
     setIsLoading(true);
 
@@ -107,19 +76,19 @@ export function LocationSheet({
         active: data.active ?? true,
       };
 
-      let location: Location;
+      let result: Location;
 
       if (mode === "create") {
-        location = await createLocation(locationData);
+        result = await createLocationAction(locationData);
         toast.success("Ubicación creada correctamente");
       } else {
-        location = await updateLocation(locationId!, locationData);
+        result = await updateLocationAction(location!.id, locationData);
         toast.success("Ubicación actualizada correctamente");
       }
 
       setOpen(false);
       resetForm();
-      onSuccess?.(location);
+      onSuccess?.(result);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Error desconocido";
@@ -127,7 +96,7 @@ export function LocationSheet({
         mode === "create"
           ? "Error al crear la ubicación"
           : "Error al actualizar la ubicación",
-        { description: errorMessage }
+        { description: errorMessage },
       );
     } finally {
       setIsLoading(false);
@@ -145,6 +114,14 @@ export function LocationSheet({
 
   function handleOpenChange(newOpen: boolean) {
     setOpen(newOpen);
+    if (newOpen && mode === "edit" && location) {
+      form.reset({
+        name: location.name,
+        address: location.address || "",
+        is_main: location.is_main ?? false,
+        active: location.active ?? true,
+      });
+    }
     if (!newOpen) {
       resetForm();
     }
@@ -172,12 +149,7 @@ export function LocationSheet({
           </SheetDescription>
         </SheetHeader>
 
-        {isLoading && mode === "edit" ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <Form {...form}>
+        <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
               className="flex flex-col gap-4 px-4 flex-1"
@@ -262,7 +234,6 @@ export function LocationSheet({
               </SheetFooter>
             </form>
           </Form>
-        )}
       </SheetContent>
     </Sheet>
   );

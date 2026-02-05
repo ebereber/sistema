@@ -201,7 +201,7 @@ export function PriceListTable({
                     <DropdownMenuContent align="end">
                       <PriceListSheet
                         mode="edit"
-                        priceListId={priceList.id}
+                        priceList={priceList}
                         onSuccess={onSuccess}
                         trigger={
                           <DropdownMenuItem

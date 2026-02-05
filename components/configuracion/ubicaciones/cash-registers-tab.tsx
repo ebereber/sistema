@@ -9,7 +9,8 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import {
@@ -49,7 +50,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -59,23 +59,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import type { CashRegister } from "@/lib/services/cash-registers";
 import {
-  type CashRegister,
-  createCashRegister,
-  deleteCashRegister,
-  getCashRegisters,
-  toggleCashRegisterStatus,
-  updateCashRegister,
-} from "@/lib/services/cash-registers";
-import { getLocations, type Location } from "@/lib/services/locations";
-import { getPointsOfSale, PointOfSale } from "@/lib/services/point-of-sale";
+  createCashRegisterAction,
+  updateCashRegisterAction,
+  toggleCashRegisterStatusAction,
+  deleteCashRegisterAction,
+} from "@/lib/actions/cash-registers";
 
-export default function CashRegistersTab() {
-  // Data states
-  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface CashRegistersTabProps {
+  initialCashRegisters: CashRegister[]
+  locations: Array<{ id: string; name: string }>
+  pointsOfSale: Array<{ id: string; name: string; number: number }>
+}
+
+export default function CashRegistersTab({ initialCashRegisters, locations, pointsOfSale }: CashRegistersTabProps) {
+  const router = useRouter();
 
   // UI states
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,40 +94,10 @@ export default function CashRegistersTab() {
   // Edit mode
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Load data
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [cashRegistersData, locationsData, posData] = await Promise.all([
-        getCashRegisters(),
-        getLocations(),
-        getPointsOfSale(),
-      ]);
-      setCashRegisters(cashRegistersData);
-      setLocations(locationsData);
-      setPointsOfSale(posData);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      toast.error("Error al cargar datos");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Filter by selected location
-  /*  const filteredPOS = formData.location_id
-    ? pointsOfSale.filter(
-        (pos) => pos.location_id === formData.location_id || pos.is_digital,
-      )
-    : pointsOfSale; */
   const filteredPOS = pointsOfSale;
 
   // Filter cash registers by search
-  const filteredCashRegisters = cashRegisters.filter((cr) =>
+  const filteredCashRegisters = initialCashRegisters.filter((cr) =>
     cr.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -145,13 +114,13 @@ export default function CashRegistersTab() {
 
   const handleArchive = async (cashRegister: CashRegister) => {
     try {
-      await toggleCashRegisterStatus(cashRegister.id);
+      await toggleCashRegisterStatusAction(cashRegister.id);
       toast.success(
         cashRegister.status === "active"
           ? "Caja archivada"
           : "Caja desarchivada",
       );
-      loadData();
+      router.refresh();
     } catch (error) {
       console.error("Error toggling status:", error);
       toast.error("Error al cambiar estado");
@@ -167,11 +136,11 @@ export default function CashRegistersTab() {
     if (!selectedCashRegister) return;
 
     try {
-      await deleteCashRegister(selectedCashRegister.id);
+      await deleteCashRegisterAction(selectedCashRegister.id);
       toast.success("Caja eliminada");
       setIsAlertOpen(false);
       setSelectedCashRegister(null);
-      loadData();
+      router.refresh();
     } catch (error) {
       console.error("Error deleting:", error);
       toast.error("Error al eliminar caja");
@@ -184,14 +153,14 @@ export default function CashRegistersTab() {
 
     try {
       if (editingId) {
-        await updateCashRegister(editingId, {
+        await updateCashRegisterAction(editingId, {
           name: formData.name,
           location_id: formData.location_id,
           point_of_sale_id: formData.point_of_sale_id || null,
         });
         toast.success("Caja actualizada");
       } else {
-        await createCashRegister({
+        await createCashRegisterAction({
           name: formData.name,
           location_id: formData.location_id,
           point_of_sale_id: formData.point_of_sale_id || null,
@@ -201,7 +170,7 @@ export default function CashRegistersTab() {
 
       setIsSheetOpen(false);
       resetForm();
-      loadData();
+      router.refresh();
     } catch (error) {
       console.error("Error saving:", error);
       toast.error(
@@ -372,27 +341,7 @@ export default function CashRegistersTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-20" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-28" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-8" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : filteredCashRegisters.length === 0 ? (
+              {filteredCashRegisters.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={5}
@@ -483,7 +432,7 @@ export default function CashRegistersTab() {
         </div>
 
         {/* Results count */}
-        {!isLoading && filteredCashRegisters.length > 0 && (
+        {filteredCashRegisters.length > 0 && (
           <div className="text-sm text-muted-foreground">
             Mostrando {filteredCashRegisters.length} caja
             {filteredCashRegisters.length !== 1 && "s"}

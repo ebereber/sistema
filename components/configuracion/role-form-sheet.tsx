@@ -26,12 +26,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { createRoleAction, updateRoleAction } from "@/lib/actions/roles";
 import {
-  createRole,
   PERMISSION_MODULES,
   SPECIAL_ACTIONS_LIST,
   STANDALONE_PERMISSIONS,
-  updateRole,
   type RoleWithCount,
 } from "@/lib/services/roles";
 
@@ -148,10 +147,10 @@ export function RoleFormSheet({
       };
 
       if (isEdit && role) {
-        await updateRole(role.id, data);
+        await updateRoleAction(role.id, data);
         toast.success("Rol actualizado");
       } else {
-        await createRole(data);
+        await createRoleAction(data);
         toast.success("Rol creado");
       }
 
@@ -206,7 +205,7 @@ export function RoleFormSheet({
                   <TableRow>
                     <TableHead className="w-full">Módulo</TableHead>
                     <TableHead className="w-16 text-center">
-                      <button
+                      <Button
                         type="button"
                         className="flex w-full items-center justify-center gap-1 text-xs"
                         onClick={() => toggleAllColumn("read")}
@@ -218,7 +217,7 @@ export function RoleFormSheet({
                           tabIndex={-1}
                         />
                         Ver
-                      </button>
+                      </Button>
                     </TableHead>
                     <TableHead className="w-16 text-center">
                       <button

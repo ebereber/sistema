@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -36,11 +36,10 @@ import {
 } from "@/components/ui/sheet";
 
 import {
-  createPriceList,
-  getPriceListById,
-  updatePriceList,
-  type PriceList,
-} from "@/lib/services/price-lists";
+  createPriceListAction,
+  updatePriceListAction,
+} from "@/lib/actions/price-lists";
+import { type PriceList } from "@/lib/services/price-lists";
 import {
   ADJUSTMENT_TYPES,
   priceListSchema,
@@ -49,14 +48,14 @@ import {
 
 interface PriceListSheetProps {
   mode: "create" | "edit";
-  priceListId?: string;
+  priceList?: PriceList;
   trigger?: React.ReactNode;
   onSuccess?: (priceList: PriceList) => void;
 }
 
 export function PriceListSheet({
   mode,
-  priceListId,
+  priceList: priceListProp,
   trigger,
   onSuccess,
 }: PriceListSheetProps) {
@@ -79,39 +78,6 @@ export function PriceListSheet({
   const isAutomatic = form.watch("is_automatic");
   const includesTax = form.watch("includes_tax");
 
-  // Load price list data in edit mode
-  useEffect(() => {
-    if (open && mode === "edit" && priceListId) {
-      loadPriceList();
-    }
-  }, [open, mode, priceListId]);
-
-  async function loadPriceList() {
-    if (!priceListId) return;
-
-    setIsLoading(true);
-    try {
-      const priceList = await getPriceListById(priceListId);
-      form.reset({
-        name: priceList.name,
-        description: priceList.description || "",
-        is_automatic: priceList.is_automatic ?? true,
-        adjustment_type: (priceList.adjustment_type ?? "AUMENTO") as "AUMENTO" | "DESCUENTO",
-        adjustment_percentage: priceList.adjustment_percentage ?? 0,
-        includes_tax: priceList.includes_tax ?? true,
-        active: priceList.active ?? true,
-      });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al cargar la lista de precios", {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function onSubmit(data: PriceListFormInput) {
     setIsLoading(true);
 
@@ -129,10 +95,10 @@ export function PriceListSheet({
       let priceList: PriceList;
 
       if (mode === "create") {
-        priceList = await createPriceList(priceListData);
+        priceList = await createPriceListAction(priceListData);
         toast.success("Lista de precios creada correctamente");
       } else {
-        priceList = await updatePriceList(priceListId!, priceListData);
+        priceList = await updatePriceListAction(priceListProp!.id, priceListData);
         toast.success("Lista de precios actualizada correctamente");
       }
 
@@ -146,7 +112,7 @@ export function PriceListSheet({
         mode === "create"
           ? "Error al crear la lista"
           : "Error al actualizar la lista",
-        { description: errorMessage }
+        { description: errorMessage },
       );
     } finally {
       setIsLoading(false);
@@ -167,6 +133,19 @@ export function PriceListSheet({
 
   function handleOpenChange(newOpen: boolean) {
     setOpen(newOpen);
+    if (newOpen && mode === "edit" && priceListProp) {
+      form.reset({
+        name: priceListProp.name,
+        description: priceListProp.description || "",
+        is_automatic: priceListProp.is_automatic ?? true,
+        adjustment_type: (priceListProp.adjustment_type ?? "AUMENTO") as
+          | "AUMENTO"
+          | "DESCUENTO",
+        adjustment_percentage: priceListProp.adjustment_percentage ?? 0,
+        includes_tax: priceListProp.includes_tax ?? true,
+        active: priceListProp.active ?? true,
+      });
+    }
     if (!newOpen) {
       resetForm();
     }
@@ -196,12 +175,7 @@ export function PriceListSheet({
           </SheetDescription>
         </SheetHeader>
 
-        {isLoading && mode === "edit" ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <Form {...form}>
+        <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
               className="flex flex-col gap-4 px-4 flex-1 "
@@ -353,7 +327,6 @@ export function PriceListSheet({
               </SheetFooter>
             </form>
           </Form>
-        )}
       </SheetContent>
     </Sheet>
   );

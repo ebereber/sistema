@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,10 @@ import {
 } from "@/components/ui/sheet";
 
 import {
-  getLocationsWithRegisters,
-  inviteCollaborator,
-  updateCollaborator,
+  inviteCollaboratorAction,
+  updateCollaboratorAction,
+} from "@/lib/actions/collaborators";
+import {
   type Collaborator,
   type LocationWithRegisters,
 } from "@/lib/services/collaborators";
@@ -40,6 +41,7 @@ interface CollaboratorFormSheetProps {
   mode: "invite" | "edit";
   collaborator?: Collaborator | null;
   roles: RoleWithCount[];
+  locations: LocationWithRegisters[];
   onSuccess: () => void;
 }
 
@@ -49,10 +51,10 @@ export function CollaboratorFormSheet({
   mode,
   collaborator,
   roles,
+  locations,
   onSuccess,
 }: CollaboratorFormSheetProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [locations, setLocations] = useState<LocationWithRegisters[]>([]);
 
   // Form fields
   const [email, setEmail] = useState("");
@@ -66,14 +68,6 @@ export function CollaboratorFormSheet({
   const [selectedRegisters, setSelectedRegisters] = useState<Set<string>>(
     new Set(),
   );
-
-  // Cargar ubicaciones
-  useEffect(() => {
-    if (!open) return;
-    getLocationsWithRegisters()
-      .then(setLocations)
-      .catch(() => toast.error("Error al cargar ubicaciones"));
-  }, [open]);
 
   // Resetear form
   useEffect(() => {
@@ -156,7 +150,7 @@ export function CollaboratorFormSheet({
       };
 
       if (mode === "invite") {
-        await inviteCollaborator({
+        await inviteCollaboratorAction({
           ...data,
           email: email.trim().toLowerCase(),
         });
@@ -164,7 +158,14 @@ export function CollaboratorFormSheet({
           description: "El colaborador debe registrarse con el email indicado.",
         });
       } else if (collaborator) {
-        await updateCollaborator(collaborator.id, data);
+        await updateCollaboratorAction(collaborator.id, {
+          role_id: data.role_id,
+          data_visibility_scope: data.data_visibility_scope,
+          max_discount_percentage: data.max_discount_percentage,
+          commission_percentage: data.commission_percentage,
+          location_ids: data.location_ids,
+          cash_register_ids: data.cash_register_ids,
+        });
         toast.success("Colaborador actualizado");
       }
 

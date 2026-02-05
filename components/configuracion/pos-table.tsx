@@ -38,11 +38,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import type { Location } from "@/lib/services/locations";
 import type { PointOfSale } from "@/lib/services/point-of-sale";
 import { POSSheet } from "./pos-sheet";
 
 interface POSTableProps {
   pointsOfSale: PointOfSale[];
+  locations?: Location[];
   isLoading?: boolean;
   onDelete: (id: string) => void;
   onSuccess: () => void;
@@ -50,6 +52,7 @@ interface POSTableProps {
 
 export function POSTable({
   pointsOfSale,
+  locations,
   isLoading,
   onDelete,
   onSuccess,
@@ -129,6 +132,7 @@ export function POSTable({
         </p>
         <POSSheet
           mode="create"
+          locations={locations}
           onSuccess={onSuccess}
           trigger={
             <Button>
@@ -202,7 +206,8 @@ export function POSTable({
                     <DropdownMenuContent align="end">
                       <POSSheet
                         mode="edit"
-                        posId={pos.id}
+                        pos={pos}
+                        locations={locations}
                         onSuccess={onSuccess}
                         trigger={
                           <DropdownMenuItem
