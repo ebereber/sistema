@@ -64,7 +64,25 @@ export async function POST(request: NextRequest) {
         break;
 
       case "order/paid":
+        if (entityId) {
+          try {
+            const { createPaymentForTiendanubeOrderAction } = await import(
+              "@/lib/actions/tiendanube"
+            );
+            await createPaymentForTiendanubeOrderAction(
+              storeId,
+              entityId,
+              store.user_id,
+            );
+          } catch (err) {
+            console.error(
+              `Webhook: Error creating payment for order ${entityId}:`,
+              err,
+            );
+          }
+        }
         revalidateTag("sales", "minutes");
+        revalidateTag("customer-payments", "minutes");
         break;
 
       case "product/updated":

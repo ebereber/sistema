@@ -360,20 +360,24 @@ export async function importTiendanubeOrderAction(
   const discount = Number.parseFloat(tnOrder.discount) || 0;
   const tax = total - subtotal + discount; // Derive tax
 
-  // Create the local sale
+  // Resolve local customer from TN order data
+  const customerId = await resolveCustomerFromTiendanubeOrder(tnOrder);
+
+  // Create the local sale as PENDING (payment comes via order/paid webhook)
   const { data: sale, error: saleError } = await supabaseAdmin
     .from("sales")
     .insert({
       sale_number: saleNumber,
       sale_date: tnOrder.created_at,
       voucher_type: "COMPROBANTE_X",
-      status: "COMPLETED",
+      status: "PENDING",
       location_id: locationId,
+      customer_id: customerId,
       subtotal,
       discount,
       tax: tax > 0 ? tax : 0,
       total,
-      amount_paid: total,
+      amount_paid: 0,
       notes: `Pedido de Tienda Nube #${tnOrder.number || tnOrder.id}`,
       created_by: userId,
     })
@@ -458,9 +462,112 @@ export async function importTiendanubeOrderAction(
   });
 
   revalidateTag("sales", "minutes");
-  revalidateTag("products", "minutes");
 
   return { saleId: sale.id };
+}
+
+// ============================================================================
+// PAYMENT FOR TIENDANUBE ORDER
+// ============================================================================
+
+/**
+ * Create a customer payment for a Tiendanube order that was marked as paid.
+ * Idempotent: skips if sale is already fully paid or if order wasn't imported.
+ */
+export async function createPaymentForTiendanubeOrderAction(
+  storeId: string,
+  tiendanubeOrderId: number,
+  userId: string,
+): Promise<void> {
+  // Find the local sale via order map
+  const { data: orderMap } = await supabaseAdmin
+    .from("tiendanube_order_map")
+    .select("local_sale_id")
+    .eq("store_id", storeId)
+    .eq("tiendanube_order_id", tiendanubeOrderId)
+    .maybeSingle();
+
+  if (!orderMap) return; // Order not imported, nothing to do
+
+  // Get the sale
+  const { data: sale, error: saleError } = await supabaseAdmin
+    .from("sales")
+    .select("id, customer_id, total, amount_paid, status")
+    .eq("id", orderMap.local_sale_id)
+    .single();
+
+  if (saleError || !sale) return;
+
+  // Already paid — idempotent
+  if (sale.amount_paid >= sale.total) return;
+
+  // customer_id is required for customer_payments
+  if (!sale.customer_id) {
+    console.error(
+      `Cannot create payment for sale ${sale.id}: no customer_id`,
+    );
+    return;
+  }
+
+  const amountToPay = sale.total - sale.amount_paid;
+
+  // Generate payment number
+  const { data: paymentNumber, error: numError } = await supabaseAdmin.rpc(
+    "generate_customer_payment_number",
+    { pos_number: 1 },
+  );
+  if (numError) throw numError;
+
+  // Create customer payment
+  const { data: payment, error: paymentError } = await supabaseAdmin
+    .from("customer_payments")
+    .insert({
+      payment_number: paymentNumber,
+      customer_id: sale.customer_id,
+      payment_date: new Date().toISOString(),
+      total_amount: amountToPay,
+      notes: `Pago recibido en Tienda Nube - Orden #${tiendanubeOrderId}`,
+      status: "completed",
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (paymentError) throw paymentError;
+
+  // Create allocation linking payment to sale
+  const { error: allocError } = await supabaseAdmin
+    .from("customer_payment_allocations")
+    .insert({
+      customer_payment_id: payment.id,
+      sale_id: sale.id,
+      amount: amountToPay,
+    });
+
+  if (allocError) throw allocError;
+
+  // Create payment method
+  const { error: methodError } = await supabaseAdmin
+    .from("customer_payment_methods")
+    .insert({
+      customer_payment_id: payment.id,
+      method_name: "Tienda Nube",
+      amount: amountToPay,
+    });
+
+  if (methodError) throw methodError;
+
+  // Update sale: mark as fully paid
+  await supabaseAdmin
+    .from("sales")
+    .update({
+      amount_paid: sale.total,
+      status: "COMPLETED",
+    })
+    .eq("id", sale.id);
+
+  revalidateTag("sales", "minutes");
+  revalidateTag("customer-payments", "minutes");
 }
 
 // ============================================================================
@@ -729,4 +836,60 @@ async function syncCategoriesFromTiendanube(
 
   revalidateTag("categories", "minutes");
   return map;
+}
+
+/**
+ * Resolve (find or create) a local customer from a Tiendanube order's customer data.
+ * Returns the local customer ID, or null if the order has no usable customer info.
+ */
+async function resolveCustomerFromTiendanubeOrder(
+  tnOrder: import("@/types/tiendanube").TiendanubeOrder,
+): Promise<string | null> {
+  const tnCustomer = tnOrder.customer;
+  if (!tnCustomer?.name) return null;
+
+  // Try to find by email first
+  if (tnCustomer.email) {
+    const { data: byEmail } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .eq("email", tnCustomer.email)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (byEmail) return byEmail.id;
+  }
+
+  // Try to find by tax_id (identification)
+  if (tnCustomer.identification) {
+    const { data: byTaxId } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .eq("tax_id", tnCustomer.identification)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (byTaxId) return byTaxId.id;
+  }
+
+  // Create a new customer
+  const { data: newCustomer, error } = await supabaseAdmin
+    .from("customers")
+    .insert({
+      name: tnCustomer.name,
+      email: tnCustomer.email || null,
+      phone: tnCustomer.phone || null,
+      tax_id: tnCustomer.identification || null,
+      active: true,
+    })
+    .select("id")
+    .single();
+
+  if (error || !newCustomer) {
+    console.error("Error creating customer from TN order:", error);
+    return null;
+  }
+
+  revalidateTag("customers", "minutes");
+  return newCustomer.id;
 }
