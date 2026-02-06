@@ -1,5 +1,6 @@
 "use server"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { revalidateTag } from "next/cache"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 
@@ -36,11 +37,14 @@ export async function createPaymentMethodAction(data: {
   is_active?: boolean
   is_system?: boolean
 }) {
+  const organizationId = await getOrganizationId()
+
   const { data: pm, error } = await supabaseAdmin
     .from("payment_methods")
     .insert({
       ...data,
       icon: data.icon || "banknote",
+      organization_id: organizationId,
     })
     .select()
     .single()

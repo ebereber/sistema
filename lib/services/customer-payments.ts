@@ -452,6 +452,15 @@ export async function createCustomerPayment(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuario no autenticado");
 
+  // Get organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   // Calculate total
   const totalAmount = allocations.reduce((sum, a) => sum + a.amount, 0);
 
@@ -473,6 +482,7 @@ export async function createCustomerPayment(
       notes: data.notes || null,
       status: "completed",
       created_by: user.id,
+      organization_id: organizationId,
     })
     .select("id, payment_number")
     .single();

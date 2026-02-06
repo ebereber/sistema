@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     // Verify that this store exists in our database
     const { data: store } = await supabaseAdmin
       .from("tiendanube_stores")
-      .select("id, user_id")
+      .select("id, user_id, organization_id")
       .eq("store_id", storeId)
       .maybeSingle();
 
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
                 storeId,
                 entityId,
                 store.user_id,
+                store.organization_id,
               );
             }
           } catch (err) {
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
               storeId,
               entityId,
               store.user_id,
+              store.organization_id,
             );
           } catch (err) {
             console.error(

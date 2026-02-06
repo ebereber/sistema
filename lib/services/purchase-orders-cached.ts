@@ -9,6 +9,7 @@ import type {
 } from "./purchase-orders";
 
 export async function getCachedPurchaseOrders(
+  organizationId: string,
   params: GetPurchaseOrdersFilters = {},
 ): Promise<{
   data: (PurchaseOrderWithDetails & {
@@ -37,6 +38,7 @@ export async function getCachedPurchaseOrders(
     .select("*, supplier:suppliers(id, name), location:locations(id, name)", {
       count: "exact",
     })
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
 
   // Default: exclude cancelled unless user explicitly filters by statuses
@@ -83,6 +85,7 @@ export async function getCachedPurchaseOrders(
 }
 
 export async function getCachedPurchaseOrderById(
+  organizationId: string,
   id: string,
 ): Promise<PurchaseOrderWithDetails | null> {
   "use cache";
@@ -92,6 +95,7 @@ export async function getCachedPurchaseOrderById(
   const { data: order, error } = await supabaseAdmin
     .from("purchase_orders")
     .select("*, supplier:suppliers(id, name), location:locations(id, name)")
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single();
 

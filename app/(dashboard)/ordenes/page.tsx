@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { OrdenesPageClient } from "@/components/ordenes/ordenes-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchaseOrders } from "@/lib/services/purchase-orders-cached";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
@@ -37,21 +38,14 @@ async function OrdenesContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const statuses = searchParams.status
     ? searchParams.status.split(",").filter(Boolean)
     : [];
 
-  /* const result = await getCachedPurchaseOrders({
-    page: Number(searchParams.page) || 1,
-    pageSize: 20,
-    search: searchParams.search,
-    statuses,
-    dateFrom: searchParams.dateFrom,
-    dateTo: searchParams.dateTo,
-  }); */
   const [result, suppliers] = await Promise.all([
-    getCachedPurchaseOrders({
+    getCachedPurchaseOrders(organizationId, {
       page: Number(searchParams.page) || 1,
       pageSize: 20,
       search: searchParams.search,
@@ -60,7 +54,7 @@ async function OrdenesContent({
       dateFrom: searchParams.dateFrom,
       dateTo: searchParams.dateTo,
     }),
-    getCachedSuppliers(), // importar de suppliers-cached.ts
+    getCachedSuppliers(organizationId),
   ]);
 
   return (

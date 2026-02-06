@@ -1,5 +1,6 @@
 "use server"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { revalidateTag } from "next/cache"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 
@@ -27,9 +28,11 @@ export async function createCategoryAction(data: {
   name: string
   subcategories?: string[]
 }): Promise<void> {
+  const organizationId = await getOrganizationId()
+
   const { data: parent, error } = await supabaseAdmin
     .from("categories")
-    .insert({ name: data.name.trim() })
+    .insert({ name: data.name.trim(), organization_id: organizationId })
     .select()
     .single()
 
@@ -41,6 +44,7 @@ export async function createCategoryAction(data: {
       .map((name) => ({
         name: name.trim(),
         parent_id: parent.id,
+        organization_id: organizationId,
       }))
 
     if (subs.length > 0) {
@@ -74,6 +78,8 @@ export async function updateCategoryWithSubsAction(
   name: string,
   subcategories: { id?: string; name: string }[]
 ): Promise<void> {
+  const organizationId = await getOrganizationId()
+
   // Update parent name
   const { error: parentError } = await supabaseAdmin
     .from("categories")
@@ -120,7 +126,7 @@ export async function updateCategoryWithSubsAction(
   // Create new subs
   const newSubs = subcategories
     .filter((s) => !s.id && s.name.trim())
-    .map((s) => ({ name: s.name.trim(), parent_id: id }))
+    .map((s) => ({ name: s.name.trim(), parent_id: id, organization_id: organizationId }))
 
   if (newSubs.length > 0) {
     const { error } = await supabaseAdmin.from("categories").insert(newSubs)
@@ -134,9 +140,11 @@ export async function createSubcategoryAction(
   parentId: string,
   name: string
 ): Promise<void> {
+  const organizationId = await getOrganizationId()
+
   const { error } = await supabaseAdmin
     .from("categories")
-    .insert({ name: name.trim(), parent_id: parentId })
+    .insert({ name: name.trim(), parent_id: parentId, organization_id: organizationId })
 
   if (error) throw error
 

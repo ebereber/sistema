@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { OrdenDetalleClient } from "@/components/ordenes/orden-detalle-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchaseOrderById } from "@/lib/services/purchase-orders-cached";
 
@@ -24,8 +25,9 @@ export default async function OrdenDetallePage({
 async function OrdenDetalleContent({ id }: { id: string }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const order = await getCachedPurchaseOrderById(id);
+  const order = await getCachedPurchaseOrderById(organizationId, id);
   if (!order) notFound();
 
   return <OrdenDetalleClient order={order} />;

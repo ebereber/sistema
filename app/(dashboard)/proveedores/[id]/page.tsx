@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedSupplierById,
@@ -28,11 +29,12 @@ export default async function ProveedorPage({
 async function SupplierDetailContent({ id }: { id: string }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   const [supplier, stats, recentPurchases] = await Promise.all([
-    getCachedSupplierById(id),
-    getCachedSupplierStats(id),
-    getCachedSupplierRecentPurchases(id),
+    getCachedSupplierById(organizationId, id),
+    getCachedSupplierStats(organizationId, id),
+    getCachedSupplierRecentPurchases(organizationId, id),
   ])
 
   if (!supplier) notFound()

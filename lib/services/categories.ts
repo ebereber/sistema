@@ -1,3 +1,4 @@
+import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -120,11 +121,12 @@ export async function createCategory(data: {
   subcategories?: string[];
 }): Promise<Category> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   // Create parent category
   const { data: parent, error: parentError } = await supabase
     .from("categories")
-    .insert({ name: data.name })
+    .insert({ name: data.name, organization_id: organizationId })
     .select()
     .single();
 
@@ -137,6 +139,7 @@ export async function createCategory(data: {
       .map((name) => ({
         name: name.trim(),
         parent_id: parent.id,
+        organization_id: organizationId,
       }));
 
     if (subcategoryInserts.length > 0) {
@@ -226,10 +229,11 @@ export async function createSubcategory(
   name: string,
 ): Promise<Category> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   const { data, error } = await supabase
     .from("categories")
-    .insert({ name: name.trim(), parent_id: parentId })
+    .insert({ name: name.trim(), parent_id: parentId, organization_id: organizationId })
     .select()
     .single();
 
@@ -291,9 +295,10 @@ export async function updateCategoryWithSubs(
   }
 
   // Create new subcategories
+  const organizationId = await getClientOrganizationId();
   const toCreate = subcategories
     .filter((s) => !s.id && s.name.trim())
-    .map((s) => ({ name: s.name.trim(), parent_id: id }));
+    .map((s) => ({ name: s.name.trim(), parent_id: id, organization_id: organizationId }));
 
   if (toCreate.length > 0) {
     const { error } = await supabase.from("categories").insert(toCreate);

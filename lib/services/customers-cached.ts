@@ -12,6 +12,7 @@ export interface GetCustomersParams {
 }
 
 export async function getCachedCustomers(
+  organizationId: string,
   params: GetCustomersParams = {},
 ): Promise<{
   data: Customer[];
@@ -33,6 +34,7 @@ export async function getCachedCustomers(
     `,
       { count: "exact" },
     )
+    .eq("organization_id", organizationId)
     .order("name", { ascending: true });
 
   if (search && search.trim()) {
@@ -62,6 +64,7 @@ export async function getCachedCustomers(
 }
 
 export async function getCachedCustomerById(
+  organizationId: string,
   id: string,
 ): Promise<Customer | null> {
   "use cache";
@@ -77,6 +80,7 @@ export async function getCachedCustomerById(
       price_list:price_lists(id, name, is_automatic, adjustment_type, adjustment_percentage)
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single();
 
@@ -89,6 +93,7 @@ export async function getCachedCustomerById(
 }
 
 export async function getCachedCustomerStats(
+  organizationId: string,
   customerId: string,
 ): Promise<{
   totalOrders: number;
@@ -102,6 +107,7 @@ export async function getCachedCustomerStats(
   const { count, error } = await supabaseAdmin
     .from("sales")
     .select("*", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
     .eq("customer_id", customerId);
 
   if (error) {
@@ -111,6 +117,7 @@ export async function getCachedCustomerStats(
   const { data: sales } = await supabaseAdmin
     .from("sales")
     .select("total")
+    .eq("organization_id", organizationId)
     .eq("customer_id", customerId);
 
   const totalAmount = sales?.reduce((sum, s) => sum + (s.total || 0), 0) || 0;
@@ -123,6 +130,7 @@ export async function getCachedCustomerStats(
 }
 
 export async function getCachedCustomerRecentSales(
+  organizationId: string,
   customerId: string,
   limit: number = 5,
 ) {
@@ -133,6 +141,7 @@ export async function getCachedCustomerRecentSales(
   const { data, error } = await supabaseAdmin
     .from("sales")
     .select("id, sale_number, created_at, total")
+    .eq("organization_id", organizationId)
     .eq("customer_id", customerId)
     .order("created_at", { ascending: false })
     .limit(limit);

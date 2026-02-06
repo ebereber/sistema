@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedPurchaseById,
@@ -26,9 +27,10 @@ export default async function CompraDetallePage({
 async function CompraDetalleContent({ id }: { id: string }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   const [purchase, payments] = await Promise.all([
-    getCachedPurchaseById(id),
+    getCachedPurchaseById(organizationId, id),
     getCachedPaymentsByPurchaseId(id),
   ])
 

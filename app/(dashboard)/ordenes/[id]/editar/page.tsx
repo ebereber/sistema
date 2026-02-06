@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PurchaseOrderForm } from "@/components/ordenes/purchase-order-form";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchaseOrderById } from "@/lib/services/purchase-orders-cached";
 
@@ -24,8 +25,9 @@ export default async function EditarOrdenPage({
 async function EditarOrdenContent({ id }: { id: string }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const order = await getCachedPurchaseOrderById(id);
+  const order = await getCachedPurchaseOrderById(organizationId, id);
   if (!order) notFound();
 
   if (order.status !== "draft" && order.status !== "confirmed") {

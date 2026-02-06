@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ColaboradoresPageClient } from "@/components/configuracion/colaboradores-page-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
   getCachedCollaborators,
@@ -22,12 +23,13 @@ export default async function ColaboradoresPage() {
 async function ColaboradoresContent() {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const [collaborators, invitations, roles, locations] = await Promise.all([
-    getCachedCollaborators(),
-    getCachedPendingInvitations(),
+    getCachedCollaborators(organizationId),
+    getCachedPendingInvitations(organizationId),
     getCachedRoles(),
-    getCachedLocationsWithRegisters(),
+    getCachedLocationsWithRegisters(organizationId),
   ]);
 
   return (

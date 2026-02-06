@@ -4,6 +4,7 @@ import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 
 import { NuevoProductoClient } from "@/components/productos/nuevo-producto-client"
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedLocationsForProducts,
@@ -29,12 +30,13 @@ async function NuevoProductoContent({
 }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const locations = await getCachedLocationsForProducts()
+  const locations = await getCachedLocationsForProducts(organizationId)
 
   let duplicateProduct = null
   if (duplicateId) {
-    duplicateProduct = await getCachedProductById(duplicateId)
+    duplicateProduct = await getCachedProductById(organizationId, duplicateId)
   }
 
   return (

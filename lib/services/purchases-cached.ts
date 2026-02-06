@@ -11,6 +11,7 @@ import type {
 } from "./purchases";
 
 export async function getCachedPurchases(
+  organizationId: string,
   params: GetPurchasesParams = {},
 ): Promise<{
   data: Purchase[];
@@ -36,7 +37,8 @@ export async function getCachedPurchases(
     .select(
       `*, supplier:suppliers(id, name, tax_id), location:locations(id, name)`,
       { count: "exact" },
-    );
+    )
+    .eq("organization_id", organizationId);
 
   if (status) {
     query = query.eq("status", status);
@@ -77,6 +79,7 @@ export async function getCachedPurchases(
 }
 
 export async function getCachedPurchaseById(
+  organizationId: string,
   id: string,
 ): Promise<Purchase | null> {
   "use cache";
@@ -93,6 +96,7 @@ export async function getCachedPurchaseById(
       items:purchase_items(*)
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single();
 
@@ -156,7 +160,7 @@ export async function getCachedPaymentsByPurchaseId(
   });
 }
 
-export async function getCachedLocations(): Promise<Location[]> {
+export async function getCachedLocations(organizationId: string): Promise<Location[]> {
   "use cache";
   cacheTag("locations");
   cacheLife("minutes");
@@ -170,6 +174,7 @@ export async function getCachedLocations(): Promise<Location[]> {
       cash_registers(id, name, status, point_of_sale:point_of_sale(id, number, name))
     `,
     )
+    .eq("organization_id", organizationId)
     .order("is_main", { ascending: false })
     .order("name");
 
@@ -177,7 +182,7 @@ export async function getCachedLocations(): Promise<Location[]> {
   return (data || []) as Location[];
 }
 
-export async function getCachedProducts(): Promise<Product[]> {
+export async function getCachedProducts(organizationId: string): Promise<Product[]> {
   "use cache";
   cacheTag("products");
   cacheLife("minutes");
@@ -190,6 +195,7 @@ export async function getCachedProducts(): Promise<Product[]> {
       category:categories(id, name)
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("name", { ascending: true });
 

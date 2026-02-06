@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import {
   getAllTiendanubeProducts,
   getTiendanubeCategories,
@@ -69,6 +70,7 @@ export async function syncProductsFromTiendanubeAction(
   storeId: string,
   userId: string,
 ): Promise<{ created: number; updated: number; errors: string[] }> {
+  const organizationId = await getOrganizationId();
   const errors: string[] = [];
   let created = 0;
   let updated = 0;
@@ -88,7 +90,7 @@ export async function syncProductsFromTiendanubeAction(
 
   // 3. Get or create Tiendanube categories locally
   const tnCategories = await getTiendanubeCategories(storeId);
-  const categoryMap = await syncCategoriesFromTiendanube(tnCategories);
+  const categoryMap = await syncCategoriesFromTiendanube(tnCategories, organizationId);
 
   // 4. Get the main location for stock assignment
   const { data: mainLocation } = await supabaseAdmin
@@ -138,6 +140,7 @@ export async function syncProductsFromTiendanubeAction(
           variant.stock ?? 0,
           locationId,
           userId,
+          organizationId,
         );
 
         // Create mapping
@@ -316,6 +319,7 @@ export async function importTiendanubeOrderAction(
   storeId: string,
   tiendanubeOrderId: number,
   userId: string,
+  organizationId: string,
 ): Promise<{ saleId: string }> {
   // Idempotency check: verify we haven't already imported this order
   const { data: existingMap } = await supabaseAdmin
@@ -361,7 +365,7 @@ export async function importTiendanubeOrderAction(
   const tax = total - subtotal + discount; // Derive tax
 
   // Resolve local customer from TN order data
-  const customerId = await resolveCustomerFromTiendanubeOrder(tnOrder);
+  const customerId = await resolveCustomerFromTiendanubeOrder(tnOrder, organizationId);
 
   // Create the local sale as PENDING (payment comes via order/paid webhook)
   const { data: sale, error: saleError } = await supabaseAdmin
@@ -380,6 +384,7 @@ export async function importTiendanubeOrderAction(
       amount_paid: 0,
       notes: `Pedido de Tienda Nube #${tnOrder.number || tnOrder.id}`,
       created_by: userId,
+      organization_id: organizationId,
     })
     .select("id")
     .single();
@@ -478,6 +483,7 @@ export async function createPaymentForTiendanubeOrderAction(
   storeId: string,
   tiendanubeOrderId: number,
   userId: string,
+  organizationId: string,
 ): Promise<void> {
   // Find the local sale via order map
   const { data: orderMap } = await supabaseAdmin
@@ -529,6 +535,7 @@ export async function createPaymentForTiendanubeOrderAction(
       notes: `Pago recibido en Tienda Nube - Orden #${tiendanubeOrderId}`,
       status: "completed",
       created_by: userId,
+      organization_id: organizationId,
     })
     .select("id")
     .single();
@@ -701,12 +708,14 @@ async function createLocalProductFromTiendanube(
   stock: number,
   locationId: string | undefined,
   userId: string,
+  organizationId: string,
 ) {
   const { data: product, error } = await supabaseAdmin
     .from("products")
     .insert({
       ...productData,
       stock_quantity: stock,
+      organization_id: organizationId,
     })
     .select("id, name")
     .single();
@@ -803,6 +812,7 @@ async function updateLocalProductFromTiendanube(
  */
 async function syncCategoriesFromTiendanube(
   tnCategories: Array<{ id: number; name: Record<string, string> }>,
+  organizationId: string,
 ): Promise<Map<number, string>> {
   const map = new Map<number, string>();
 
@@ -824,7 +834,7 @@ async function syncCategoriesFromTiendanube(
       // Create new category
       const { data: newCat, error } = await supabaseAdmin
         .from("categories")
-        .insert({ name, active: true })
+        .insert({ name, active: true, organization_id: organizationId })
         .select("id")
         .single();
 
@@ -844,6 +854,7 @@ async function syncCategoriesFromTiendanube(
  */
 async function resolveCustomerFromTiendanubeOrder(
   tnOrder: import("@/types/tiendanube").TiendanubeOrder,
+  organizationId: string,
 ): Promise<string | null> {
   const tnCustomer = tnOrder.customer;
   if (!tnCustomer?.name) return null;
@@ -881,6 +892,7 @@ async function resolveCustomerFromTiendanubeOrder(
       phone: tnCustomer.phone || null,
       tax_id: tnCustomer.identification || null,
       active: true,
+      organization_id: organizationId,
     })
     .select("id")
     .single();

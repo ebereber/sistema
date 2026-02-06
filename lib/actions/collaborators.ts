@@ -1,5 +1,6 @@
 "use server"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { revalidateTag } from "next/cache"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 
@@ -71,6 +72,8 @@ export async function inviteCollaboratorAction(data: {
     throw new Error("Ya existe una invitación pendiente para ese email")
   }
 
+  const organizationId = await getOrganizationId()
+
   const { error } = await supabaseAdmin.from("user_invitations").insert({
     email: data.email.trim().toLowerCase(),
     role_id: data.role_id,
@@ -79,6 +82,7 @@ export async function inviteCollaboratorAction(data: {
     commission_percentage: data.commission_percentage,
     location_ids: data.location_ids,
     cash_register_ids: data.cash_register_ids,
+    organization_id: organizationId,
   })
 
   if (error) throw error

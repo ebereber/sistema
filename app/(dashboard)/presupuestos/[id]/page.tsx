@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PresupuestoDetalleClient } from "@/components/presupuestos/presupuesto-detalle-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedQuoteById } from "@/lib/services/quotes-cached";
 
@@ -23,8 +24,9 @@ export default async function PresupuestoDetallePage({
 async function PresupuestoDetalleContent({ id }: { id: string }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const quote = await getCachedQuoteById(id);
+  const quote = await getCachedQuoteById(organizationId, id);
   if (!quote) notFound();
 
   return <PresupuestoDetalleClient quote={quote} />;

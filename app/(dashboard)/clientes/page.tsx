@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { CustomersPageClient } from "@/components/clientes/customers-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCustomers } from "@/lib/services/customers-cached";
 
@@ -33,6 +34,7 @@ async function ClientesContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const page = Number(searchParams.page) || 1;
   const pageSize = 50;
@@ -48,7 +50,7 @@ async function ClientesContent({
     active = undefined;
   }
 
-  const result = await getCachedCustomers({
+  const result = await getCachedCustomers(organizationId, {
     page,
     pageSize,
     search: searchParams.search,

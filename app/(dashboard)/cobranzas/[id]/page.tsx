@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { CobranzaDetalleClient } from "@/components/cobranzas/cobranza-detalle-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCustomerPaymentById } from "@/lib/services/customer-payments-cached";
 
@@ -23,8 +24,9 @@ export default async function CobranzaDetailPage({
 async function CobranzaDetailContent({ id }: { id: string }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const payment = await getCachedCustomerPaymentById(id);
+  const payment = await getCachedCustomerPaymentById(organizationId, id);
   if (!payment) notFound();
 
   return <CobranzaDetalleClient payment={payment} />;

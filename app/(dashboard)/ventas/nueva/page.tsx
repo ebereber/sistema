@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { NuevaVentaClient } from "@/components/ventas/nueva-venta-client"
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedAllProductsForPOS,
@@ -22,11 +23,12 @@ async function NuevaVentaContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
   if (!user.active) redirect("/acceso-pendiente")
+  const organizationId = await getOrganizationId()
 
   const [allProducts, topSelling, categories] = await Promise.all([
-    getCachedAllProductsForPOS(),
-    getCachedTopSellingProducts(20),
-    getCachedCategories(),
+    getCachedAllProductsForPOS(organizationId),
+    getCachedTopSellingProducts(organizationId, 20),
+    getCachedCategories(organizationId),
   ])
 
   return (

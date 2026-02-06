@@ -348,7 +348,7 @@ export async function getCachedShiftActivities(
   );
 }
 
-export async function getCachedActiveCashRegisters(): Promise<
+export async function getCachedActiveCashRegisters(organizationId: string): Promise<
   { id: string; name: string }[]
 > {
   "use cache";
@@ -358,6 +358,7 @@ export async function getCachedActiveCashRegisters(): Promise<
   const { data, error } = await supabaseAdmin
     .from("cash_registers")
     .select("id, name")
+    .eq("organization_id", organizationId)
     .eq("status", "active")
     .order("name");
 

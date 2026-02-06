@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PagoDetalleClient } from "@/components/pagos/pago-detalle-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedSupplierPaymentById } from "@/lib/services/supplier-payments-cached";
 
@@ -23,8 +24,9 @@ export default async function PagoDetallePage({
 async function PagoDetalleContent({ id }: { id: string }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const payment = await getCachedSupplierPaymentById(id);
+  const payment = await getCachedSupplierPaymentById(organizationId, id);
   if (!payment) notFound();
 
   return <PagoDetalleClient payment={payment} />;

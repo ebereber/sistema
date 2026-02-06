@@ -9,6 +9,7 @@ import type {
 } from "./sales"
 
 export async function getCachedSales(
+  organizationId: string,
   params: GetSalesParams = {},
   scope?: {
     visibility: "own" | "assigned_locations" | "all"
@@ -56,6 +57,7 @@ export async function getCachedSales(
     `,
       { count: "exact" },
     )
+    .eq("organization_id", organizationId)
     .order("sale_date", { ascending: false })
     .order("created_at", { ascending: false })
 
@@ -172,6 +174,7 @@ export async function getCachedSales(
 }
 
 export async function getCachedSaleById(
+  organizationId: string,
   id: string,
 ): Promise<SaleWithDetails | null> {
   "use cache"
@@ -211,6 +214,7 @@ export async function getCachedSaleById(
       )
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single()
 

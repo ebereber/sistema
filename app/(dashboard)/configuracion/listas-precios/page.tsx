@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Loader2 } from "lucide-react"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedPriceLists } from "@/lib/services/price-lists-cached"
 import { ListasPreciosPageClient } from "@/components/configuracion/listas-precios-page-client"
@@ -18,8 +19,9 @@ export default async function ListasPreciosPage() {
 async function ListasPreciosContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const priceLists = await getCachedPriceLists()
+  const priceLists = await getCachedPriceLists(organizationId)
 
   return <ListasPreciosPageClient initialPriceLists={priceLists} />
 }

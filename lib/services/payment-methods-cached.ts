@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin"
 import type { PaymentMethod } from "@/types/payment-method"
 
 export async function getCachedPaymentMethods(
+  organizationId: string,
   search?: string
 ): Promise<PaymentMethod[]> {
   "use cache"
@@ -14,6 +15,7 @@ export async function getCachedPaymentMethods(
   let query = supabaseAdmin
     .from("payment_methods")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("is_system", { ascending: false })
     .order("name", { ascending: true })
 

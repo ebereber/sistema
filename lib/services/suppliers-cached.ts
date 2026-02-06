@@ -6,7 +6,7 @@ import type { Tables } from "@/lib/supabase/types"
 
 export type Supplier = Tables<"suppliers">
 
-export async function getCachedSuppliers(): Promise<Supplier[]> {
+export async function getCachedSuppliers(organizationId: string): Promise<Supplier[]> {
   "use cache"
   cacheTag("suppliers")
   cacheLife("minutes")
@@ -14,6 +14,7 @@ export async function getCachedSuppliers(): Promise<Supplier[]> {
   const { data, error } = await supabaseAdmin
     .from("suppliers")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("name", { ascending: true })
 
   if (error) throw error
@@ -21,6 +22,7 @@ export async function getCachedSuppliers(): Promise<Supplier[]> {
 }
 
 export async function getCachedSupplierById(
+  organizationId: string,
   id: string
 ): Promise<Supplier | null> {
   "use cache"
@@ -30,6 +32,7 @@ export async function getCachedSupplierById(
   const { data, error } = await supabaseAdmin
     .from("suppliers")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single()
 
@@ -38,6 +41,7 @@ export async function getCachedSupplierById(
 }
 
 export async function getCachedSupplierStats(
+  organizationId: string,
   id: string
 ): Promise<{ totalPurchases: number; totalAmount: number }> {
   "use cache"
@@ -47,6 +51,7 @@ export async function getCachedSupplierStats(
   const { count, error } = await supabaseAdmin
     .from("purchases")
     .select("*", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
     .eq("supplier_id", id)
 
   if (error) {
@@ -56,6 +61,7 @@ export async function getCachedSupplierStats(
   const { data: purchases } = await supabaseAdmin
     .from("purchases")
     .select("total")
+    .eq("organization_id", organizationId)
     .eq("supplier_id", id)
 
   const totalAmount =
@@ -68,6 +74,7 @@ export async function getCachedSupplierStats(
 }
 
 export async function getCachedSupplierRecentPurchases(
+  organizationId: string,
   id: string,
   limit: number = 5
 ) {
@@ -78,6 +85,7 @@ export async function getCachedSupplierRecentPurchases(
   const { data, error } = await supabaseAdmin
     .from("purchases")
     .select("id, purchase_number, created_at, total")
+    .eq("organization_id", organizationId)
     .eq("supplier_id", id)
     .order("created_at", { ascending: false })
     .limit(limit)

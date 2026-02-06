@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type {
@@ -42,6 +43,7 @@ export async function createPurchaseOrderAction(
 ): Promise<PurchaseOrder> {
   const user = await getServerUser();
   if (!user) throw new Error("No autenticado");
+  const organizationId = await getOrganizationId();
 
   const { data: orderNumber, error: rpcError } = await supabaseAdmin.rpc(
     "generate_purchase_order_number",
@@ -63,6 +65,7 @@ export async function createPurchaseOrderAction(
       status: "draft",
       notes: data.notes,
       created_by: user.id,
+      organization_id: organizationId,
     })
     .select()
     .single();

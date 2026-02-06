@@ -1,3 +1,4 @@
+import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -102,6 +103,7 @@ export async function createCashRegister(
   data: CreateCashRegisterData,
 ): Promise<CashRegister> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   const { data: created, error } = await supabase
     .from("cash_registers")
@@ -109,6 +111,7 @@ export async function createCashRegister(
       name: data.name,
       location_id: data.location_id,
       point_of_sale_id: data.point_of_sale_id || null,
+      organization_id: organizationId,
     })
     .select(
       `

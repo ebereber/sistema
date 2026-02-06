@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type {
@@ -21,6 +22,7 @@ export async function createSupplierPaymentAction(
 ): Promise<SupplierPayment> {
   const user = await getServerUser();
   if (!user) throw new Error("No autenticado");
+  const organizationId = await getOrganizationId();
 
   // Generate payment number
   const { data: paymentNumber, error: rpcError } = await supabaseAdmin.rpc(
@@ -45,6 +47,7 @@ export async function createSupplierPaymentAction(
       on_account_amount: onAccountAmount,
       notes: paymentData.notes,
       status: "completed",
+      organization_id: organizationId,
     })
     .select()
     .single();

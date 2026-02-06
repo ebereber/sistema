@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 import type { PointOfSale } from "@/lib/services/point-of-sale";
@@ -39,9 +40,11 @@ export async function createPOSAction(data: {
     throw new Error("Ya existe un punto de venta con ese número");
   }
 
+  const organizationId = await getOrganizationId();
+
   const { data: pos, error } = await supabaseAdmin
     .from("point_of_sale")
-    .insert(data)
+    .insert({ ...data, organization_id: organizationId })
     .select()
     .single();
 

@@ -1,3 +1,4 @@
+import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
 import { createClient } from "@/lib/supabase/client";
 
 export interface Collaborator {
@@ -172,6 +173,8 @@ export async function inviteCollaborator(
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
+  const organizationId = await getClientOrganizationId();
+
   const { data: invitation, error } = await supabase
     .from("user_invitations")
     .insert({
@@ -183,6 +186,7 @@ export async function inviteCollaborator(
       location_ids: data.location_ids,
       cash_register_ids: data.cash_register_ids,
       invited_by: currentUser?.id,
+      organization_id: organizationId,
     })
     .select("*, role:roles(id, name)")
     .single();

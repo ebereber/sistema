@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PagosPageClient } from "@/components/pagos/pagos-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedSupplierPayments } from "@/lib/services/supplier-payments-cached";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
@@ -36,9 +37,10 @@ async function PagosContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const [result, suppliers] = await Promise.all([
-    getCachedSupplierPayments({
+    getCachedSupplierPayments(organizationId, {
       page: Number(searchParams.page) || 1,
       limit: 20,
       search: searchParams.search,
@@ -46,7 +48,7 @@ async function PagosContent({
       dateFrom: searchParams.dateFrom,
       dateTo: searchParams.dateTo,
     }),
-    getCachedSuppliers(),
+    getCachedSuppliers(organizationId),
   ]);
 
   return (

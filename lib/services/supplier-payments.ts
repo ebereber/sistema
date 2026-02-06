@@ -1,3 +1,4 @@
+import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -203,6 +204,7 @@ export async function createSupplierPayment(
   paymentMethods: CreatePaymentMethod[],
 ): Promise<SupplierPayment> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   // Generate payment number
   const paymentNumber = await generatePaymentNumber();
@@ -223,6 +225,7 @@ export async function createSupplierPayment(
       on_account_amount: onAccountAmount,
       notes: paymentData.notes,
       status: "completed",
+      organization_id: organizationId,
     })
     .select()
     .single();

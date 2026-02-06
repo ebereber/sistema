@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin"
 import type { Category, CategoryWithChildren } from "./categories"
 
 export async function getCachedCategoriesHierarchy(
+  organizationId: string,
   search?: string
 ): Promise<CategoryWithChildren[]> {
   "use cache"
@@ -14,6 +15,7 @@ export async function getCachedCategoriesHierarchy(
   let query = supabaseAdmin
     .from("categories")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("name", { ascending: true })
 

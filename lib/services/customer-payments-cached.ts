@@ -21,6 +21,7 @@ export interface GetCachedCustomerPaymentsParams {
 }
 
 export async function getCachedCustomerPayments(
+  organizationId: string,
   params: GetCachedCustomerPaymentsParams,
 ): Promise<GetCustomerPaymentsResult> {
   "use cache";
@@ -50,6 +51,7 @@ export async function getCachedCustomerPayments(
     `,
       { count: "exact" },
     )
+    .eq("organization_id", organizationId)
     .order("payment_date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -162,6 +164,7 @@ export async function getCachedCustomerPayments(
 }
 
 export async function getCachedCustomerPaymentById(
+  organizationId: string,
   id: string,
 ): Promise<CustomerPaymentWithDetails | null> {
   "use cache";
@@ -177,6 +180,7 @@ export async function getCachedCustomerPaymentById(
       customer:customers(id, name, email, phone, tax_id, street_address, city)
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single();
 

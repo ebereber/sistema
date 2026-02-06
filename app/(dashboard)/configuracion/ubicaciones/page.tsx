@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedLocations, getCachedCashRegisters } from "@/lib/services/locations-cached"
 import { getCachedPointsOfSale } from "@/lib/services/point-of-sale-cached"
@@ -19,11 +20,12 @@ export default async function UbicacionesPage() {
 async function UbicacionesContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   const [locations, cashRegisters, pointsOfSale] = await Promise.all([
-    getCachedLocations(),
-    getCachedCashRegisters(),
-    getCachedPointsOfSale(),
+    getCachedLocations(organizationId),
+    getCachedCashRegisters(organizationId),
+    getCachedPointsOfSale(organizationId),
   ])
 
   return (

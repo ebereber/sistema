@@ -4,6 +4,7 @@ import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 
 import { EditarProductoClient } from "@/components/productos/editar-producto-client"
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedProductById } from "@/lib/services/products-cached"
 
@@ -23,8 +24,9 @@ export default async function ProductoDetailPage({
 async function ProductoDetailContent({ id }: { id: string }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const product = await getCachedProductById(id)
+  const product = await getCachedProductById(organizationId, id)
   if (!product) notFound()
 
   // Map stock data

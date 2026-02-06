@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Loader2 } from "lucide-react"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedPointsOfSale } from "@/lib/services/point-of-sale-cached"
 import { getCachedLocations } from "@/lib/services/locations-cached"
@@ -19,10 +20,11 @@ export default async function PuntosDeVentaPage() {
 async function PuntosDeVentaContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   const [pointsOfSale, locations] = await Promise.all([
-    getCachedPointsOfSale(),
-    getCachedLocations(),
+    getCachedPointsOfSale(organizationId),
+    getCachedLocations(organizationId),
   ])
 
   return <PuntosDeVentaPageClient initialPointsOfSale={pointsOfSale} locations={locations} />

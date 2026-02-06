@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { VentasPageClient } from "@/components/ventas/ventas-page-client"
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedSales } from "@/lib/services/sales-cached"
 
@@ -63,7 +64,10 @@ async function VentasContent({
         }
       : undefined
 
+  const organizationId = await getOrganizationId()
+
   const result = await getCachedSales(
+    organizationId,
     {
       page,
       pageSize,

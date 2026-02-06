@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { ComprasPageClient } from "@/components/compras/compras-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchases } from "@/lib/services/purchases-cached";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
@@ -36,12 +37,13 @@ async function ComprasContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const page = Number(searchParams.page) || 1;
   const pageSize = 20;
 
   const [purchasesResult, suppliers] = await Promise.all([
-    getCachedPurchases({
+    getCachedPurchases(organizationId, {
       page,
       pageSize,
       status: searchParams.status as
@@ -53,7 +55,7 @@ async function ComprasContent({
       dateFrom: searchParams.dateFrom,
       search: searchParams.search,
     }),
-    getCachedSuppliers(),
+    getCachedSuppliers(organizationId),
   ]);
 
   return (

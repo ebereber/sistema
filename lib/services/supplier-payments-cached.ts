@@ -8,6 +8,7 @@ import type {
 } from "./supplier-payments";
 
 export async function getCachedSupplierPayments(
+  organizationId: string,
   params: GetPaymentsParams = {},
 ): Promise<{
   data: SupplierPayment[];
@@ -43,6 +44,7 @@ export async function getCachedSupplierPayments(
     `,
       { count: "exact" },
     )
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
 
   if (search) {
@@ -81,6 +83,7 @@ export async function getCachedSupplierPayments(
 }
 
 export async function getCachedSupplierPaymentById(
+  organizationId: string,
   id: string,
 ): Promise<SupplierPayment | null> {
   "use cache";
@@ -108,6 +111,7 @@ export async function getCachedSupplierPaymentById(
       )
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single();
 

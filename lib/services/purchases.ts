@@ -184,6 +184,15 @@ export async function createPurchase(
   } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Usuario no autenticado");
 
+  // Get organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   // Generate purchase number
   const { data: purchaseNumber, error: numberError } = await supabase.rpc(
     "generate_purchase_number",
@@ -217,6 +226,7 @@ export async function createPurchase(
       tax_category: purchaseData.tax_category || null,
       created_by: user.id,
       purchase_order_id: purchaseData.purchase_order_id || null,
+      organization_id: organizationId,
     })
     .select()
     .single();

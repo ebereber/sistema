@@ -4,6 +4,7 @@ import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 
 import { ProductosPageClient } from "@/components/productos/productos-page-client"
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedProducts,
@@ -39,6 +40,7 @@ async function ProductosContent({
 }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   // Parse filters from URL
   const statusParam = searchParams.status || "active"
@@ -53,7 +55,7 @@ async function ProductosContent({
     .filter(Boolean)
 
   const [result, categories] = await Promise.all([
-    getCachedProducts({
+    getCachedProducts(organizationId, {
       page: Number(searchParams.page) || 1,
       pageSize: 20,
       search: searchParams.search,
@@ -66,7 +68,7 @@ async function ProductosContent({
         | "NEGATIVE_STOCK"
         | undefined,
     }),
-    getCachedCategories(),
+    getCachedCategories(organizationId),
   ])
 
   return (

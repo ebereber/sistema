@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
@@ -16,6 +17,7 @@ export async function createCustomerPaymentAction(
 ): Promise<{ id: string; payment_number: string }> {
   const user = await getServerUser();
   if (!user) throw new Error("Usuario no autenticado");
+  const organizationId = await getOrganizationId();
 
   // Calculate total
   const totalAmount = allocations.reduce((sum, a) => sum + a.amount, 0);
@@ -38,6 +40,7 @@ export async function createCustomerPaymentAction(
       notes: data.notes || null,
       status: "completed",
       created_by: user.id,
+      organization_id: organizationId,
     })
     .select("id, payment_number")
     .single();

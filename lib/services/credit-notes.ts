@@ -120,6 +120,15 @@ export async function createCreditNote(data: CreateCreditNoteData) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuario no autenticado");
 
+  // 1b. Get organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   // 2. Calculate totals
   const subtotal = data.items.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
@@ -159,6 +168,7 @@ export async function createCreditNote(data: CreateCreditNoteData) {
       voucher_type: "NOTA_CREDITO_X",
       sale_date: data.date.toISOString(),
       related_sale_id: data.originalSaleId,
+      organization_id: organizationId,
     })
     .select()
     .single();

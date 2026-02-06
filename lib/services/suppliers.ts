@@ -1,3 +1,4 @@
+import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 
@@ -58,13 +59,14 @@ export async function getSupplierById(id: string): Promise<Supplier> {
  * Create a new supplier
  */
 export async function createSupplier(
-  supplier: SupplierInsert,
+  supplier: Omit<SupplierInsert, "organization_id">,
 ): Promise<Supplier> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   const { data, error } = await supabase
     .from("suppliers")
-    .insert(supplier)
+    .insert({ ...supplier, organization_id: organizationId })
     .select()
     .single();
 

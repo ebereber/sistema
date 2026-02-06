@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PresupuestosPageClient } from "@/components/presupuestos/presupuestos-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedQuotes } from "@/lib/services/quotes-cached";
 
@@ -34,8 +35,9 @@ async function PresupuestosContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const result = await getCachedQuotes({
+  const result = await getCachedQuotes(organizationId, {
     page: Number(searchParams.page) || 1,
     pageSize: 20,
     search: searchParams.search,

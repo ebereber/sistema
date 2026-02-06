@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Loader2 } from "lucide-react"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedPaymentMethods } from "@/lib/services/payment-methods-cached"
 import { MediosDePagoPageClient } from "@/components/configuracion/medios-de-pago-page-client"
@@ -18,8 +19,9 @@ export default async function MediosDePagoPage() {
 async function MediosDePagoContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const paymentMethods = await getCachedPaymentMethods()
+  const paymentMethods = await getCachedPaymentMethods(organizationId)
 
   return <MediosDePagoPageClient initialPaymentMethods={paymentMethods} />
 }

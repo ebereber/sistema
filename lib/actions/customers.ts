@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 
@@ -23,11 +24,13 @@ export async function createCustomerAction(data: {
   payment_terms?: string | null;
   active?: boolean;
 }) {
-  console.log("Creating customer with:", data);
+  const organizationId = await getOrganizationId();
+
   const { data: customer, error } = await supabaseAdmin
     .from("customers")
     .insert({
       name: data.name,
+      organization_id: organizationId,
       tax_id: data.tax_id || null,
       tax_id_type: data.tax_id_type || null,
       legal_entity_type: data.legal_entity_type || null,

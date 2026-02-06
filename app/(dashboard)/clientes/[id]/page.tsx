@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
   getCachedCustomerById,
@@ -27,11 +28,12 @@ export default async function ClientePage({
 async function ClienteContent({ id }: { id: string }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const [customer, stats, recentSales] = await Promise.all([
-    getCachedCustomerById(id),
-    getCachedCustomerStats(id),
-    getCachedCustomerRecentSales(id),
+    getCachedCustomerById(organizationId, id),
+    getCachedCustomerStats(organizationId, id),
+    getCachedCustomerRecentSales(organizationId, id),
   ]);
 
   if (!customer) notFound();

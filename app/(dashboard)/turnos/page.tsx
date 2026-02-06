@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { TurnosPageClient } from "@/components/turnos/turnos-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
   getCachedActiveCashRegisters,
@@ -39,6 +40,7 @@ async function TurnosContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const page = Number(searchParams.page) || 1;
   const pageSize = 20;
@@ -53,7 +55,7 @@ async function TurnosContent({
       dateFrom: searchParams.dateFrom,
       dateTo: searchParams.dateTo,
     }),
-    getCachedActiveCashRegisters(),
+    getCachedActiveCashRegisters(organizationId),
   ]);
 
   return (

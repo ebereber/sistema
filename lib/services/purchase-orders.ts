@@ -116,6 +116,15 @@ export async function createPurchaseOrder(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // Get organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   const { data: orderNumber, error: rpcError } = await supabase.rpc(
     "generate_purchase_order_number",
   );
@@ -136,6 +145,7 @@ export async function createPurchaseOrder(
       status: "draft",
       notes: data.notes,
       created_by: user.id,
+      organization_id: organizationId,
     })
     .select()
     .single();

@@ -1,5 +1,6 @@
 "use server"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { revalidateTag } from "next/cache"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 
@@ -8,12 +9,15 @@ export async function createCashRegisterAction(data: {
   location_id: string
   point_of_sale_id?: string | null
 }) {
+  const organizationId = await getOrganizationId()
+
   const { data: created, error } = await supabaseAdmin
     .from("cash_registers")
     .insert({
       name: data.name,
       location_id: data.location_id,
       point_of_sale_id: data.point_of_sale_id || null,
+      organization_id: organizationId,
     })
     .select(
       "*, location:locations(id, name), point_of_sale:point_of_sale(id, name, number)"

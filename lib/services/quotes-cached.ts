@@ -8,6 +8,7 @@ import type { Tables } from "@/lib/supabase/types";
 type Quote = Tables<"quotes">;
 
 export async function getCachedQuotes(
+  organizationId: string,
   filters: GetQuotesFilters = {},
 ): Promise<{
   data: Quote[];
@@ -26,6 +27,7 @@ export async function getCachedQuotes(
   let query = supabaseAdmin
     .from("quotes")
     .select("*", { count: "exact" })
+    .eq("organization_id", organizationId)
     .neq("status", "deleted")
     .order("created_at", { ascending: false })
     .range(from, to);
@@ -55,6 +57,7 @@ export async function getCachedQuotes(
 }
 
 export async function getCachedQuoteById(
+  organizationId: string,
   id: string,
 ): Promise<Quote | null> {
   "use cache";
@@ -64,6 +67,7 @@ export async function getCachedQuoteById(
   const { data, error } = await supabaseAdmin
     .from("quotes")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single();
 

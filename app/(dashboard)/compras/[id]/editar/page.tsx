@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedPurchaseById,
@@ -28,12 +29,13 @@ export default async function EditarCompraPage({
 async function EditarCompraContent({ id }: { id: string }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   const [purchase, suppliers, products, locations] = await Promise.all([
-    getCachedPurchaseById(id),
-    getCachedSuppliers(),
-    getCachedProducts(),
-    getCachedLocations(),
+    getCachedPurchaseById(organizationId, id),
+    getCachedSuppliers(organizationId),
+    getCachedProducts(organizationId),
+    getCachedLocations(organizationId),
   ])
 
   if (!purchase) notFound()

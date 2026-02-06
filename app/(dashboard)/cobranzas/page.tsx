@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { CobranzasPageClient } from "@/components/cobranzas/cobranzas-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getServerUserScope } from "@/lib/auth/get-server-user-scope";
 import { getCachedCustomerPayments } from "@/lib/services/customer-payments-cached";
@@ -35,10 +36,11 @@ async function CobranzasContent({
 }) {
   const user = await getServerUser();
   if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   const scope = await getServerUserScope(user.id);
 
-  const result = await getCachedCustomerPayments({
+  const result = await getCachedCustomerPayments(organizationId, {
     page: Number(searchParams.page) || 1,
     pageSize: 20,
     search: searchParams.search,

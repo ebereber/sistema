@@ -73,6 +73,19 @@ export async function GET(request: NextRequest) {
     // tokenData.user_id from Tiendanube is actually the store_id
     const storeId = String(tokenData.user_id)
 
+    // Get organization_id from user
+    const { data: userData } = await supabaseAdmin
+      .from("users")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!userData?.organization_id) {
+      return NextResponse.redirect(
+        new URL("/configuracion/integraciones?error=tiendanube_no_org", process.env.NEXT_PUBLIC_APP_URL!),
+      )
+    }
+
     // Upsert the store connection using admin client (bypasses RLS)
     const { error: upsertError } = await supabaseAdmin
       .from("tiendanube_stores")
@@ -84,6 +97,7 @@ export async function GET(request: NextRequest) {
           scope: tokenData.scope,
           connected_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          organization_id: userData.organization_id,
         },
         { onConflict: "store_id" },
       )

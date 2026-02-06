@@ -12,6 +12,7 @@ import type {
 import type { ProductForSale } from "./sales"
 
 export async function getCachedProducts(
+  organizationId: string,
   params: GetProductsParams = {},
 ): Promise<{
   data: Product[]
@@ -41,6 +42,7 @@ export async function getCachedProducts(
     `,
       { count: "exact" },
     )
+    .eq("organization_id", organizationId)
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
@@ -83,6 +85,7 @@ export async function getCachedProducts(
 }
 
 export async function getCachedProductById(
+  organizationId: string,
   id: string,
 ): Promise<Product | null> {
   "use cache"
@@ -102,6 +105,7 @@ export async function getCachedProductById(
         location:locations(id, name, is_main)
       )
     `)
+    .eq("organization_id", organizationId)
     .eq("id", id)
     .single()
 
@@ -113,7 +117,7 @@ export async function getCachedProductById(
   return data as unknown as Product
 }
 
-export async function getCachedCategories(): Promise<Category[]> {
+export async function getCachedCategories(organizationId: string): Promise<Category[]> {
   "use cache"
   cacheTag("categories")
   cacheLife("minutes")
@@ -121,6 +125,7 @@ export async function getCachedCategories(): Promise<Category[]> {
   const { data, error } = await supabaseAdmin
     .from("categories")
     .select("*")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("name", { ascending: true })
 
@@ -128,7 +133,7 @@ export async function getCachedCategories(): Promise<Category[]> {
   return data || []
 }
 
-export async function getCachedLocationsForProducts(): Promise<
+export async function getCachedLocationsForProducts(organizationId: string): Promise<
   { id: string; name: string; is_main: boolean | null; active: boolean | null }[]
 > {
   "use cache"
@@ -138,6 +143,7 @@ export async function getCachedLocationsForProducts(): Promise<
   const { data, error } = await supabaseAdmin
     .from("locations")
     .select("id, name, is_main, active")
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .order("is_main", { ascending: false })
     .order("name")
@@ -147,13 +153,14 @@ export async function getCachedLocationsForProducts(): Promise<
 }
 
 export async function getCachedAllProductIds(
+  organizationId: string,
   filters: BulkFilters,
 ): Promise<string[]> {
   "use cache"
   cacheTag("products")
   cacheLife("minutes")
 
-  let query = supabaseAdmin.from("products").select("id")
+  let query = supabaseAdmin.from("products").select("id").eq("organization_id", organizationId)
 
   if (filters.search) {
     query = query.or(
@@ -187,7 +194,7 @@ export async function getCachedAllProductIds(
   return data?.map((p) => p.id) || []
 }
 
-export async function getCachedAllProductsForPOS(): Promise<ProductForSale[]> {
+export async function getCachedAllProductsForPOS(organizationId: string): Promise<ProductForSale[]> {
   "use cache"
   cacheTag("products")
   cacheLife("minutes")
@@ -208,6 +215,7 @@ export async function getCachedAllProductsForPOS(): Promise<ProductForSale[]> {
       category:categories(name)
     `,
     )
+    .eq("organization_id", organizationId)
     .eq("active", true)
     .in("visibility", ["SALES_AND_PURCHASES", "SALES_ONLY"])
     .order("name", { ascending: true })
@@ -229,6 +237,7 @@ export async function getCachedAllProductsForPOS(): Promise<ProductForSale[]> {
 }
 
 export async function getCachedTopSellingProducts(
+  organizationId: string,
   limit: number = 20,
 ): Promise<ProductForSale[]> {
   "use cache"
@@ -236,6 +245,7 @@ export async function getCachedTopSellingProducts(
   cacheLife("hours")
 
   // Get recent sale items to determine top sellers
+  // sale_items has no org_id, but we filter via joined product
   const { data, error } = await supabaseAdmin
     .from("sale_items")
     .select(
@@ -254,6 +264,7 @@ export async function getCachedTopSellingProducts(
         category_id,
         active,
         visibility,
+        organization_id,
         category:categories(name)
       )
     `,
@@ -274,6 +285,7 @@ export async function getCachedTopSellingProducts(
       ? item.product[0]
       : item.product
     if (!product || !product.active) continue
+    if ((product as any).organization_id !== organizationId) continue
     if (
       product.visibility !== "SALES_AND_PURCHASES" &&
       product.visibility !== "SALES_ONLY"

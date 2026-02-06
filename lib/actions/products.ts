@@ -1,5 +1,6 @@
 "use server"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { revalidateTag } from "next/cache"
 import type { BulkFilters, ProductInsert, ProductUpdate } from "@/lib/services/products"
@@ -9,16 +10,17 @@ import type { BulkFilters, ProductInsert, ProductUpdate } from "@/lib/services/p
 // ============================================================================
 
 export async function createProductAction(data: {
-  product: ProductInsert
+  product: Omit<ProductInsert, "organization_id">
   stockByLocation: Array<{ location_id: string; quantity: number }>
   userId: string
 }): Promise<{ id: string; name: string }> {
+  const organizationId = await getOrganizationId()
   const totalStock = data.stockByLocation.reduce((sum, s) => sum + s.quantity, 0)
 
   // 1. Create product
   const { data: product, error: productError } = await supabaseAdmin
     .from("products")
-    .insert({ ...data.product, stock_quantity: totalStock })
+    .insert({ ...data.product, stock_quantity: totalStock, organization_id: organizationId })
     .select("id, name")
     .single()
 

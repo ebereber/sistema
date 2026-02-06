@@ -304,6 +304,15 @@ export async function createSale(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuario no autenticado");
 
+  // 1b. Obtener organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   // 2. Generar número de venta
   const { data: saleNumber, error: numberError } = await supabase.rpc(
     "generate_sale_number",
@@ -320,6 +329,7 @@ export async function createSale(
       seller_id: user.id, // ← Usuario actual
       location_id: locationId, // ← Ubicación
       created_by: user.id, // ← Usuario actual
+      organization_id: organizationId,
     })
     .select()
     .single();
@@ -361,6 +371,7 @@ export async function createSale(
           notes: null,
           status: "completed",
           created_by: user.id,
+          organization_id: organizationId,
         })
         .select("id")
         .single();
@@ -963,6 +974,15 @@ export async function createExchange(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuario no autenticado");
 
+  // Get organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   let creditNote: ExchangeResult["creditNote"] = null;
   let sale: ExchangeResult["sale"] = null;
 
@@ -1023,6 +1043,7 @@ export async function createExchange(
         created_by: user.id,
         related_sale_id: exchangeData.originalSaleId,
         shift_id: shiftId,
+        organization_id: organizationId,
       })
       .select()
       .single();
@@ -1105,6 +1126,7 @@ export async function createExchange(
         location_id: locationId,
         created_by: user.id,
         shift_id: shiftId,
+        organization_id: organizationId,
       })
       .select()
       .single();
@@ -1174,6 +1196,7 @@ export async function createExchange(
               notes: `Cambio de venta ${exchangeData.originalSaleNumber}`,
               status: "completed",
               created_by: user.id,
+              organization_id: organizationId,
             })
             .select("id")
             .single();

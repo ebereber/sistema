@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin"
 import type { Collaborator, PendingInvitation } from "./collaborators"
 
 export async function getCachedCollaborators(
+  organizationId: string,
   search?: string
 ): Promise<Collaborator[]> {
   "use cache"
@@ -14,6 +15,7 @@ export async function getCachedCollaborators(
   let query = supabaseAdmin
     .from("users")
     .select("*, role:roles(id, name, is_system)")
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: true })
 
   if (search?.trim()) {
@@ -50,7 +52,7 @@ export async function getCachedCollaborators(
   })) as Collaborator[]
 }
 
-export async function getCachedPendingInvitations(): Promise<
+export async function getCachedPendingInvitations(organizationId: string): Promise<
   PendingInvitation[]
 > {
   "use cache"
@@ -60,6 +62,7 @@ export async function getCachedPendingInvitations(): Promise<
   const { data, error } = await supabaseAdmin
     .from("user_invitations")
     .select("*, role:roles(id, name, is_system)")
+    .eq("organization_id", organizationId)
     .eq("status", "pending")
     .order("created_at", { ascending: false })
 

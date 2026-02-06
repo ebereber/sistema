@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 
@@ -47,6 +48,8 @@ export async function duplicateRoleAction(id: string) {
 
   if (fetchError) throw fetchError;
 
+  const organizationId = await getOrganizationId()
+
   const { data: role, error } = await supabaseAdmin
     .from("roles")
     .insert({
@@ -54,6 +57,7 @@ export async function duplicateRoleAction(id: string) {
       permissions: original.permissions,
       special_actions: original.special_actions,
       is_system: false,
+      organization_id: organizationId,
     })
     .select()
     .single();
@@ -70,12 +74,15 @@ export async function createRoleAction(data: {
   permissions: string[];
   special_actions: string[];
 }) {
+  const organizationId = await getOrganizationId()
+
   const { data: role, error } = await supabaseAdmin
     .from("roles")
     .insert({
       name: data.name.trim(),
       permissions: data.permissions,
       special_actions: data.special_actions,
+      organization_id: organizationId,
     })
     .select()
     .single();

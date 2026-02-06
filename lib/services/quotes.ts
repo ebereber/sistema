@@ -67,6 +67,15 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // Get organization_id
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+  if (!userData?.organization_id) throw new Error("Usuario sin organización");
+  const organizationId = userData.organization_id;
+
   // Generate sequential quote number via RPC (uses sequences table + pos_number)
   const { data: quoteNumber, error: rpcError } = await supabase.rpc(
     "generate_quote_number",
@@ -112,6 +121,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
       status: "active",
       created_by: user.id,
       location_id: input.locationId || null,
+      organization_id: organizationId,
     })
     .select()
     .single();

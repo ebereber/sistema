@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached"
 import { SuppliersPageClient } from "@/components/proveedores/suppliers-page-client"
@@ -18,8 +19,9 @@ export default async function ProveedoresPage() {
 async function SuppliersContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const suppliers = await getCachedSuppliers()
+  const suppliers = await getCachedSuppliers(organizationId)
 
   return <SuppliersPageClient initialSuppliers={suppliers} />
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 
@@ -77,9 +78,11 @@ export async function createLocationAction(data: {
     if (updateError) throw updateError;
   }
 
+  const organizationId = await getOrganizationId();
+
   const { data: location, error } = await supabaseAdmin
     .from("locations")
-    .insert(data)
+    .insert({ ...data, organization_id: organizationId })
     .select()
     .single();
 

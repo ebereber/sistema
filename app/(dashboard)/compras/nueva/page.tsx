@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
   getCachedPurchaseById,
@@ -38,17 +39,18 @@ async function NuevaCompraContent({
 }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
   const [suppliers, products, locations] = await Promise.all([
-    getCachedSuppliers(),
-    getCachedProducts(),
-    getCachedLocations(),
+    getCachedSuppliers(organizationId),
+    getCachedProducts(organizationId),
+    getCachedLocations(organizationId),
   ])
 
   let duplicateData
   let purchaseOrderData
   if (duplicateFromId) {
-    duplicateData = await getCachedPurchaseById(duplicateFromId)
+    duplicateData = await getCachedPurchaseById(organizationId, duplicateFromId)
   } else if (purchaseOrderId) {
     try {
       purchaseOrderData = await getPurchaseOrderById(purchaseOrderId)

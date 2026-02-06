@@ -1,5 +1,6 @@
 "use server";
 
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 
@@ -35,9 +36,11 @@ export async function createPriceListAction(data: {
   adjustment_percentage?: number;
   includes_tax?: boolean;
 }) {
+  const organizationId = await getOrganizationId();
+
   const { data: priceList, error } = await supabaseAdmin
     .from("price_lists")
-    .insert(data)
+    .insert({ ...data, organization_id: organizationId })
     .select()
     .single();
 

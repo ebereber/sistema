@@ -1,3 +1,4 @@
+import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
 import { createClient } from "@/lib/supabase/client";
 import type {
   PaymentMethod,
@@ -59,13 +60,14 @@ export async function getPaymentMethodById(id: string): Promise<PaymentMethod> {
  * Create payment method
  */
 export async function createPaymentMethod(
-  paymentMethod: PaymentMethodInsert,
+  paymentMethod: Omit<PaymentMethodInsert, "organization_id">,
 ): Promise<PaymentMethod> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   const { data, error } = await supabase
     .from("payment_methods")
-    .insert(paymentMethod)
+    .insert({ ...paymentMethod, organization_id: organizationId })
     .select()
     .single();
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Loader2 } from "lucide-react"
 
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedCategoriesHierarchy } from "@/lib/services/categories-cached"
 import { CategoriasPageClient } from "@/components/configuracion/categorias-page-client"
@@ -18,8 +19,9 @@ export default async function CategoriasPage() {
 async function CategoriasContent() {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const categories = await getCachedCategoriesHierarchy()
+  const categories = await getCachedCategoriesHierarchy(organizationId)
 
   return <CategoriasPageClient initialCategories={categories} />
 }

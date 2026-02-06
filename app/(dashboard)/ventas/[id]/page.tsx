@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { VentaDetailClient } from "@/components/ventas/venta-detail-client"
+import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedSaleById } from "@/lib/services/sales-cached"
 
@@ -22,8 +23,9 @@ export default async function VentasDetailPage({
 async function VentaDetailContent({ id }: { id: string }) {
   const user = await getServerUser()
   if (!user) redirect("/login")
+  const organizationId = await getOrganizationId()
 
-  const sale = await getCachedSaleById(id)
+  const sale = await getCachedSaleById(organizationId, id)
 
   if (!sale) {
     notFound()

@@ -10,7 +10,7 @@ export async function getServerUser() {
   const { data } = await supabase
     .from("users")
     .select(
-      `id, email, name, active,
+      `id, email, name, active, organization_id,
       role:roles!users_role_id_fkey(id, name, permissions)`
     )
     .eq("id", user.id)
