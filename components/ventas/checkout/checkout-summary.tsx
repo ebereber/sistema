@@ -246,6 +246,12 @@ export function CheckoutSummary({
             <span className="text-muted-foreground">Subtotal</span>
             <span>{formatPrice(totals.subtotal)}</span>
           </div>
+          {totals.taxes > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">IVA</span>
+              <span>{formatPrice(totals.taxes)}</span>
+            </div>
+          )}
 
           {hasGlobalDiscount && (
             <div className="flex justify-between text-sm">
@@ -257,7 +263,6 @@ export function CheckoutSummary({
               <span>-{formatPrice(totals.globalDiscount)}</span>
             </div>
           )}
-
           {/* NC available for normal sales */}
           {availableCreditNotes.length > 0 && (
             <CreditNotesSelector

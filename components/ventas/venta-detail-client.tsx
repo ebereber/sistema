@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { format, isToday, isYesterday } from "date-fns"
-import { es } from "date-fns/locale"
+import { format, isToday, isYesterday } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   ChevronRight,
   CircleHelp,
@@ -17,96 +17,100 @@ import {
   TrendingUp,
   Undo2,
   User,
-} from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { toast } from "sonner"
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { AddNoteDialog } from "@/components/ventas/add-note-dialog"
-import { updateSaleNotesAction } from "@/lib/actions/sales"
-import type { SaleWithDetails } from "@/lib/services/sales"
+} from "@/components/ui/tooltip";
+import { AddNoteDialog } from "@/components/ventas/add-note-dialog";
+import { updateSaleNotesAction } from "@/lib/actions/sales";
+import type { SaleWithDetails } from "@/lib/services/sales";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
-  }).format(amount)
+  }).format(amount);
 }
 
 function formatRelativeDate(dateString: string) {
-  const date = new Date(dateString)
-  if (isToday(date)) return "hoy"
-  if (isYesterday(date)) return "ayer"
-  return format(date, "d 'de' MMMM", { locale: es })
+  const date = new Date(dateString);
+  if (isToday(date)) return "hoy";
+  if (isYesterday(date)) return "ayer";
+  return format(date, "d 'de' MMMM", { locale: es });
 }
 
 function formatFullDate(dateString: string) {
-  const date = new Date(dateString)
-  return format(date, "dd/MM/yyyy HH:mm", { locale: es })
+  const date = new Date(dateString);
+  return format(date, "dd/MM/yyyy HH:mm", { locale: es });
 }
 
 interface VentaDetailClientProps {
-  sale: SaleWithDetails
+  sale: SaleWithDetails;
 }
 
-export function VentaDetailClient({ sale: initialSale }: VentaDetailClientProps) {
-  const router = useRouter()
-  const [sale, setSale] = useState(initialSale)
-  const [noteDialogOpen, setNoteDialogOpen] = useState(false)
-  const [tempNote, setTempNote] = useState("")
-  const [isSavingNote, setIsSavingNote] = useState(false)
+export function VentaDetailClient({
+  sale: initialSale,
+}: VentaDetailClientProps) {
+  const router = useRouter();
+  const [sale, setSale] = useState(initialSale);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [tempNote, setTempNote] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const handleSaveNote = async () => {
     try {
-      setIsSavingNote(true)
-      await updateSaleNotesAction(sale.id, tempNote || null)
-      setSale((prev) => ({ ...prev, notes: tempNote || null }))
-      toast.success("Nota actualizada")
-      setNoteDialogOpen(false)
-      router.refresh()
+      setIsSavingNote(true);
+      await updateSaleNotesAction(sale.id, tempNote || null);
+      setSale((prev) => ({ ...prev, notes: tempNote || null }));
+      toast.success("Nota actualizada");
+      setNoteDialogOpen(false);
+      router.refresh();
     } catch (err) {
-      console.error("Error saving note:", err)
-      toast.error("Error al guardar la nota")
+      console.error("Error saving note:", err);
+      toast.error("Error al guardar la nota");
     } finally {
-      setIsSavingNote(false)
+      setIsSavingNote(false);
     }
-  }
+  };
 
   // Calculate profitability
   const cmv = sale.items.reduce((sum, item) => {
-    const cost = item.product?.cost || 0
-    return sum + cost * item.quantity
-  }, 0)
+    const cost = item.product?.cost || 0;
+    return sum + cost * item.quantity;
+  }, 0);
 
   const paymentFee = sale.customer_payment_receipts.reduce((sum, rcb) => {
     return (
       sum +
       rcb.methods.reduce((mSum, method) => {
-        const percentageFee = (method.amount * method.fee_percentage) / 100
-        return mSum + percentageFee + method.fee_fixed
+        const percentageFee = (method.amount * method.fee_percentage) / 100;
+        return mSum + percentageFee + method.fee_fixed;
       }, 0)
-    )
-  }, 0)
+    );
+  }, 0);
 
-  const grossProfit = sale.total - cmv - paymentFee
-  const netTaxed = sale.subtotal - sale.discount
+  const grossProfit = sale.total - cmv - paymentFee;
+  /*   const netTaxed = sale.subtotal - sale.discount */
+  const grossSubtotal = sale.subtotal + sale.tax + sale.discount;
+  const netTaxed = sale.subtotal;
 
   const googleMapsUrl = sale.customer?.street_address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         `${sale.customer.street_address}, ${sale.customer.city || ""}`,
       )}`
-    : null
+    : null;
 
   return (
     <div className="container mx-auto space-y-6 p-6">
@@ -299,7 +303,7 @@ export function VentaDetailClient({ sale: initialSale }: VentaDetailClientProps)
                       Subtotal productos
                     </span>
                     <span className="text-sm">
-                      {formatCurrency(sale.subtotal)}
+                      {formatCurrency(grossSubtotal)}
                     </span>
                   </div>
                   {sale.discount > 0 && (
@@ -626,8 +630,8 @@ export function VentaDetailClient({ sale: initialSale }: VentaDetailClientProps)
                 size="default"
                 className="h-6 py-0 text-muted-foreground"
                 onClick={() => {
-                  setTempNote(sale.notes || "")
-                  setNoteDialogOpen(true)
+                  setTempNote(sale.notes || "");
+                  setNoteDialogOpen(true);
                 }}
               >
                 Editar
@@ -723,5 +727,5 @@ export function VentaDetailClient({ sale: initialSale }: VentaDetailClientProps)
         onSave={handleSaveNote}
       />
     </div>
-  )
+  );
 }
