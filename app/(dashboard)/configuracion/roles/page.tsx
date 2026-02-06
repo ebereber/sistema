@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { RolesPageClient } from "@/components/configuracion/roles-page-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedRoles } from "@/lib/services/roles-cached";
 
@@ -18,7 +19,8 @@ async function RolesContent() {
   const user = await getServerUser();
   if (!user) redirect("/login");
 
-  const roles = await getCachedRoles();
+  const organizationId = await getOrganizationId();
+  const roles = await getCachedRoles(organizationId);
 
   return <RolesPageClient initialRoles={roles} />;
 }

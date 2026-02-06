@@ -1,9 +1,9 @@
 "use server";
 
 import { getOrganizationId } from "@/lib/auth/get-organization";
+import type { PointOfSale } from "@/lib/services/point-of-sale";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
-import type { PointOfSale } from "@/lib/services/point-of-sale";
 
 export async function deletePOSAction(id: string): Promise<void> {
   const { error } = await supabaseAdmin
@@ -133,11 +133,14 @@ export async function assignPOSToLocationAction(
 }
 
 export async function getAvailablePOSAction(excludeLocationId?: string) {
+  const organizationId = await getOrganizationId();
+
   const { data, error } = await supabaseAdmin
     .from("point_of_sale")
     .select("*, location:locations(id, name)")
     .eq("active", true)
-    .eq("is_digital", false);
+    .eq("is_digital", false)
+    .eq("organization_id", organizationId); // ← agregar esto
 
   if (error) throw error;
 

@@ -28,7 +28,7 @@ async function ColaboradoresContent() {
   const [collaborators, invitations, roles, locations] = await Promise.all([
     getCachedCollaborators(organizationId),
     getCachedPendingInvitations(organizationId),
-    getCachedRoles(),
+    getCachedRoles(organizationId),
     getCachedLocationsWithRegisters(organizationId),
   ]);
 

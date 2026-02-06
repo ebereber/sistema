@@ -91,16 +91,105 @@ export async function completeOnboardingAction(data: {
   if (userError) throw userError;
 
   // Create default location
-  const { error: locationError } = await supabaseAdmin
+  const { data: location, error: locationError } = await supabaseAdmin
     .from("locations")
     .insert({
-      name: "Local principal",
+      name: "Principal",
       is_main: true,
+      active: true,
+      organization_id: org.id,
+    })
+    .select("id")
+    .single();
+
+  if (locationError) throw locationError;
+
+  // Create default point of sale (digital)
+  const { data: pos, error: posError } = await supabaseAdmin
+    .from("point_of_sale")
+    .insert({
+      number: 1,
+      name: "Ejemplo",
+      is_digital: true,
+      location_id: null,
+      enabled_for_arca: false,
+      active: true,
+      organization_id: org.id,
+    })
+    .select("id")
+    .single();
+
+  if (posError) throw posError;
+
+  // Create default cash register
+  const { error: cashRegisterError } = await supabaseAdmin
+    .from("cash_registers")
+    .insert({
+      name: "Caja chica",
+      location_id: location.id,
+      point_of_sale_id: pos.id,
+      status: "active",
+      organization_id: org.id,
+    });
+
+  if (cashRegisterError) throw cashRegisterError;
+
+  // Create default payment methods
+  const { error: paymentMethodsError } = await supabaseAdmin
+    .from("payment_methods")
+    .insert([
+      {
+        name: "Efectivo",
+        type: "EFECTIVO",
+        icon: "Banknote",
+        fee_percentage: 0,
+        fee_fixed: 0,
+        requires_reference: false,
+        availability: "VENTAS_Y_COMPRAS",
+        is_active: true,
+        is_system: true,
+        organization_id: org.id,
+      },
+      {
+        name: "Tarjeta",
+        type: "TARJETA",
+        icon: "CreditCard",
+        fee_percentage: 1.8,
+        fee_fixed: 0,
+        requires_reference: false,
+        availability: "VENTAS_Y_COMPRAS",
+        is_active: true,
+        is_system: true,
+        organization_id: org.id,
+      },
+      {
+        name: "Transferencia",
+        type: "TRANSFERENCIA",
+        icon: "Landmark",
+        fee_percentage: 0,
+        fee_fixed: 0,
+        requires_reference: false,
+        availability: "VENTAS_Y_COMPRAS",
+        is_active: true,
+        is_system: true,
+        organization_id: org.id,
+      },
+    ]);
+
+  if (paymentMethodsError) throw paymentMethodsError;
+
+  // Create default category
+  const { error: categoryError } = await supabaseAdmin
+    .from("categories")
+    .insert({
+      name: "General",
+      description: null,
+      parent_id: null,
       active: true,
       organization_id: org.id,
     });
 
-  if (locationError) throw locationError;
+  if (categoryError) throw categoryError;
 
   revalidateTag("organization", "minutes");
   return org.id;

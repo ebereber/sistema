@@ -64,7 +64,7 @@ export function POSSheet({
   const form = useForm<PointOfSaleFormInput>({
     resolver: zodResolver(pointOfSaleSchema),
     defaultValues: {
-      number: 1,
+      number: undefined,
       name: "",
       is_digital: false,
       location_id: null,
@@ -181,7 +181,7 @@ export function POSSheet({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-4 px-4 flex-1"
+            className="flex flex-col gap-6 px-4 flex-1"
           >
             {/* Número */}
             <FormField
@@ -196,23 +196,17 @@ export function POSSheet({
                     <Input
                       type="number"
                       min={1}
-                      placeholder="1"
+                      placeholder="Ingresa el número"
                       {...field}
-                      value={field.value || ""}
+                      value={field.value ?? ""}
                       onChange={(e) => {
                         const val = e.target.value;
-                        field.onChange(val === "" ? "" : parseInt(val));
-                      }}
-                      onBlur={(e) => {
-                        // Al salir del input, si está vacío poner 1
-                        if (!e.target.value) field.onChange(1);
-                        field.onBlur();
+
+                        field.onChange(val === "" ? "" : Number(val));
                       }}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Número único del punto de venta (ej: 1, 2, 3...)
-                  </FormDescription>
+                  <FormDescription className="hidden"></FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -228,7 +222,7 @@ export function POSSheet({
                     Nombre <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="Caja Principal" {...field} />
+                    <Input placeholder="Principal" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -249,11 +243,10 @@ export function POSSheet({
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel className="cursor-pointer">
-                      Punto de venta digital
+                      Punto de venta digital (no físico)
                     </FormLabel>
-                    <FormDescription>
-                      Los puntos de venta digitales no requieren ubicación
-                      física (ej: tienda online).
+                    <FormDescription className="text-sm">
+                      Para ventas online o e-commerce
                     </FormDescription>
                   </div>
                 </FormItem>
@@ -314,12 +307,9 @@ export function POSSheet({
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel className="cursor-pointer">
-                      Habilitado para ARCA
+                      Usar para facturación electrtónica ARCA
                     </FormLabel>
-                    <FormDescription>
-                      Permite emitir comprobantes fiscales desde este punto de
-                      venta.
-                    </FormDescription>
+                    <FormDescription className="hidden"></FormDescription>
                   </div>
                 </FormItem>
               )}

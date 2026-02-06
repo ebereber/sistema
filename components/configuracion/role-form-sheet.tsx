@@ -205,7 +205,7 @@ export function RoleFormSheet({
                   <TableRow>
                     <TableHead className="w-full">Módulo</TableHead>
                     <TableHead className="w-16 text-center">
-                      <Button
+                      <button
                         type="button"
                         className="flex w-full items-center justify-center gap-1 text-xs"
                         onClick={() => toggleAllColumn("read")}
@@ -217,7 +217,7 @@ export function RoleFormSheet({
                           tabIndex={-1}
                         />
                         Ver
-                      </Button>
+                      </button>
                     </TableHead>
                     <TableHead className="w-16 text-center">
                       <button
