@@ -47,9 +47,8 @@ export function SignUpForm({
         options: {
           data: {
             name: email.split("@")[0], // Usar primera parte del email como nombre
-            role: "SELLER",
           },
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -62,7 +61,7 @@ export function SignUpForm({
       setError(
         error instanceof Error
           ? error.message
-          : "Ocurrió un error al crear la cuenta"
+          : "Ocurrió un error al crear la cuenta",
       );
     } finally {
       setIsLoading(false);

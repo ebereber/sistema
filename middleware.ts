@@ -5,7 +5,13 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_ROUTES = [
   "/login",
   "/register",
+  "/sign-up",
+  "/sign-up-success",
+  "/forgot-password",
+  "/update-password",
+  "/confirm",
   "/acceso-pendiente",
+  "/onboarding",
   "/auth/callback",
 ];
 
@@ -60,6 +66,12 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // 2. Si HAY usuario, puedes añadir lógica extra:
+  // Ejemplo: Si ya está logueado e intenta ir a /login, mándalo a /dashboard
+  if (user && (pathname === "/login" || pathname === "/sign-up")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

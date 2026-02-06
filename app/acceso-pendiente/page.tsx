@@ -1,9 +1,36 @@
-// app/acceso-pendiente/page.tsx
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ShieldX } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-export default function AccesoPendientePage() {
+export default async function AccesoPendientePage() {
+  // If user is not even logged in, send to login
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    redirect("/login");
+  }
+
+  // Check if the user already has an active account with org
+  const { data: dbUser } = await supabaseAdmin
+    .from("users")
+    .select("active, organization_id")
+    .eq("id", authUser.id)
+    .single();
+
+  if (dbUser?.active && dbUser.organization_id) {
+    redirect("/");
+  }
+
+  if (dbUser?.active && !dbUser.organization_id) {
+    redirect("/onboarding");
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="flex flex-col items-center gap-4 text-center">
