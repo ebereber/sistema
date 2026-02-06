@@ -23,7 +23,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -39,6 +38,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import {
+  confirmDelegationAction,
+  saveFiscalConfigAction,
+  updateFiscalSettingsAction,
+} from "@/lib/actions/fiscal";
+import {
+  updateOrganizationAction,
+  uploadOrganizationLogoAction,
+} from "@/lib/actions/organization";
+import type { FiscalConfig, FiscalPointOfSale } from "@/lib/services/fiscal";
+import type { Organization } from "@/lib/services/organization";
+import type { PointOfSale } from "@/lib/services/point-of-sale";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -47,50 +58,94 @@ import {
   CreditCard,
   ExternalLink,
   Image as ImageIcon,
+  Loader2,
   Lock,
   Mail,
   Receipt,
-  X,
+  Upload,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 
-export function ConfiguracionContent() {
+interface ConfiguracionContentProps {
+  organization: Organization;
+  fiscalConfig: FiscalConfig | null;
+  fiscalPointsOfSale: FiscalPointOfSale[];
+  pointsOfSale: PointOfSale[];
+}
+
+export function ConfiguracionContent({
+  organization,
+  fiscalConfig,
+  fiscalPointsOfSale,
+  pointsOfSale,
+}: ConfiguracionContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab") || "general";
 
   const [activeTab, setActiveTab] = useState(currentTab);
-  const [fiscalDialogOpen, setFiscalDialogOpen] = useState(false);
 
-  // General tab form state
+  // --- General tab ---
   const [generalForm, setGeneralForm] = useState({
-    name: "Local 1",
-    email: "",
-    phone: "",
+    name: organization.name,
+    email: organization.email || "",
+    phone: organization.phone || "",
+  });
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(organization.logo_url || "");
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- ARCA tab ---
+  const [fiscalDialogOpen, setFiscalDialogOpen] = useState(false);
+  const [isSavingFiscal, setIsSavingFiscal] = useState(false);
+
+  // Fiscal dialog form state
+  const hasFiscalData = !!fiscalConfig?.razon_social;
+  const [fiscalForm, setFiscalForm] = useState({
+    cuit: fiscalConfig?.cuit || organization.cuit || "",
+    razon_social: fiscalConfig?.razon_social || "",
+    condicion_iva: fiscalConfig?.condicion_iva || "Monotributista",
+    personeria: fiscalConfig?.personeria || "Física",
+    domicilio_fiscal: fiscalConfig?.domicilio_fiscal || "",
+    localidad: fiscalConfig?.localidad || "",
+    provincia: fiscalConfig?.provincia || "",
+    codigo_postal: fiscalConfig?.codigo_postal || "",
+    inicio_actividades: fiscalConfig?.inicio_actividades || "",
+    iibb: fiscalConfig?.iibb || "",
   });
 
-  // ARCA tab form state
-  const [closingDate, setClosingDate] = useState<Date | undefined>(undefined);
-  const [taxSettings, setTaxSettings] = useState({
-    iibbIsExempt: false,
-    isIvaPerceptionAgent: false,
-    isIibbPerceptionAgent: false,
-    isRetentionAgent: false,
-  });
-  const [cbu, setCbu] = useState("");
-
-  // Fiscal dialog state
-  const [activitiesStartedAt, setActivitiesStartedAt] = useState<Date>(
-    new Date(2018, 6, 1),
+  // Fiscal settings
+  const [closingDate, setClosingDate] = useState<Date | undefined>(
+    fiscalConfig?.fecha_cierre
+      ? new Date(fiscalConfig.fecha_cierre)
+      : undefined,
   );
-  const [iibb, setIibb] = useState("");
+  const [taxSettings, setTaxSettings] = useState({
+    iibbIsExempt: fiscalConfig?.iibb_exento ?? false,
+    isIvaPerceptionAgent: fiscalConfig?.es_agente_percepcion_iva ?? false,
+    isIibbPerceptionAgent: fiscalConfig?.es_agente_percepcion_iibb ?? false,
+    isRetentionAgent: fiscalConfig?.es_agente_retencion ?? false,
+  });
+  const [cbu, setCbu] = useState(fiscalConfig?.cbu_fce || "");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSavingClosingDate, setIsSavingClosingDate] = useState(false);
+  const [isSavingCbu, setIsSavingCbu] = useState(false);
+
+  // Delegation
+  const [confirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
+  const [delegationCheckbox, setDelegationCheckbox] = useState(false);
+  const [isConfirmingDelegation, setIsConfirmingDelegation] = useState(false);
+  const isDelegationConfirmed = fiscalConfig?.delegacion_confirmada ?? false;
 
   // Checklist state
-  const [expandedStep, setExpandedStep] = useState<number | null>(4);
-  const [confirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
-  const [delegationConfirmed, setDelegationConfirmed] = useState(false);
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+
+  // --- Handlers ---
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -101,11 +156,184 @@ export function ConfiguracionContent() {
     }
   };
 
+  const handleSaveGeneral = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!generalForm.name.trim()) {
+      toast.error("El nombre es requerido");
+      return;
+    }
+    setIsSavingGeneral(true);
+    try {
+      await updateOrganizationAction({
+        name: generalForm.name.trim(),
+        email: generalForm.email.trim() || null,
+        phone: generalForm.phone.trim() || null,
+      });
+      toast.success("Datos actualizados");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar");
+    } finally {
+      setIsSavingGeneral(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 512 * 1024) {
+      toast.error("El archivo excede 512KB");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = await uploadOrganizationLogoAction(formData);
+      setLogoUrl(url);
+      toast.success("Logo actualizado");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al subir el logo");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleSaveFiscal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !fiscalForm.cuit ||
+      !fiscalForm.razon_social ||
+      !fiscalForm.condicion_iva
+    ) {
+      toast.error("Completá los campos obligatorios");
+      return;
+    }
+    setIsSavingFiscal(true);
+    try {
+      await saveFiscalConfigAction({
+        cuit: fiscalForm.cuit,
+        razon_social: fiscalForm.razon_social,
+        condicion_iva: fiscalForm.condicion_iva,
+        personeria: fiscalForm.personeria || null,
+        domicilio_fiscal: fiscalForm.domicilio_fiscal || null,
+        localidad: fiscalForm.localidad || null,
+        provincia: fiscalForm.provincia || null,
+        codigo_postal: fiscalForm.codigo_postal || null,
+        inicio_actividades: fiscalForm.inicio_actividades || null,
+        iibb: fiscalForm.iibb || null,
+      });
+      toast.success("Datos fiscales guardados");
+      setFiscalDialogOpen(false);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar datos fiscales");
+    } finally {
+      setIsSavingFiscal(false);
+    }
+  };
+
+  const handleMarkDelegationDone = async () => {
+    try {
+      await updateFiscalSettingsAction({ delegacion_web_service: true });
+      toast.success("Marcado como completado");
+      router.refresh();
+    } catch (error) {
+      toast.error("Error al guardar");
+    }
+  };
+
+  const handleConfirmDelegation = async () => {
+    setIsConfirmingDelegation(true);
+    try {
+      await confirmDelegationAction();
+      toast.success("Delegación confirmada");
+      setConfirmationDialogOpen(false);
+      setDelegationCheckbox(false);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al confirmar delegación");
+    } finally {
+      setIsConfirmingDelegation(false);
+    }
+  };
+
+  const handleSaveTaxSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      await updateFiscalSettingsAction({
+        iibb_exento: taxSettings.iibbIsExempt,
+        es_agente_percepcion_iva: taxSettings.isIvaPerceptionAgent,
+        es_agente_percepcion_iibb: taxSettings.isIibbPerceptionAgent,
+        es_agente_retencion: taxSettings.isRetentionAgent,
+      });
+      toast.success("Configuración fiscal actualizada");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleSaveClosingDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingClosingDate(true);
+    try {
+      await updateFiscalSettingsAction({
+        fecha_cierre: closingDate
+          ? closingDate.toISOString().split("T")[0]
+          : null,
+      });
+      toast.success("Fecha de cierre actualizada");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar");
+    } finally {
+      setIsSavingClosingDate(false);
+    }
+  };
+
+  const handleSaveCbu = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingCbu(true);
+    try {
+      await updateFiscalSettingsAction({
+        cbu_fce: cbu.trim() || null,
+      });
+      toast.success("CBU actualizado");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar");
+    } finally {
+      setIsSavingCbu(false);
+    }
+  };
+
+  // --- Checklist completion ---
+  const step1Completed = hasFiscalData;
+  const step2Completed = fiscalConfig?.delegacion_web_service ?? false;
+  const step3Completed = isDelegationConfirmed;
+  const step4Completed = fiscalConfig?.punto_venta_creado_arca ?? false;
+  /* const step5Completed = fiscalPointsOfSale.length > 0; */
+  const step5Completed = pointsOfSale.some((pos) => pos.enabled_for_arca);
+
   const steps = [
     {
       id: 1,
       title: "Completá tus datos fiscales",
-      completed: true,
+      completed: step1Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -117,7 +345,7 @@ export function ConfiguracionContent() {
               variant="secondary"
               onClick={() => setFiscalDialogOpen(true)}
             >
-              Ver datos fiscales
+              {hasFiscalData ? "Ver datos fiscales" : "Ingresar datos fiscales"}
             </Button>
           </div>
         </div>
@@ -126,7 +354,7 @@ export function ConfiguracionContent() {
     {
       id: 2,
       title: "Delegá la facturación electrónica",
-      completed: true,
+      completed: step2Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -135,7 +363,15 @@ export function ConfiguracionContent() {
             La Pyme facture por vos desde ARCA.
           </p>
           <div className="flex flex-col gap-2 pt-1 md:flex-row">
-            <Button variant="secondary" disabled>
+            <Button
+              variant="secondary"
+              disabled={step2Completed || !step1Completed}
+              onClick={() =>
+                updateFiscalSettingsAction({
+                  delegacion_web_service: true,
+                }).then(() => router.refresh())
+              }
+            >
               Ya delegué la facturación
             </Button>
             <Button variant="outline" asChild>
@@ -156,7 +392,7 @@ export function ConfiguracionContent() {
     {
       id: 3,
       title: "Confirmá la delegación de facturación en ARCA",
-      completed: false,
+      completed: step3Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -165,9 +401,15 @@ export function ConfiguracionContent() {
             habilitar la emisión de comprobantes fiscales desde La Pyme.
           </p>
           <div className="flex flex-col gap-2 pt-1 md:flex-row">
-            <Button onClick={() => setConfirmationDialogOpen(true)}>
-              Confirmar delegación
-            </Button>
+            {step3Completed ? (
+              <Button variant="secondary" disabled>
+                Delegación confirmada
+              </Button>
+            ) : (
+              <Button onClick={() => setConfirmationDialogOpen(true)}>
+                Confirmar delegación
+              </Button>
+            )}
           </div>
         </div>
       ),
@@ -175,7 +417,7 @@ export function ConfiguracionContent() {
     {
       id: 4,
       title: "Creá un punto de venta con facturación electrónica en ARCA",
-      completed: true,
+      completed: step4Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -185,7 +427,15 @@ export function ConfiguracionContent() {
             al siguiente paso.
           </p>
           <div className="flex flex-col gap-2 pt-1 md:flex-row">
-            <Button variant="secondary" disabled>
+            <Button
+              variant="secondary"
+              disabled={step4Completed || !step3Completed}
+              onClick={() =>
+                updateFiscalSettingsAction({
+                  punto_venta_creado_arca: true,
+                }).then(() => router.refresh())
+              }
+            >
               Ya tengo punto de venta
             </Button>
             <Button variant="outline" asChild>
@@ -206,7 +456,7 @@ export function ConfiguracionContent() {
     {
       id: 5,
       title: "Creá tu punto de venta en La Pyme",
-      completed: false,
+      completed: step5Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -215,10 +465,12 @@ export function ConfiguracionContent() {
             ARCA.
           </p>
           <div className="flex flex-col gap-2 pt-1 md:flex-row">
-            <Link href="/configuracion/puntos-venta">
+            <Link href="/configuracion/puntos-de-venta">
               <Button>
                 <span className="inline-flex items-center gap-1">
-                  Crear punto de venta
+                  {step5Completed
+                    ? "Ver puntos de venta"
+                    : "Crear punto de venta"}
                   <ExternalLink className="h-3 w-3" />
                 </span>
               </Button>
@@ -230,6 +482,11 @@ export function ConfiguracionContent() {
   ];
 
   const completedSteps = steps.filter((s) => s.completed).length;
+
+  const generalFormChanged =
+    generalForm.name !== organization.name ||
+    generalForm.email !== (organization.email || "") ||
+    generalForm.phone !== (organization.phone || "");
 
   return (
     <div className="p-4 md:p-6">
@@ -280,11 +537,11 @@ export function ConfiguracionContent() {
                 </CardTitle>
                 <CardDescription>
                   Estos datos se muestran en los emails y facturas, son visibles
-                  para los cientes.
+                  para los clientes.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
+                <form onSubmit={handleSaveGeneral} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Nombre de fantasía</Label>
                     <Input
@@ -328,7 +585,13 @@ export function ConfiguracionContent() {
                     </div>
                   </div>
                   <div className="flex justify-end">
-                    <Button type="submit" disabled>
+                    <Button
+                      type="submit"
+                      disabled={isSavingGeneral || !generalFormChanged}
+                    >
+                      {isSavingGeneral && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Guardar
                     </Button>
                   </div>
@@ -354,12 +617,19 @@ export function ConfiguracionContent() {
                   <div
                     role="presentation"
                     tabIndex={0}
-                    className="h-full w-full cursor-pointer rounded-lg border-2 border-dashed border-gray-300 bg-card text-center text-foreground transition-colors duration-300"
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ")
+                        fileInputRef.current?.click();
+                    }}
+                    className="relative h-full w-full cursor-pointer rounded-lg border-2 border-dashed border-gray-300 bg-card text-center text-foreground transition-colors duration-300 hover:border-primary/50"
                   >
                     <input
+                      ref={fileInputRef}
                       accept="image/jpeg,image/png"
                       tabIndex={-1}
                       type="file"
+                      onChange={handleLogoUpload}
                       style={{
                         border: 0,
                         clip: "rect(0 0 0 0)",
@@ -373,11 +643,29 @@ export function ConfiguracionContent() {
                         whiteSpace: "nowrap",
                       }}
                     />
-                    <div className="flex h-full items-center justify-center">
-                      <p className="cursor-pointer text-sm text-muted-foreground">
-                        Hacé click o arrastrá tu logo
-                      </p>
-                    </div>
+                    {isUploadingLogo ? (
+                      <div className="flex h-full items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : logoUrl ? (
+                      <div className="relative h-full w-full overflow-hidden rounded-lg">
+                        <Image
+                          src={logoUrl}
+                          alt="Logo"
+                          fill
+                          className="object-contain"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity hover:opacity-100">
+                          <Upload className="h-5 w-5 text-white" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <p className="cursor-pointer text-sm text-muted-foreground">
+                          Hacé click o arrastrá tu logo
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -475,7 +763,7 @@ export function ConfiguracionContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
+                <form onSubmit={handleSaveClosingDate} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="closingDate">Fecha de cierre</Label>
                     <Popover>
@@ -508,7 +796,13 @@ export function ConfiguracionContent() {
                     </p>
                   </div>
                   <div className="flex justify-end">
-                    <Button type="submit" disabled>
+                    <Button
+                      type="submit"
+                      disabled={!fiscalConfig || isSavingClosingDate}
+                    >
+                      {isSavingClosingDate && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Guardar
                     </Button>
                   </div>
@@ -525,7 +819,7 @@ export function ConfiguracionContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <form id="tax-settings-form">
+                <form id="tax-settings-form" onSubmit={handleSaveTaxSettings}>
                   <div className="rounded-lg border">
                     <div className="flex items-center justify-between border-b p-4">
                       <Label htmlFor="tax-settings-iibbIsExempt">
@@ -589,7 +883,14 @@ export function ConfiguracionContent() {
                     </div>
                   </div>
                   <div className="mt-4 flex justify-end">
-                    <Button type="submit" form="tax-settings-form" disabled>
+                    <Button
+                      type="submit"
+                      form="tax-settings-form"
+                      disabled={!fiscalConfig || isSavingSettings}
+                    >
+                      {isSavingSettings && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Guardar
                     </Button>
                   </div>
@@ -606,7 +907,7 @@ export function ConfiguracionContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
+                <form onSubmit={handleSaveCbu} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="cbu">
                       CBU para Factura de Crédito Electrónica
@@ -623,7 +924,13 @@ export function ConfiguracionContent() {
                     </p>
                   </div>
                   <div className="flex justify-end">
-                    <Button type="submit" disabled>
+                    <Button
+                      type="submit"
+                      disabled={!fiscalConfig || isSavingCbu}
+                    >
+                      {isSavingCbu && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Guardar
                     </Button>
                   </div>
@@ -645,78 +952,195 @@ export function ConfiguracionContent() {
           <DialogHeader>
             <DialogTitle>Datos fiscales</DialogTitle>
             <DialogDescription>
-              Podés actualizar la fecha de inicio de actividades y el número de
-              IIBB. Si necesitás cambiar otros datos, contactanos.
+              {hasFiscalData
+                ? "Podés actualizar la fecha de inicio de actividades y el número de IIBB. Si necesitás cambiar otros datos, contactanos."
+                : "Ingresá los datos fiscales de tu organización."}
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-6">
-            <Card className="p-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">CUIT</p>
-                  <p className="font-medium">23-29607188-9</p>
+          <form onSubmit={handleSaveFiscal} className="space-y-6">
+            {hasFiscalData ? (
+              /* Read-only display for existing fiscal data */
+              <Card className="p-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">CUIT</p>
+                    <p className="font-medium">{fiscalConfig!.cuit}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Razón Social
+                    </p>
+                    <p className="font-medium">{fiscalConfig!.razon_social}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Razón Social</p>
-                  <p className="font-medium">GUSTAVO GIMENEZ</p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Personería</p>
+                    <p className="font-medium">
+                      {fiscalConfig!.personeria || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Condición ante IVA
+                    </p>
+                    <p className="font-medium">{fiscalConfig!.condicion_iva}</p>
+                  </div>
+                </div>
+                {fiscalConfig!.domicilio_fiscal && (
+                  <div>
+                    <p className="mb-1 text-sm text-muted-foreground">
+                      Domicilio Fiscal
+                    </p>
+                    <div className="text-sm">
+                      <p>{fiscalConfig!.domicilio_fiscal}</p>
+                      {(fiscalConfig!.localidad || fiscalConfig!.provincia) && (
+                        <p>
+                          {[fiscalConfig!.localidad, fiscalConfig!.provincia]
+                            .filter(Boolean)
+                            .join(", ")}
+                          {fiscalConfig!.codigo_postal &&
+                            ` - CP: ${fiscalConfig!.codigo_postal}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ) : (
+              /* Editable form for new fiscal data */
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>CUIT *</Label>
+                    <Input
+                      value={fiscalForm.cuit}
+                      onChange={(e) =>
+                        setFiscalForm({ ...fiscalForm, cuit: e.target.value })
+                      }
+                      placeholder="20123456789"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Razón Social *</Label>
+                    <Input
+                      value={fiscalForm.razon_social}
+                      onChange={(e) =>
+                        setFiscalForm({
+                          ...fiscalForm,
+                          razon_social: e.target.value,
+                        })
+                      }
+                      placeholder="NOMBRE APELLIDO"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Condición ante IVA *</Label>
+                    <Input
+                      value={fiscalForm.condicion_iva}
+                      onChange={(e) =>
+                        setFiscalForm({
+                          ...fiscalForm,
+                          condicion_iva: e.target.value,
+                        })
+                      }
+                      placeholder="Monotributista"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Personería</Label>
+                    <Input
+                      value={fiscalForm.personeria}
+                      onChange={(e) =>
+                        setFiscalForm({
+                          ...fiscalForm,
+                          personeria: e.target.value,
+                        })
+                      }
+                      placeholder="Física"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Domicilio Fiscal</Label>
+                  <Input
+                    value={fiscalForm.domicilio_fiscal}
+                    onChange={(e) =>
+                      setFiscalForm({
+                        ...fiscalForm,
+                        domicilio_fiscal: e.target.value,
+                      })
+                    }
+                    placeholder="Calle 123"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Localidad</Label>
+                    <Input
+                      value={fiscalForm.localidad}
+                      onChange={(e) =>
+                        setFiscalForm({
+                          ...fiscalForm,
+                          localidad: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Provincia</Label>
+                    <Input
+                      value={fiscalForm.provincia}
+                      onChange={(e) =>
+                        setFiscalForm({
+                          ...fiscalForm,
+                          provincia: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Código Postal</Label>
+                    <Input
+                      value={fiscalForm.codigo_postal}
+                      onChange={(e) =>
+                        setFiscalForm({
+                          ...fiscalForm,
+                          codigo_postal: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Personería</p>
-                  <p className="font-medium">Física</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Condición ante IVA
-                  </p>
-                  <p className="font-medium">Monotributista</p>
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 text-sm text-muted-foreground">
-                  Domicilio Fiscal
-                </p>
-                <div className="text-sm">
-                  <p>Jorge Luis Borges 686</p>
-                  <p>La Calera, Córdoba - CP: 5151</p>
-                </div>
-              </div>
-            </Card>
+            )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="activitiesStartedAt">
-                  Inicio de actividades *
+                  Inicio de actividades
                 </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {format(activitiesStartedAt, "d 'de' MMMM 'de' yyyy", {
-                        locale: es,
-                      })}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarComponent
-                      mode="single"
-                      selected={activitiesStartedAt}
-                      onSelect={(date) => date && setActivitiesStartedAt(date)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  type="date"
+                  value={fiscalForm.inicio_actividades}
+                  onChange={(e) =>
+                    setFiscalForm({
+                      ...fiscalForm,
+                      inicio_actividades: e.target.value,
+                    })
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="iibb">IIBB (opcional)</Label>
                 <Input
                   id="iibb"
                   placeholder="Número de IIBB"
-                  value={iibb}
-                  onChange={(e) => setIibb(e.target.value)}
+                  value={fiscalForm.iibb}
+                  onChange={(e) =>
+                    setFiscalForm({ ...fiscalForm, iibb: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -728,15 +1152,14 @@ export function ConfiguracionContent() {
               >
                 Cancelar
               </Button>
-              <Button type="submit">Guardar</Button>
+              <Button type="submit" disabled={isSavingFiscal}>
+                {isSavingFiscal && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Guardar
+              </Button>
             </DialogFooter>
           </form>
-          <DialogClose className="absolute right-2 top-2">
-            <Button variant="ghost" size="icon-sm">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogClose>
         </DialogContent>
       </Dialog>
 
@@ -759,9 +1182,9 @@ export function ConfiguracionContent() {
           <div className="py-4">
             <label className="flex cursor-pointer items-center gap-2">
               <Checkbox
-                checked={delegationConfirmed}
+                checked={delegationCheckbox}
                 onCheckedChange={(checked) =>
-                  setDelegationConfirmed(checked as boolean)
+                  setDelegationCheckbox(checked as boolean)
                 }
               />
               <span className="text-sm">
@@ -770,10 +1193,19 @@ export function ConfiguracionContent() {
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDelegationConfirmed(false)}>
+            <AlertDialogCancel onClick={() => setDelegationCheckbox(false)}>
               Cancelar
             </AlertDialogCancel>
-            <AlertDialogAction disabled={!delegationConfirmed}>
+            <AlertDialogAction
+              disabled={!delegationCheckbox || isConfirmingDelegation}
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmDelegation();
+              }}
+            >
+              {isConfirmingDelegation && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Confirmar delegación
             </AlertDialogAction>
           </AlertDialogFooter>

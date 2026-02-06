@@ -531,6 +531,7 @@ export type Database = {
           cuit: string
           delegacion_confirmada: boolean | null
           delegacion_confirmada_at: string | null
+          delegacion_web_service: boolean | null
           domicilio_fiscal: string | null
           es_agente_percepcion_iibb: boolean | null
           es_agente_percepcion_iva: boolean | null
@@ -544,6 +545,7 @@ export type Database = {
           organization_id: string
           personeria: string | null
           provincia: string | null
+          punto_venta_creado_arca: boolean | null
           razon_social: string
           updated_at: string | null
         }
@@ -557,6 +559,7 @@ export type Database = {
           cuit: string
           delegacion_confirmada?: boolean | null
           delegacion_confirmada_at?: string | null
+          delegacion_web_service?: boolean | null
           domicilio_fiscal?: string | null
           es_agente_percepcion_iibb?: boolean | null
           es_agente_percepcion_iva?: boolean | null
@@ -570,6 +573,7 @@ export type Database = {
           organization_id: string
           personeria?: string | null
           provincia?: string | null
+          punto_venta_creado_arca?: boolean | null
           razon_social: string
           updated_at?: string | null
         }
@@ -583,6 +587,7 @@ export type Database = {
           cuit?: string
           delegacion_confirmada?: boolean | null
           delegacion_confirmada_at?: string | null
+          delegacion_web_service?: boolean | null
           domicilio_fiscal?: string | null
           es_agente_percepcion_iibb?: boolean | null
           es_agente_percepcion_iva?: boolean | null
@@ -596,6 +601,7 @@ export type Database = {
           organization_id?: string
           personeria?: string | null
           provincia?: string | null
+          punto_venta_creado_arca?: boolean | null
           razon_social?: string
           updated_at?: string | null
         }
