@@ -1,8 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronRight, ChevronsUpDown } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,16 +18,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import {
-  getCategories,
-  getCategoryById,
-  type Category,
-} from "@/lib/services/categories";
+import { CategoryFormSheet } from "@/components/configuracion/category-form-sheet";
+
+import { type Category } from "@/lib/services/categories";
+import { ArrowLeft, ChevronRight, ChevronsUpDown, Plus } from "lucide-react";
 
 interface CategoryComboboxProps {
   value?: string | null;
   onChange: (value: string | null) => void;
   disabled?: boolean;
+  categories: Category[];
 }
 
 interface BreadcrumbItem {
@@ -41,85 +39,54 @@ export function CategoryCombobox({
   value,
   onChange,
   disabled,
+  categories: initialCategories,
 }: CategoryComboboxProps) {
   const [open, setOpen] = useState(false);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  /* const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
-  );
+  ); */
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([]);
   const [currentParentId, setCurrentParentId] = useState<string | null>(null);
-  const loadedRef = useRef(false);
 
-  // Load ALL categories once
-  const loadAllCategories = useCallback(async () => {
-    if (loadedRef.current && allCategories.length > 0) return;
-    setIsLoading(true);
-    try {
-      const data = await getCategories();
-      setAllCategories(data);
-      loadedRef.current = true;
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al cargar categorías", { description: errorMessage });
-    } finally {
-      setIsLoading(false);
+  // Sheet state
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"create" | "add-sub">("create");
+  const [parentCategory, setParentCategory] = useState<Category | null>(null);
+
+  // Sync with props
+  /*   useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]); */
+
+  // Update selected category
+  const selectedCategory = useMemo(() => {
+    if (value) {
+      return categories.find((c) => c.id === value) || null;
     }
-  }, [allCategories.length]);
-
-  // Load selected category display name
-  useEffect(() => {
-    async function loadSelectedCategory() {
-      if (value) {
-        // Try from cache first
-        const cached = allCategories.find((c) => c.id === value);
-        if (cached) {
-          setSelectedCategory(cached);
-          return;
-        }
-        try {
-          const category = await getCategoryById(value);
-          setSelectedCategory(category);
-        } catch {
-          setSelectedCategory(null);
-        }
-      } else {
-        setSelectedCategory(null);
-      }
-    }
-    loadSelectedCategory();
-  }, [value, allCategories]);
-
-  // Load on first open
-  useEffect(() => {
-    if (open) {
-      loadAllCategories();
-    }
-  }, [open, loadAllCategories]);
-
-  // Derive current visible categories from memory (no API calls)
+    return null;
+  }, [value, categories]);
+  // Visible categories
   const visibleCategories = useMemo(() => {
     if (searchQuery.trim()) {
-      return allCategories.filter((cat) =>
+      return categories.filter((cat) =>
         cat.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
-    return allCategories.filter((cat) =>
+    return categories.filter((cat) =>
       currentParentId ? cat.parent_id === currentParentId : !cat.parent_id,
     );
-  }, [allCategories, currentParentId, searchQuery]);
+  }, [categories, currentParentId, searchQuery]);
 
-  // Derive which categories have children (no API calls)
+  // Categories with children
   const categoriesWithChildren = useMemo(() => {
     const set = new Set<string>();
-    allCategories.forEach((cat) => {
+    categories.forEach((cat) => {
       if (cat.parent_id) set.add(cat.parent_id);
     });
     return set;
-  }, [allCategories]);
+  }, [categories]);
 
   function navigateToCategory(category: Category) {
     if (categoriesWithChildren.has(category.id)) {
@@ -165,97 +132,164 @@ export function CategoryCombobox({
     }
   }
 
+  function handleCreateClick() {
+    setOpen(false);
+
+    if (currentParentId) {
+      // Estamos dentro de una categoría → crear subcategoría
+      const parent = categories.find((c) => c.id === currentParentId);
+      console.log("Creating subcategory for parent:", parent);
+      setParentCategory(parent || null);
+      setSheetMode("add-sub");
+    } else {
+      // Estamos en root → crear categoría padre
+      setParentCategory(null);
+      setSheetMode("create");
+    }
+
+    setTimeout(() => {
+      setSheetOpen(true);
+    }, 100);
+  }
+
+  function handleCreateSuccess(newCategory?: Category) {
+    if (newCategory) {
+      setCategories((prev) =>
+        [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      onChange(newCategory.id);
+    }
+  }
+
+  // Determinar texto del botón
+  const createButtonText = currentParentId
+    ? "Crear subcategoría"
+    : "Crear categoría";
+
+  const selectedCategoryDisplay = useMemo(() => {
+    if (!selectedCategory) return null;
+
+    if (selectedCategory.parent_id) {
+      const parent = categories.find(
+        (c) => c.id === selectedCategory.parent_id,
+      );
+      return {
+        name: selectedCategory.name,
+        parentName: parent?.name || null,
+      };
+    }
+
+    return {
+      name: selectedCategory.name,
+      parentName: null,
+    };
+  }, [selectedCategory, categories]);
+
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-          disabled={disabled}
-        >
-          {selectedCategory?.name || "Seleccionar categoría"}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Buscar categoría..."
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-          />
-          <CommandList>
-            {isLoading ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                Cargando...
-              </div>
-            ) : (
-              <>
-                {breadcrumb.length > 0 && !searchQuery && (
-                  <>
-                    <CommandGroup>
-                      <CommandItem onSelect={navigateBack}>
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Volver
-                      </CommandItem>
-                    </CommandGroup>
-
-                    <CommandGroup
-                    /* heading={breadcrumb[breadcrumb.length - 1].name} */
-                    >
-                      <CommandItem
-                        onSelect={() => {
-                          onChange(currentParentId);
-                          setOpen(false);
-                          setBreadcrumb([]);
-                          setCurrentParentId(null);
-                        }}
-                        className="font-semibold"
-                      >
-                        {breadcrumb[breadcrumb.length - 1].name}
-                      </CommandItem>
-                    </CommandGroup>
-                    <CommandSeparator />
-                  </>
+    <>
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+            disabled={disabled}
+          >
+            {selectedCategoryDisplay ? (
+              <span className="truncate text-left">
+                {selectedCategoryDisplay.name}
+                {selectedCategoryDisplay.parentName && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    en {selectedCategoryDisplay.parentName}
+                  </span>
                 )}
-
-                <CommandEmpty>No se encontraron categorías</CommandEmpty>
-
-                <CommandGroup
-                  heading={
-                    breadcrumb.length > 0
-                      ? "Subcategorías"
-                      : searchQuery
-                        ? "Resultados"
-                        : undefined
-                  }
-                >
-                  {visibleCategories.map((category) => (
-                    <CommandItem
-                      key={category.id}
-                      value={category.id}
-                      onSelect={() => navigateToCategory(category)}
-                    >
-                      {/*   <Check
-                        className={cn(
-                          "h-4 w-4",
-                          value === category.id ? "opacity-100" : "opacity-0",
-                        )}
-                      /> */}
-                      <span className="flex-1">{category.name}</span>
-                      {categoriesWithChildren.has(category.id) && (
-                        <ChevronRight className="ml-2 h-4 w-4 text-muted-foreground" />
-                      )}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </>
+              </span>
+            ) : (
+              "Seleccionar categoría"
             )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Buscar categoría..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              {breadcrumb.length > 0 && !searchQuery && (
+                <>
+                  <CommandGroup>
+                    <CommandItem onSelect={navigateBack}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Volver
+                    </CommandItem>
+                  </CommandGroup>
+
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        onChange(currentParentId);
+                        setOpen(false);
+                        setBreadcrumb([]);
+                        setCurrentParentId(null);
+                      }}
+                      className="font-semibold"
+                    >
+                      {breadcrumb[breadcrumb.length - 1].name}
+                    </CommandItem>
+                  </CommandGroup>
+                  <CommandSeparator />
+                </>
+              )}
+
+              <CommandEmpty>No se encontraron categorías</CommandEmpty>
+
+              <CommandGroup
+                heading={
+                  breadcrumb.length > 0
+                    ? "Subcategorías"
+                    : searchQuery
+                      ? "Resultados"
+                      : undefined
+                }
+              >
+                {visibleCategories.map((category) => (
+                  <CommandItem
+                    key={category.id}
+                    value={category.id}
+                    onSelect={() => navigateToCategory(category)}
+                  >
+                    <span className="flex-1">{category.name}</span>
+                    {categoriesWithChildren.has(category.id) && (
+                      <ChevronRight className="ml-2 h-4 w-4 text-muted-foreground" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem onSelect={handleCreateClick}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {createButtonText}
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      <CategoryFormSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        mode={sheetMode}
+        category={parentCategory}
+        onSuccess={handleCreateSuccess}
+      />
+    </>
   );
 }

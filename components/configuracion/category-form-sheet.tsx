@@ -22,7 +22,10 @@ import {
   updateCategoryAction,
   updateCategoryWithSubsAction,
 } from "@/lib/actions/categories";
-import { type CategoryWithChildren } from "@/lib/services/categories";
+import {
+  type Category,
+  type CategoryWithChildren,
+} from "@/lib/services/categories";
 
 type SheetMode =
   | "create" // New category + optional subcategories
@@ -35,7 +38,7 @@ interface CategoryFormSheetProps {
   onOpenChange: (open: boolean) => void;
   mode: SheetMode;
   category?: CategoryWithChildren | null;
-  onSuccess: () => void;
+  onSuccess: (newCategory?: Category) => void;
 }
 
 interface SubItem {
@@ -95,6 +98,7 @@ export function CategoryFormSheet({
   }
 
   async function handleSubmit() {
+    console.log("handleSubmit - mode:", mode, "category:", category);
     setIsLoading(true);
     const finalSubcategories = [...subcategories];
     if (newSubName.trim() && showSubcategories) {
@@ -104,16 +108,23 @@ export function CategoryFormSheet({
       if (mode === "create") {
         if (!name.trim()) {
           toast.error("Ingresá el nombre de la categoría");
+          setIsLoading(false);
           return;
         }
-        await createCategoryAction({
+        const newCategory = await createCategoryAction({
           name: name.trim(),
           subcategories: finalSubcategories.map((s) => s.name).filter(Boolean),
         });
         toast.success("Categoría creada");
-      } else if (mode === "edit-parent" && category) {
+        onOpenChange(false);
+        onSuccess(newCategory);
+        return;
+      }
+
+      if (mode === "edit-parent" && category) {
         if (!name.trim()) {
           toast.error("Ingresá el nombre de la categoría");
+          setIsLoading(false);
           return;
         }
         await updateCategoryWithSubsAction(
@@ -122,24 +133,39 @@ export function CategoryFormSheet({
           finalSubcategories.filter((s) => s.name.trim()),
         );
         toast.success("Categoría actualizada");
-      } else if (mode === "edit-sub" && category) {
+        onOpenChange(false);
+        onSuccess();
+        return;
+      }
+
+      if (mode === "edit-sub" && category) {
         if (!name.trim()) {
           toast.error("Ingresá el nombre");
+          setIsLoading(false);
           return;
         }
         await updateCategoryAction(category.id, name.trim());
         toast.success("Subcategoría actualizada");
-      } else if (mode === "add-sub" && category) {
-        if (!name.trim()) {
-          toast.error("Ingresá el nombre de la subcategoría");
-          return;
-        }
-        await createSubcategoryAction(category.id, name.trim());
-        toast.success("Subcategoría creada");
+        onOpenChange(false);
+        onSuccess();
+        return;
       }
 
-      onOpenChange(false);
-      onSuccess();
+      if (mode === "add-sub" && category) {
+        if (!name.trim()) {
+          toast.error("Ingresá el nombre de la subcategoría");
+          setIsLoading(false);
+          return;
+        }
+        const newSubcategory = await createSubcategoryAction(
+          category.id,
+          name.trim(),
+        );
+        toast.success("Subcategoría creada");
+        onOpenChange(false);
+        onSuccess(newSubcategory);
+        return;
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Error desconocido";
       toast.error("Error", { description: msg });

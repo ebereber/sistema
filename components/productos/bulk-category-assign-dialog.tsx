@@ -17,6 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 
 import { bulkAssignCategoryAction } from "@/lib/actions/products";
+import type { Category } from "@/lib/services/categories";
 import type { BulkFilters } from "@/lib/services/products";
 
 interface BulkCategoryAssignDialogProps {
@@ -27,6 +28,7 @@ interface BulkCategoryAssignDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  categories: Category[];
 }
 
 export function BulkCategoryAssignDialog({
@@ -37,6 +39,7 @@ export function BulkCategoryAssignDialog({
   open,
   onOpenChange,
   onSuccess,
+  categories,
 }: BulkCategoryAssignDialogProps) {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +97,7 @@ export function BulkCategoryAssignDialog({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Categoría</Label>
-            <CategoryCombobox value={categoryId} onChange={setCategoryId} />
+            <CategoryCombobox value={categoryId} onChange={setCategoryId} categories={categories} />
             <p className="text-xs text-muted-foreground">
               Dejá vacío para quitar la categoría de los productos seleccionados
             </p>

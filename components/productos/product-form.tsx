@@ -35,7 +35,10 @@ import { StockMovementsDialog } from "./stock-movements-dialog";
 import { StockTable } from "./stock-table";
 import { SupplierCombobox } from "./supplier-combobox";
 
+import type { Category } from "@/lib/services/categories";
 import type { Product } from "@/lib/services/products";
+import type { LocationForProducts } from "@/lib/services/products-cached";
+import type { Supplier } from "@/lib/services/suppliers";
 import {
   productSchema,
   TAX_RATES,
@@ -52,6 +55,9 @@ interface ProductFormProps {
   onArchive?: () => void;
   onActivate?: () => void;
   isLoading?: boolean;
+  categories?: Category[];
+  suppliers?: Supplier[];
+  locations?: LocationForProducts[];
 }
 
 export function ProductForm({
@@ -62,6 +68,9 @@ export function ProductForm({
   onArchive,
   onActivate,
   isLoading,
+  categories = [],
+  suppliers = [],
+  locations = [],
 }: ProductFormProps) {
   const form = useForm<ProductFormInput>({
     resolver: zodResolver(productSchema),
@@ -172,6 +181,7 @@ export function ProductForm({
   return (
     <Form {...form}>
       <form
+        id="product-form"
         onSubmit={form.handleSubmit(handleFormSubmit)}
         className="space-y-6"
       >
@@ -259,6 +269,7 @@ export function ProductForm({
                           value={field.value}
                           onChange={field.onChange}
                           disabled={isLoading}
+                          categories={categories}
                         />
                       </FormControl>
                       <FormMessage />
@@ -300,6 +311,7 @@ export function ProductForm({
                           value={field.value}
                           onChange={field.onChange}
                           disabled={isLoading}
+                          suppliers={suppliers}
                         />
                       </FormControl>
                       <FormMessage />
@@ -476,6 +488,7 @@ export function ProductForm({
                   value={internalStock}
                   onChange={setInternalStock}
                   disabled={isLoading}
+                  locations={locations}
                 />
               </CardContent>
             </Card>

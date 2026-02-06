@@ -1,8 +1,7 @@
 "use client";
 
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,51 +21,34 @@ import {
 
 import { SupplierDialog } from "@/components/proveedores/supplier-dialog";
 
-import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
+import { type Supplier } from "@/lib/services/suppliers";
 import { cn } from "@/lib/utils";
 
 interface SupplierComboboxProps {
   value?: string | null;
   onChange: (value: string | null) => void;
   disabled?: boolean;
+  suppliers?: Supplier[];
 }
 
 export function SupplierCombobox({
   value,
   onChange,
   disabled,
+  suppliers: initialSuppliers = [],
 }: SupplierComboboxProps) {
   const [open, setOpen] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
-    null
-  );
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+
   const [searchQuery, setSearchQuery] = useState("");
   const createButtonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    loadSuppliers();
-  }, []);
-
-  useEffect(() => {
-    if (value && suppliers.length > 0) {
-      const supplier = suppliers.find((s) => s.id === value);
-      setSelectedSupplier(supplier || null);
-    } else {
-      setSelectedSupplier(null);
+  const selectedSupplier = useMemo(() => {
+    if (value) {
+      return suppliers.find((s) => s.id === value) || null;
     }
+    return null;
   }, [value, suppliers]);
-
-  async function loadSuppliers() {
-    try {
-      const data = await getSuppliers({ active: true });
-      setSuppliers(data);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al cargar proveedores", { description: errorMessage });
-    }
-  }
 
   function handleSelect(supplierId: string) {
     onChange(supplierId === value ? null : supplierId);
@@ -75,13 +57,15 @@ export function SupplierCombobox({
   }
 
   function handleCreateSuccess(newSupplier: Supplier) {
-    loadSuppliers();
+    // Agregar al estado local y seleccionar
+    setSuppliers((prev) =>
+      [...prev, newSupplier].sort((a, b) => a.name.localeCompare(b.name)),
+    );
     onChange(newSupplier.id);
   }
 
   function handleCreateClick() {
     setOpen(false);
-    // Small delay to allow popover to close before opening dialog
     setTimeout(() => {
       createButtonRef.current?.click();
     }, 100);
@@ -91,7 +75,7 @@ export function SupplierCombobox({
     ? suppliers.filter(
         (s) =>
           s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.tax_id?.toLowerCase().includes(searchQuery.toLowerCase())
+          s.tax_id?.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : suppliers;
 
@@ -129,7 +113,7 @@ export function SupplierCombobox({
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        value === supplier.id ? "opacity-100" : "opacity-0"
+                        value === supplier.id ? "opacity-100" : "opacity-0",
                       )}
                     />
                     <div className="flex flex-col">
@@ -145,7 +129,10 @@ export function SupplierCombobox({
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup>
-                <CommandItem onSelect={handleCreateClick} className="text-primary">
+                <CommandItem
+                  onSelect={handleCreateClick}
+                  className="text-primary"
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Crear nuevo proveedor
                 </CommandItem>

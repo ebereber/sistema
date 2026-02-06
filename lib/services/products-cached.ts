@@ -1,27 +1,30 @@
-import "server-only"
+import "server-only";
 
-import { supabaseAdmin } from "@/lib/supabase/admin"
-import { normalizeRelation } from "@/lib/supabase/types"
-import { cacheLife, cacheTag } from "next/cache"
-import type { Category } from "./categories"
-import type {
-  BulkFilters,
-  GetProductsParams,
-  Product,
-} from "./products"
-import type { ProductForSale } from "./sales"
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeRelation } from "@/lib/supabase/types";
+import { cacheLife, cacheTag } from "next/cache";
+import type { Category } from "./categories";
+import type { BulkFilters, GetProductsParams, Product } from "./products";
+import type { ProductForSale } from "./sales";
+
+export type LocationForProducts = {
+  id: string;
+  name: string;
+  is_main: boolean | null;
+  active: boolean | null;
+};
 
 export async function getCachedProducts(
   organizationId: string,
   params: GetProductsParams = {},
 ): Promise<{
-  data: Product[]
-  count: number
-  totalPages: number
+  data: Product[];
+  count: number;
+  totalPages: number;
 }> {
-  "use cache"
-  cacheTag("products")
-  cacheLife("minutes")
+  "use cache";
+  cacheTag("products");
+  cacheLife("minutes");
 
   const {
     search,
@@ -31,7 +34,7 @@ export async function getCachedProducts(
     stockFilter,
     page = 1,
     pageSize = 20,
-  } = params
+  } = params;
 
   let query = supabaseAdmin
     .from("products")
@@ -42,59 +45,60 @@ export async function getCachedProducts(
     `,
       { count: "exact" },
     )
-    .eq("organization_id", organizationId)
+    .eq("organization_id", organizationId);
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
   }
 
   if (active !== undefined) {
-    query = query.eq("active", active)
+    query = query.eq("active", active);
   }
 
   if (categoryId) {
-    query = query.eq("category_id", categoryId)
+    query = query.eq("category_id", categoryId);
   }
 
   if (visibility && visibility.length > 0) {
-    query = query.in("visibility", visibility)
+    query = query.in("visibility", visibility);
   }
 
   if (stockFilter === "WITH_STOCK") {
-    query = query.gt("stock_quantity", 0)
+    query = query.gt("stock_quantity", 0);
   } else if (stockFilter === "WITHOUT_STOCK") {
-    query = query.eq("stock_quantity", 0)
+    query = query.eq("stock_quantity", 0);
   } else if (stockFilter === "NEGATIVE_STOCK") {
-    query = query.lt("stock_quantity", 0)
+    query = query.lt("stock_quantity", 0);
   }
 
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
   const { data, error, count } = await query
     .range(from, to)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  if (error) throw error
+  if (error) throw error;
 
   return {
     data: (data || []) as unknown as Product[],
     count: count || 0,
     totalPages: Math.ceil((count || 0) / pageSize),
-  }
+  };
 }
 
 export async function getCachedProductById(
   organizationId: string,
   id: string,
 ): Promise<Product | null> {
-  "use cache"
-  cacheTag("products", `product-${id}`)
-  cacheLife("minutes")
+  "use cache";
+  cacheTag("products", `product-${id}`);
+  cacheLife("minutes");
 
   const { data, error } = await supabaseAdmin
     .from("products")
-    .select(`
+    .select(
+      `
       *,
       category:categories(id, name),
       supplier:suppliers(id, name),
@@ -104,41 +108,44 @@ export async function getCachedProductById(
         quantity,
         location:locations(id, name, is_main)
       )
-    `)
+    `,
+    )
     .eq("organization_id", organizationId)
     .eq("id", id)
-    .single()
+    .single();
 
   if (error) {
-    if (error.code === "PGRST116") return null
-    throw error
+    if (error.code === "PGRST116") return null;
+    throw error;
   }
 
-  return data as unknown as Product
+  return data as unknown as Product;
 }
 
-export async function getCachedCategories(organizationId: string): Promise<Category[]> {
-  "use cache"
-  cacheTag("categories")
-  cacheLife("minutes")
+export async function getCachedCategories(
+  organizationId: string,
+): Promise<Category[]> {
+  "use cache";
+  cacheTag("categories");
+  cacheLife("minutes");
 
   const { data, error } = await supabaseAdmin
     .from("categories")
     .select("*")
     .eq("organization_id", organizationId)
     .eq("active", true)
-    .order("name", { ascending: true })
+    .order("name", { ascending: true });
 
-  if (error) throw error
-  return data || []
+  if (error) throw error;
+  return data || [];
 }
 
-export async function getCachedLocationsForProducts(organizationId: string): Promise<
-  { id: string; name: string; is_main: boolean | null; active: boolean | null }[]
-> {
-  "use cache"
-  cacheTag("locations")
-  cacheLife("minutes")
+export async function getCachedLocationsForProducts(
+  organizationId: string,
+): Promise<LocationForProducts[]> {
+  "use cache";
+  cacheTag("locations");
+  cacheLife("minutes");
 
   const { data, error } = await supabaseAdmin
     .from("locations")
@@ -146,58 +153,63 @@ export async function getCachedLocationsForProducts(organizationId: string): Pro
     .eq("organization_id", organizationId)
     .eq("active", true)
     .order("is_main", { ascending: false })
-    .order("name")
+    .order("name");
 
-  if (error) throw error
-  return data || []
+  if (error) throw error;
+  return data || [];
 }
 
 export async function getCachedAllProductIds(
   organizationId: string,
   filters: BulkFilters,
 ): Promise<string[]> {
-  "use cache"
-  cacheTag("products")
-  cacheLife("minutes")
+  "use cache";
+  cacheTag("products");
+  cacheLife("minutes");
 
-  let query = supabaseAdmin.from("products").select("id").eq("organization_id", organizationId)
+  let query = supabaseAdmin
+    .from("products")
+    .select("id")
+    .eq("organization_id", organizationId);
 
   if (filters.search) {
     query = query.or(
       `name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%`,
-    )
+    );
   }
 
   if (filters.active !== undefined) {
-    query = query.eq("active", filters.active)
+    query = query.eq("active", filters.active);
   }
 
   if (filters.categoryId) {
-    query = query.eq("category_id", filters.categoryId)
+    query = query.eq("category_id", filters.categoryId);
   }
 
   if (filters.visibility && filters.visibility.length > 0) {
-    query = query.in("visibility", filters.visibility)
+    query = query.in("visibility", filters.visibility);
   }
 
   if (filters.stockFilter === "WITH_STOCK") {
-    query = query.gt("stock_quantity", 0)
+    query = query.gt("stock_quantity", 0);
   } else if (filters.stockFilter === "WITHOUT_STOCK") {
-    query = query.eq("stock_quantity", 0)
+    query = query.eq("stock_quantity", 0);
   } else if (filters.stockFilter === "NEGATIVE_STOCK") {
-    query = query.lt("stock_quantity", 0)
+    query = query.lt("stock_quantity", 0);
   }
 
-  const { data, error } = await query
+  const { data, error } = await query;
 
-  if (error) throw error
-  return data?.map((p) => p.id) || []
+  if (error) throw error;
+  return data?.map((p) => p.id) || [];
 }
 
-export async function getCachedAllProductsForPOS(organizationId: string): Promise<ProductForSale[]> {
-  "use cache"
-  cacheTag("products")
-  cacheLife("minutes")
+export async function getCachedAllProductsForPOS(
+  organizationId: string,
+): Promise<ProductForSale[]> {
+  "use cache";
+  cacheTag("products");
+  cacheLife("minutes");
 
   const { data, error } = await supabaseAdmin
     .from("products")
@@ -218,9 +230,9 @@ export async function getCachedAllProductsForPOS(organizationId: string): Promis
     .eq("organization_id", organizationId)
     .eq("active", true)
     .in("visibility", ["SALES_AND_PURCHASES", "SALES_ONLY"])
-    .order("name", { ascending: true })
+    .order("name", { ascending: true });
 
-  if (error) throw error
+  if (error) throw error;
 
   return (data || []).map((product) => ({
     id: product.id,
@@ -233,16 +245,16 @@ export async function getCachedAllProductsForPOS(organizationId: string): Promis
     imageUrl: product.image_url,
     categoryId: product.category_id,
     categoryName: normalizeRelation(product.category)?.name || null,
-  }))
+  }));
 }
 
 export async function getCachedTopSellingProducts(
   organizationId: string,
   limit: number = 20,
 ): Promise<ProductForSale[]> {
-  "use cache"
-  cacheTag("sales", "products")
-  cacheLife("hours")
+  "use cache";
+  cacheTag("sales", "products");
+  cacheLife("hours");
 
   // Get recent sale items to determine top sellers
   // sale_items has no org_id, but we filter via joined product
@@ -270,33 +282,33 @@ export async function getCachedTopSellingProducts(
     `,
     )
     .not("product_id", "is", null)
-    .limit(1000)
+    .limit(1000);
 
-  if (error) throw error
+  if (error) throw error;
 
   // Group by product_id and sum quantities
   const counts = new Map<
     string,
     { count: number; product: (typeof data)[number]["product"] }
-  >()
+  >();
   for (const item of data || []) {
-    if (!item.product_id || !item.product) continue
+    if (!item.product_id || !item.product) continue;
     const product = Array.isArray(item.product)
       ? item.product[0]
-      : item.product
-    if (!product || !product.active) continue
-    if ((product as any).organization_id !== organizationId) continue
+      : item.product;
+    if (!product || !product.active) continue;
+    if ((product as any).organization_id !== organizationId) continue;
     if (
       product.visibility !== "SALES_AND_PURCHASES" &&
       product.visibility !== "SALES_ONLY"
     )
-      continue
+      continue;
 
-    const existing = counts.get(item.product_id)
+    const existing = counts.get(item.product_id);
     if (existing) {
-      existing.count += item.quantity
+      existing.count += item.quantity;
     } else {
-      counts.set(item.product_id, { count: item.quantity, product })
+      counts.set(item.product_id, { count: item.quantity, product });
     }
   }
 
@@ -304,10 +316,10 @@ export async function getCachedTopSellingProducts(
     .sort((a, b) => b.count - a.count)
     .slice(0, limit)
     .map((x) => {
-      const p = x.product as Record<string, unknown>
+      const p = x.product as Record<string, unknown>;
       const category = normalizeRelation(
         p.category as { name: string } | { name: string }[] | null,
-      )
+      );
       return {
         id: p.id as string,
         name: p.name as string,
@@ -319,6 +331,6 @@ export async function getCachedTopSellingProducts(
         imageUrl: p.image_url as string | null,
         categoryId: p.category_id as string | null,
         categoryName: category?.name || null,
-      }
-    })
+      };
+    });
 }

@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { Loader2 } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
-import { toast } from "sonner"
+import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 
-import { ProductForm } from "@/components/productos/product-form"
+import { ProductForm } from "@/components/productos/product-form";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,36 +14,45 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 import {
   createProductAction,
-  isSkuUniqueAction,
   isBarcodeUniqueAction,
-} from "@/lib/actions/products"
-import type { Product } from "@/lib/services/products"
-import { createClient } from "@/lib/supabase/client"
+  isSkuUniqueAction,
+} from "@/lib/actions/products";
+import type { Category } from "@/lib/services/categories";
+import type { Product } from "@/lib/services/products";
+import type { Supplier } from "@/lib/services/suppliers-cached";
+import { createClient } from "@/lib/supabase/client";
 import type {
   ProductFormInput,
   StockByLocationData,
-} from "@/lib/validations/product"
+} from "@/lib/validations/product";
+
+import type { LocationForProducts } from "@/lib/services/products-cached";
 
 interface NuevoProductoClientProps {
-  locations: { id: string; name: string; is_main: boolean | null }[]
-  duplicateProduct: Product | null
+  locations: LocationForProducts[];
+  duplicateProduct: Product | null;
+  categories: Category[];
+  suppliers: Supplier[];
 }
 
 export function NuevoProductoClient({
   locations,
   duplicateProduct,
+  categories,
+  suppliers,
 }: NuevoProductoClientProps) {
-  const router = useRouter()
-  const isDuplicating = !!duplicateProduct
+  const router = useRouter();
+  const isDuplicating = !!duplicateProduct;
+  const [formKey, setFormKey] = useState(0);
 
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSaveAndCreate, setIsSaveAndCreate] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
+  const submitActionRef = useRef<"create" | "save-and-create">("create");
   const [stockData, setStockData] = useState<StockByLocationData[]>(
     locations.map((loc) => ({
       location_id: loc.id,
@@ -51,7 +60,7 @@ export function NuevoProductoClient({
       is_main: loc.is_main ?? false,
       quantity: 0,
     })),
-  )
+  );
 
   // Prepare initial data for duplicating
   const initialData = duplicateProduct
@@ -65,45 +74,46 @@ export function NuevoProductoClient({
         created_at: "",
         updated_at: "",
       }
-    : null
+    : null;
 
   const handleSubmit = useCallback(
     async (data: ProductFormInput, stock: StockByLocationData[]) => {
-      setIsLoading(true)
+      const action = submitActionRef.current;
+      setIsLoading(true);
 
       try {
-        const supabase = createClient()
+        const supabase = createClient();
         const {
           data: { user },
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser();
 
         if (!user) {
           toast.error("Error de autenticacion", {
             description: "No se pudo obtener el usuario actual",
-          })
-          setIsLoading(false)
-          return
+          });
+          setIsLoading(false);
+          return;
         }
 
         // Validate SKU uniqueness
-        const skuIsUnique = await isSkuUniqueAction(data.sku)
+        const skuIsUnique = await isSkuUniqueAction(data.sku);
         if (!skuIsUnique) {
           toast.error("SKU duplicado", {
             description: "Ya existe un producto con este SKU",
-          })
-          setIsLoading(false)
-          return
+          });
+          setIsLoading(false);
+          return;
         }
 
         // Validate barcode uniqueness if provided
         if (data.barcode) {
-          const barcodeIsUnique = await isBarcodeUniqueAction(data.barcode)
+          const barcodeIsUnique = await isBarcodeUniqueAction(data.barcode);
           if (!barcodeIsUnique) {
             toast.error("Codigo de barras duplicado", {
               description: "Ya existe un producto con este codigo de barras",
-            })
-            setIsLoading(false)
-            return
+            });
+            setIsLoading(false);
+            return;
           }
         }
 
@@ -126,7 +136,7 @@ export function NuevoProductoClient({
           visibility: data.visibility || "SALES_AND_PURCHASES",
           image_url: data.image_url || null,
           active: data.active ?? true,
-        }
+        };
 
         const product = await createProductAction({
           product: productData,
@@ -135,13 +145,13 @@ export function NuevoProductoClient({
             quantity: s.quantity,
           })),
           userId: user.id,
-        })
+        });
 
-        if (isSaveAndCreate) {
-          toast.success("Producto creado", {
-            description: `${product.name} se creo correctamente`,
-          })
-          // Reset stock data
+        toast.success("Producto creado", {
+          description: `${product.name} se creó correctamente`,
+        });
+
+        if (action === "save-and-create") {
           setStockData(
             locations.map((loc) => ({
               location_id: loc.id,
@@ -149,24 +159,21 @@ export function NuevoProductoClient({
               is_main: loc.is_main ?? false,
               quantity: 0,
             })),
-          )
-          setIsSaveAndCreate(false)
+          );
+          setFormKey((k) => k + 1);
         } else {
-          toast.success("Producto creado", {
-            description: `${product.name} se creo correctamente`,
-          })
-          router.push(`/productos/${product.id}`)
+          router.push("/productos");
         }
       } catch (error: unknown) {
         const errorMessage =
-          error instanceof Error ? error.message : "Error desconocido"
-        toast.error("Error al crear producto", { description: errorMessage })
+          error instanceof Error ? error.message : "Error desconocido";
+        toast.error("Error al crear producto", { description: errorMessage });
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     },
-    [router, isSaveAndCreate, locations],
-  )
+    [router, locations],
+  );
 
   return (
     <div className="space-y-6">
@@ -201,14 +208,11 @@ export function NuevoProductoClient({
         </div>
         <div className="flex items-center md:flex-row flex-col gap-2">
           <Button
-            type="button"
+            type="submit"
+            form="product-form"
             variant="outline"
             onClick={() => {
-              setIsSaveAndCreate(true)
-              const form = document.querySelector("form")
-              if (form) {
-                form.requestSubmit()
-              }
+              submitActionRef.current = "save-and-create";
             }}
             disabled={isLoading}
           >
@@ -218,7 +222,9 @@ export function NuevoProductoClient({
             type="submit"
             form="product-form"
             disabled={isLoading}
-            onClick={() => setIsSaveAndCreate(false)}
+            onClick={() => {
+              submitActionRef.current = "create";
+            }}
             className="w-full md:w-fit"
           >
             {isLoading ? (
@@ -236,15 +242,17 @@ export function NuevoProductoClient({
       <Separator />
 
       {/* Form */}
-      <div id="product-form">
-        <ProductForm
-          mode="create"
-          initialData={initialData}
-          stockData={stockData}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-        />
-      </div>
+      <ProductForm
+        key={formKey}
+        mode="create"
+        initialData={initialData}
+        stockData={stockData}
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
+        categories={categories}
+        suppliers={suppliers}
+        locations={locations}
+      />
     </div>
-  )
+  );
 }

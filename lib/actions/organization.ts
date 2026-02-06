@@ -191,6 +191,24 @@ export async function completeOnboardingAction(data: {
 
   if (categoryError) throw categoryError;
 
+  // Create default "Vendedor" role
+  const { error: roleError } = await supabaseAdmin.from("roles").insert({
+    name: "Vendedor",
+    permissions: [
+      "sales:read",
+      "sales:write",
+      "products:read",
+      "customers:read",
+      "customers:write",
+    ],
+    special_actions: [],
+    is_system: false,
+    active: true,
+    organization_id: org.id,
+  });
+
+  if (roleError) throw roleError;
+
   revalidateTag("organization", "minutes");
   return org.id;
 }

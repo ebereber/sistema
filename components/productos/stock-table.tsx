@@ -2,7 +2,6 @@
 
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,56 +16,43 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { getLocations, type Location } from "@/lib/services/locations";
+import type { LocationForProducts } from "@/lib/services/products-cached";
 import type { StockByLocationData } from "@/lib/validations/product";
 
 interface StockTableProps {
   value: StockByLocationData[];
   onChange: (value: StockByLocationData[]) => void;
   disabled?: boolean;
+  locations: LocationForProducts[];
 }
 
 const INITIAL_VISIBLE_COUNT = 2;
 
-export function StockTable({ value, onChange, disabled }: StockTableProps) {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function StockTable({
+  value,
+  onChange,
+  disabled,
+  locations,
+}: StockTableProps) {
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    loadLocations();
-  }, []);
-
-  async function loadLocations() {
-    setIsLoading(true);
-    try {
-      const data = await getLocations();
-      setLocations(data);
-
-      // Initialize stock data if empty
-      if (value.length === 0 && data.length > 0) {
-        const initialStock = data.map((loc) => ({
-          location_id: loc.id,
-          location_name: loc.name,
-          is_main: loc.is_main ?? false,
-          quantity: 0,
-        }));
-        onChange(initialStock);
-      }
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al cargar ubicaciones", { description: errorMessage });
-    } finally {
-      setIsLoading(false);
+    if (value.length === 0 && locations.length > 0) {
+      const initialStock = locations.map((loc) => ({
+        location_id: loc.id,
+        location_name: loc.name,
+        is_main: loc.is_main ?? false,
+        quantity: 0,
+      }));
+      onChange(initialStock);
     }
-  }
+  }, [locations, value.length, onChange]);
 
   function handleQuantityChange(locationId: string, quantity: number) {
     const newValue = value.map((item) =>
       item.location_id === locationId
         ? { ...item, quantity: Math.max(0, quantity) }
-        : item
+        : item,
     );
     onChange(newValue);
   }
@@ -82,14 +68,6 @@ export function StockTable({ value, onChange, disabled }: StockTableProps) {
     ? locations
     : locations.slice(0, INITIAL_VISIBLE_COUNT);
   const hiddenCount = locations.length - INITIAL_VISIBLE_COUNT;
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
-        Cargando ubicaciones...
-      </div>
-    );
-  }
 
   if (locations.length === 0) {
     return (
@@ -131,7 +109,7 @@ export function StockTable({ value, onChange, disabled }: StockTableProps) {
                     const val = e.target.value;
                     handleQuantityChange(
                       location.id,
-                      val === "" ? 0 : parseInt(val) || 0
+                      val === "" ? 0 : parseInt(val) || 0,
                     );
                   }}
                   className="w-24 text-right ml-auto [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
@@ -144,7 +122,9 @@ export function StockTable({ value, onChange, disabled }: StockTableProps) {
         <TableFooter>
           <TableRow>
             <TableCell className="font-medium">Total</TableCell>
-            <TableCell className="text-right font-medium">{totalStock}</TableCell>
+            <TableCell className="text-right font-medium">
+              {totalStock}
+            </TableCell>
           </TableRow>
         </TableFooter>
       </Table>

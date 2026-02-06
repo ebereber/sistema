@@ -1,50 +1,54 @@
-import { redirect } from "next/navigation"
-import { Suspense } from "react"
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { NuevoProductoClient } from "@/components/productos/nuevo-producto-client"
-import { getOrganizationId } from "@/lib/auth/get-organization"
-import { getServerUser } from "@/lib/auth/get-server-user"
+import { NuevoProductoClient } from "@/components/productos/nuevo-producto-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
+import { getServerUser } from "@/lib/auth/get-server-user";
+import { getCachedCategories } from "@/lib/services/categories-cached";
 import {
   getCachedLocationsForProducts,
   getCachedProductById,
-} from "@/lib/services/products-cached"
+} from "@/lib/services/products-cached";
+import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
 export default async function NuevoProductoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ duplicate?: string }>
+  searchParams: Promise<{ duplicate?: string }>;
 }) {
-  const params = await searchParams
+  const params = await searchParams;
   return (
     <Suspense fallback={<FormSkeleton />}>
       <NuevoProductoContent duplicateId={params.duplicate} />
     </Suspense>
-  )
+  );
 }
 
-async function NuevoProductoContent({
-  duplicateId,
-}: {
-  duplicateId?: string
-}) {
-  const user = await getServerUser()
-  if (!user) redirect("/login")
-  const organizationId = await getOrganizationId()
+async function NuevoProductoContent({ duplicateId }: { duplicateId?: string }) {
+  const user = await getServerUser();
+  if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const locations = await getCachedLocationsForProducts(organizationId)
+  const [locations, categories, suppliers] = await Promise.all([
+    getCachedLocationsForProducts(organizationId),
+    getCachedCategories(organizationId),
+    getCachedSuppliers(organizationId),
+  ]);
 
-  let duplicateProduct = null
+  let duplicateProduct = null;
   if (duplicateId) {
-    duplicateProduct = await getCachedProductById(organizationId, duplicateId)
+    duplicateProduct = await getCachedProductById(organizationId, duplicateId);
   }
 
   return (
     <NuevoProductoClient
       locations={locations}
+      categories={categories}
+      suppliers={suppliers}
       duplicateProduct={duplicateProduct}
     />
-  )
+  );
 }
 
 function FormSkeleton() {
@@ -64,5 +68,5 @@ function FormSkeleton() {
         <Skeleton className="h-48" />
       </div>
     </div>
-  )
+  );
 }

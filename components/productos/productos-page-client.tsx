@@ -1165,6 +1165,7 @@ export function ProductosPageClient({
         open={bulkCategoryDialogOpen}
         onOpenChange={setBulkCategoryDialogOpen}
         onSuccess={handleBulkSuccess}
+        categories={flatCategories}
       />
 
       <BulkArchiveDialog
