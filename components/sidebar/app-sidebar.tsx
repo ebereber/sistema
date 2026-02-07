@@ -2,14 +2,16 @@
 
 import {
   ChartNoAxesColumnDecreasing,
+  ChessRook,
   ChevronRight,
-  Lightbulb,
   Package,
   PanelLeft,
   Plus,
   Settings,
   ShoppingBag,
   ShoppingCart,
+  Truck,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -45,12 +47,13 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+
 import { hasPermission } from "@/lib/auth/permissions";
 import { useCurrentUser } from "@/lib/auth/user-provider";
 
 const COMPANY = {
   name: "Lemar",
-  logo: Lightbulb,
+  logo: ChessRook,
 };
 
 const NAV_ITEMS = [
@@ -66,10 +69,23 @@ const NAV_ITEMS = [
     icon: ShoppingCart,
     permission: "sales:read",
     items: [
-      { title: "Clientes", url: "/clientes", permission: "customers:read" },
       { title: "Cobranzas", url: "/cobranzas", permission: "sales:read" },
       { title: "Presupuestos", url: "/presupuestos", permission: "sales:read" },
       { title: "Turnos", url: "/turnos", permission: "sales:read" },
+    ],
+  },
+  {
+    title: "Compras",
+    url: "/compras",
+    icon: ShoppingBag,
+    permission: "purchases:read",
+    items: [
+      {
+        title: "Órdenes de Compra",
+        url: "/ordenes",
+        permission: "orders:read",
+      },
+      { title: "Pagos", url: "/pagos", permission: "purchases:read" },
     ],
   },
   {
@@ -86,23 +102,16 @@ const NAV_ITEMS = [
     ],
   },
   {
-    title: "Compras",
-    url: "/compras",
-    icon: ShoppingBag,
-    permission: "purchases:read",
-    items: [
-      {
-        title: "Órdenes de Compra",
-        url: "/ordenes",
-        permission: "orders:read",
-      },
-      {
-        title: "Proveedores",
-        url: "/proveedores",
-        permission: "suppliers:read",
-      },
-      { title: "Pagos", url: "/pagos", permission: "purchases:read" },
-    ],
+    title: "Clientes",
+    url: "/clientes",
+    icon: Users,
+    permission: "customers:read",
+  },
+  {
+    title: "Proveedores",
+    url: "/proveedores",
+    icon: Truck,
+    permission: "suppliers:read",
   },
   {
     title: "Reportes",
@@ -125,9 +134,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { permissions } = useCurrentUser();
   const [mode, setMode] = React.useState<SidebarMode>("hover");
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
+  const [openSection, setOpenSection] = React.useState<string | null>(null);
   const { setOpen } = useSidebar();
 
-  // Filtrar items según permisos
   const filteredItems = NAV_ITEMS.filter(
     (item) => !item.permission || hasPermission(permissions, item.permission),
   ).map((item) => ({
@@ -136,14 +146,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       (sub) => !sub.permission || hasPermission(permissions, sub.permission),
     ),
   }));
+  const isHoverMode = mode === "hover";
+
+  const hoverTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
-    if (mode === "hover" && !isDropdownOpen) setOpen(true);
+    if (isHoverMode && !isDropdownOpen) {
+      if (hoverTimeout.current) {
+        clearTimeout(hoverTimeout.current);
+        hoverTimeout.current = null;
+      }
+      setOpen(true);
+    }
   };
 
   const handleMouseLeave = () => {
-    if (mode === "hover" && !isDropdownOpen) setOpen(false);
+    if (isHoverMode && !isDropdownOpen) {
+      hoverTimeout.current = setTimeout(() => {
+        setOpen(false);
+      }, 150);
+    }
   };
+
+  React.useEffect(() => {
+    document.body.classList.toggle("sidebar-hover-mode", isHoverMode);
+    return () => {
+      document.body.classList.remove("sidebar-hover-mode");
+      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    };
+  }, [isHoverMode]);
 
   return (
     <Sidebar
@@ -152,16 +183,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       {...props}
+      className="z-30"
     >
-      <SidebarHeader className="flex h-12 items-center justify-center border-b border-sidebar-border">
+      <SidebarHeader className="flex h-12  items-center justify-center border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <COMPANY.logo className="size-4" />
-                </div>
-                <span className="text-sm font-semibold">{COMPANY.name}</span>
+                <COMPANY.logo className="size-4" />
+
+                {/*  <span className="text-sm font-semibold">{COMPANY.name}</span> */}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -172,37 +203,59 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu className="gap-1 px-2 py-2">
           {filteredItems.map((item) => {
             const hasItems = item.items && item.items.length > 0;
-            const isChildActive = item.items?.some(
-              (sub) => pathname === sub.url,
+            const isChildActive = item.items?.some((sub) =>
+              pathname.startsWith(sub.url),
             );
             const isParentActive = pathname === item.url;
+            const isActive = isParentActive || isChildActive;
 
             if (hasItems) {
               return (
                 <Collapsible
                   key={item.title}
-                  asChild
-                  defaultOpen={isChildActive || isParentActive}
+                  open={openSection === item.title}
+                  onOpenChange={(open) =>
+                    setOpenSection(open ? item.title : null)
+                  }
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={item.title}
-                        isActive={isParentActive || isChildActive}
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                      isActive={isActive}
+                      className="pr-1"
+                    >
+                      <Link
+                        href={item.url}
+                        className="flex flex-1 items-center gap-2"
                       >
                         {item.icon && <item.icon className="size-4" />}
                         <span>{item.title}</span>
-                        <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
+                      </Link>
+                      <CollapsibleTrigger asChild>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="rounded-sm p-1 hover:bg-sidebar-accent"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.currentTarget.click();
+                            }
+                          }}
+                        >
+                          <ChevronRight className="size-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </span>
+                      </CollapsibleTrigger>
+                    </SidebarMenuButton>
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {item.items?.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.title}>
                             <SidebarMenuSubButton
                               asChild
-                              isActive={pathname === subItem.url}
+                              isActive={pathname.startsWith(subItem.url)}
                             >
                               <Link href={subItem.url}>
                                 <span>{subItem.title}</span>
@@ -251,7 +304,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup
                 value={mode}
-                onValueChange={(v) => setMode(v as SidebarMode)}
+                onValueChange={(v) => {
+                  const newMode = v as SidebarMode;
+                  setMode(newMode);
+                  if (newMode === "expanded") setOpen(true);
+                  if (newMode === "collapsed" || newMode === "hover") {
+                    setOpen(false);
+                    setIsHovered(false);
+                  }
+                }}
               >
                 <DropdownMenuRadioItem
                   value="expanded"
@@ -284,78 +345,3 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   );
 }
-
-/* const data = {
-  company: {
-    name: "La Pyme",
-    logo: Sparkles,
-  },
-  navItems: [
-    {
-      title: "Nueva Venta",
-      icon: Plus,
-      isButton: true,
-      shortcut: "V",
-    },
-    {
-      title: "Dashboard",
-      url: "#",
-      icon: Clock,
-    },
-    {
-      title: "Chat",
-      url: "#",
-      icon: MessageSquare,
-    },
-    {
-      title: "Ventas",
-      url: "#",
-      icon: ShoppingCart,
-      items: [
-        {
-          title: "Clientes",
-          url: "#",
-        },
-        {
-          title: "Cobranzas",
-          url: "#",
-        },
-        {
-          title: "Presupuestos",
-          url: "#",
-        },
-        {
-          title: "Turnos",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Productos",
-      url: "#",
-      icon: Package,
-    },
-    {
-      title: "Compras",
-      url: "#",
-      icon: ShoppingBag,
-      items: [],
-    },
-    {
-      title: "Tesorería",
-      url: "#",
-      icon: Landmark,
-      items: [],
-    },
-    {
-      title: "Importar",
-      url: "#",
-      icon: Upload,
-    },
-    {
-      title: "Reportes",
-      url: "#",
-      icon: BarChart3,
-    },
-  ],
-} */

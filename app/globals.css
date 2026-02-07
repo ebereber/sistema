@@ -123,3 +123,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hover mode: gap stays at icon width so content doesn't shift */
+body.sidebar-hover-mode [data-slot="sidebar-gap"] {
+  width: var(--sidebar-width-icon) !important;
+  transition: none !important;
+}
