@@ -30,6 +30,7 @@ import {
   cancelCustomerPaymentAction,
   updateCustomerPaymentNotesAction,
 } from "@/lib/actions/customer-payments";
+import { downloadReceiptPdf } from "@/lib/pdf/client";
 import type { CustomerPaymentWithDetails } from "@/lib/services/customer-payments";
 import {
   ChevronRight,
@@ -83,9 +84,7 @@ interface CobranzaDetalleClientProps {
   payment: CustomerPaymentWithDetails;
 }
 
-export function CobranzaDetalleClient({
-  payment,
-}: CobranzaDetalleClientProps) {
+export function CobranzaDetalleClient({ payment }: CobranzaDetalleClientProps) {
   const router = useRouter();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -166,7 +165,13 @@ export function CobranzaDetalleClient({
             </p>
           </div>
         </div>
-
+        <Button
+          onClick={() =>
+            downloadReceiptPdf(payment.id, `${payment.payment_number}.pdf`)
+          }
+        >
+          Descargar
+        </Button>
         {/* Actions */}
         {!isCancelled && (
           <div className="flex w-fit items-stretch gap-0" role="group">

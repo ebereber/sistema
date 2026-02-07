@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   ArrowLeftRight,
@@ -21,12 +21,12 @@ import {
   Search,
   Settings2,
   Undo2,
-} from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, useTransition } from "react"
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,22 +36,22 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -59,32 +59,32 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { CancelNCDialog } from "@/components/ventas/cancel-nc-dialog"
-import { useDebounce } from "@/hooks/use-debounce"
-import type { SaleListItem } from "@/lib/services/sales"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/tooltip";
+import { CancelNCDialog } from "@/components/ventas/cancel-nc-dialog";
+import { useDebounce } from "@/hooks/use-debounce";
+import type { SaleListItem } from "@/lib/services/sales";
+import { cn } from "@/lib/utils";
 
 interface VentasPageClientProps {
-  sales: SaleListItem[]
-  count: number
-  totalPages: number
+  sales: SaleListItem[];
+  count: number;
+  totalPages: number;
   currentFilters: {
-    search: string
-    status: string
-    dateFrom: string
-    dateTo: string
-    minAmount: string
-    maxAmount: string
-    page: number
-  }
+    search: string;
+    status: string;
+    dateFrom: string;
+    dateTo: string;
+    minAmount: string;
+    maxAmount: string;
+    page: number;
+  };
 }
 
 export function VentasPageClient({
@@ -93,210 +93,210 @@ export function VentasPageClient({
   totalPages,
   currentFilters,
 }: VentasPageClientProps) {
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   // Search with debounce
-  const [searchInput, setSearchInput] = useState(currentFilters.search)
-  const debouncedSearch = useDebounce(searchInput, 300)
-  const isFirstRender = useRef(true)
+  const [searchInput, setSearchInput] = useState(currentFilters.search);
+  const debouncedSearch = useDebounce(searchInput, 300);
+  const isFirstRender = useRef(true);
 
   // Date filter popover states
   const [datePeriod, setDatePeriod] = useState<
     "last" | "next" | "before" | "after"
-  >("last")
-  const [dateValue, setDateValue] = useState("30")
+  >("last");
+  const [dateValue, setDateValue] = useState("30");
   const [dateUnit, setDateUnit] = useState<
     "days" | "weeks" | "months" | "years"
-  >("days")
-  const [datePopoverOpen, setDatePopoverOpen] = useState(false)
+  >("days");
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   // Amount filter popover states
   const [amountOperator, setAmountOperator] = useState<
     "greaterThan" | "lessThan" | "equals"
-  >("greaterThan")
-  const [amountValue, setAmountValue] = useState("")
-  const [amountPopoverOpen, setAmountPopoverOpen] = useState(false)
+  >("greaterThan");
+  const [amountValue, setAmountValue] = useState("");
+  const [amountPopoverOpen, setAmountPopoverOpen] = useState(false);
 
   // Cancel NC dialog states
-  const [cancelNCDialogOpen, setCancelNCDialogOpen] = useState(false)
+  const [cancelNCDialogOpen, setCancelNCDialogOpen] = useState(false);
   const [selectedNCToCancel, setSelectedNCToCancel] =
-    useState<SaleListItem | null>(null)
+    useState<SaleListItem | null>(null);
 
   // Sync search input when URL changes externally
   useEffect(() => {
-    setSearchInput(currentFilters.search)
-  }, [currentFilters.search])
+    setSearchInput(currentFilters.search);
+  }, [currentFilters.search]);
 
   // Push debounced search to URL
   useEffect(() => {
     if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
+      isFirstRender.current = false;
+      return;
     }
     updateSearchParams({
       search: debouncedSearch || undefined,
       page: undefined,
-    })
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch])
+  }, [debouncedSearch]);
 
   // Helper: build URL from filter updates and navigate
   const updateSearchParams = (updates: Record<string, string | undefined>) => {
-    const merged: Record<string, string> = {}
+    const merged: Record<string, string> = {};
 
-    if (currentFilters.search) merged.search = currentFilters.search
-    if (currentFilters.status) merged.status = currentFilters.status
-    if (currentFilters.dateFrom) merged.dateFrom = currentFilters.dateFrom
-    if (currentFilters.dateTo) merged.dateTo = currentFilters.dateTo
-    if (currentFilters.minAmount) merged.minAmount = currentFilters.minAmount
-    if (currentFilters.maxAmount) merged.maxAmount = currentFilters.maxAmount
-    if (currentFilters.page > 1) merged.page = String(currentFilters.page)
+    if (currentFilters.search) merged.search = currentFilters.search;
+    if (currentFilters.status) merged.status = currentFilters.status;
+    if (currentFilters.dateFrom) merged.dateFrom = currentFilters.dateFrom;
+    if (currentFilters.dateTo) merged.dateTo = currentFilters.dateTo;
+    if (currentFilters.minAmount) merged.minAmount = currentFilters.minAmount;
+    if (currentFilters.maxAmount) merged.maxAmount = currentFilters.maxAmount;
+    if (currentFilters.page > 1) merged.page = String(currentFilters.page);
 
     for (const [key, value] of Object.entries(updates)) {
       if (value) {
-        merged[key] = value
+        merged[key] = value;
       } else {
-        delete merged[key]
+        delete merged[key];
       }
     }
 
-    const params = new URLSearchParams()
+    const params = new URLSearchParams();
     for (const [key, value] of Object.entries(merged)) {
-      params.set(key, value)
+      params.set(key, value);
     }
 
-    const qs = params.toString()
+    const qs = params.toString();
     startTransition(() => {
-      router.push(qs ? `/ventas?${qs}` : "/ventas")
-    })
-  }
+      router.push(qs ? `/ventas?${qs}` : "/ventas");
+    });
+  };
 
   // Apply date filter
   const applyDateFilter = () => {
-    const now = new Date()
-    let from: Date | null = null
-    let to: Date | null = null
+    const now = new Date();
+    let from: Date | null = null;
+    let to: Date | null = null;
 
-    const value = parseInt(dateValue) || 30
+    const value = parseInt(dateValue) || 30;
 
     if (datePeriod === "last") {
-      from = new Date(now)
-      if (dateUnit === "days") from.setDate(from.getDate() - value)
-      if (dateUnit === "weeks") from.setDate(from.getDate() - value * 7)
-      if (dateUnit === "months") from.setMonth(from.getMonth() - value)
-      if (dateUnit === "years") from.setFullYear(from.getFullYear() - value)
-      to = now
+      from = new Date(now);
+      if (dateUnit === "days") from.setDate(from.getDate() - value);
+      if (dateUnit === "weeks") from.setDate(from.getDate() - value * 7);
+      if (dateUnit === "months") from.setMonth(from.getMonth() - value);
+      if (dateUnit === "years") from.setFullYear(from.getFullYear() - value);
+      to = now;
     } else if (datePeriod === "next") {
-      from = now
-      to = new Date(now)
-      if (dateUnit === "days") to.setDate(to.getDate() + value)
-      if (dateUnit === "weeks") to.setDate(to.getDate() + value * 7)
-      if (dateUnit === "months") to.setMonth(to.getMonth() + value)
-      if (dateUnit === "years") to.setFullYear(to.getFullYear() + value)
+      from = now;
+      to = new Date(now);
+      if (dateUnit === "days") to.setDate(to.getDate() + value);
+      if (dateUnit === "weeks") to.setDate(to.getDate() + value * 7);
+      if (dateUnit === "months") to.setMonth(to.getMonth() + value);
+      if (dateUnit === "years") to.setFullYear(to.getFullYear() + value);
     } else if (datePeriod === "before") {
-      to = new Date(now)
-      if (dateUnit === "days") to.setDate(to.getDate() - value)
-      if (dateUnit === "weeks") to.setDate(to.getDate() - value * 7)
-      if (dateUnit === "months") to.setMonth(to.getMonth() - value)
-      if (dateUnit === "years") to.setFullYear(to.getFullYear() - value)
+      to = new Date(now);
+      if (dateUnit === "days") to.setDate(to.getDate() - value);
+      if (dateUnit === "weeks") to.setDate(to.getDate() - value * 7);
+      if (dateUnit === "months") to.setMonth(to.getMonth() - value);
+      if (dateUnit === "years") to.setFullYear(to.getFullYear() - value);
     } else if (datePeriod === "after") {
-      from = new Date(now)
-      if (dateUnit === "days") from.setDate(from.getDate() + value)
-      if (dateUnit === "weeks") from.setDate(from.getDate() + value * 7)
-      if (dateUnit === "months") from.setMonth(from.getMonth() + value)
-      if (dateUnit === "years") from.setFullYear(from.getFullYear() + value)
+      from = new Date(now);
+      if (dateUnit === "days") from.setDate(from.getDate() + value);
+      if (dateUnit === "weeks") from.setDate(from.getDate() + value * 7);
+      if (dateUnit === "months") from.setMonth(from.getMonth() + value);
+      if (dateUnit === "years") from.setFullYear(from.getFullYear() + value);
     }
 
     updateSearchParams({
       dateFrom: from ? from.toISOString().split("T")[0] : undefined,
       dateTo: to ? to.toISOString().split("T")[0] : undefined,
       page: undefined,
-    })
-    setDatePopoverOpen(false)
-  }
+    });
+    setDatePopoverOpen(false);
+  };
 
   const clearDateFilter = () => {
     updateSearchParams({
       dateFrom: undefined,
       dateTo: undefined,
       page: undefined,
-    })
-    setDatePeriod("last")
-    setDateValue("30")
-    setDateUnit("days")
-    setDatePopoverOpen(false)
-  }
+    });
+    setDatePeriod("last");
+    setDateValue("30");
+    setDateUnit("days");
+    setDatePopoverOpen(false);
+  };
 
   // Apply amount filter
   const applyAmountFilter = () => {
-    const value = parseFloat(amountValue.replace(",", ".")) || 0
+    const value = parseFloat(amountValue.replace(",", ".")) || 0;
 
     if (amountOperator === "greaterThan") {
       updateSearchParams({
         minAmount: value.toString(),
         maxAmount: undefined,
         page: undefined,
-      })
+      });
     } else if (amountOperator === "lessThan") {
       updateSearchParams({
         minAmount: undefined,
         maxAmount: value.toString(),
         page: undefined,
-      })
+      });
     } else {
       updateSearchParams({
         minAmount: (value - 0.01).toString(),
         maxAmount: (value + 0.01).toString(),
         page: undefined,
-      })
+      });
     }
-    setAmountPopoverOpen(false)
-  }
+    setAmountPopoverOpen(false);
+  };
 
   const clearAmountFilter = () => {
     updateSearchParams({
       minAmount: undefined,
       maxAmount: undefined,
       page: undefined,
-    })
-    setAmountValue("")
-    setAmountOperator("greaterThan")
-    setAmountPopoverOpen(false)
-  }
+    });
+    setAmountValue("");
+    setAmountOperator("greaterThan");
+    setAmountPopoverOpen(false);
+  };
 
   // Navigation
   const handleRowClick = (saleId: string) => {
-    router.push(`/ventas/${saleId}`)
-  }
+    router.push(`/ventas/${saleId}`);
+  };
 
   const handlePageChange = (newPage: number) => {
     updateSearchParams({
       page: newPage > 1 ? String(newPage) : undefined,
-    })
-  }
+    });
+  };
 
   // Formatting
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
-    }).format(amount)
+    }).format(amount);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const today = new Date()
+    const date = new Date(dateString);
+    const today = new Date();
     const isToday =
       date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
+      date.getFullYear() === today.getFullYear();
 
-    return isToday ? "hoy" : date.toLocaleDateString("es-AR")
-  }
+    return isToday ? "hoy" : date.toLocaleDateString("es-AR");
+  };
 
-  const hasDateFilter = currentFilters.dateFrom || currentFilters.dateTo
-  const hasAmountFilter = currentFilters.minAmount || currentFilters.maxAmount
-  const currentPage = currentFilters.page
+  const hasDateFilter = currentFilters.dateFrom || currentFilters.dateTo;
+  const hasAmountFilter = currentFilters.minAmount || currentFilters.maxAmount;
+  const currentPage = currentFilters.page;
 
   return (
     <div className="flex h-full flex-1 flex-col space-y-8 p-6">
@@ -332,7 +332,10 @@ export function VentasPageClient({
       </div>
 
       <div
-        className={cn("space-y-4", isPending && "opacity-50 pointer-events-none")}
+        className={cn(
+          "space-y-4",
+          isPending && "opacity-50 pointer-events-none",
+        )}
       >
         {/* Filters */}
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -379,11 +382,7 @@ export function VentasPageClient({
                       <TabsTrigger value="invoiceDate" className="flex-1">
                         Factura
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="dueDate"
-                        className="flex-1"
-                        disabled
-                      >
+                      <TabsTrigger value="dueDate" className="flex-1" disabled>
                         Vencimiento
                       </TabsTrigger>
                     </TabsList>
@@ -393,9 +392,7 @@ export function VentasPageClient({
                     <Select
                       value={datePeriod}
                       onValueChange={(v) =>
-                        setDatePeriod(
-                          v as "last" | "next" | "before" | "after",
-                        )
+                        setDatePeriod(v as "last" | "next" | "before" | "after")
                       }
                     >
                       <SelectTrigger>
@@ -501,11 +498,7 @@ export function VentasPageClient({
                       <TabsTrigger value="total" className="flex-1">
                         Total
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="balance"
-                        className="flex-1"
-                        disabled
-                      >
+                      <TabsTrigger value="balance" className="flex-1" disabled>
                         Saldo
                       </TabsTrigger>
                     </TabsList>
@@ -524,9 +517,7 @@ export function VentasPageClient({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="greaterThan">
-                          es mayor a
-                        </SelectItem>
+                        <SelectItem value="greaterThan">es mayor a</SelectItem>
                         <SelectItem value="lessThan">es menor a</SelectItem>
                         <SelectItem value="equals">es igual a</SelectItem>
                       </SelectContent>
@@ -694,11 +685,7 @@ export function VentasPageClient({
                   <TableHead className="text-right">
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                        >
+                        <Button variant="ghost" size="icon" className="size-8">
                           <Settings2 className="size-4" />
                         </Button>
                       </PopoverTrigger>
@@ -797,8 +784,7 @@ export function VentasPageClient({
                         {sale.availableBalance !== null &&
                           sale.availableBalance > 0 && (
                             <div className="text-xs text-red-500">
-                              Saldo NC:{" "}
-                              {formatCurrency(sale.availableBalance)}
+                              Saldo NC: {formatCurrency(sale.availableBalance)}
                             </div>
                           )}
                       </TableCell>
@@ -830,9 +816,9 @@ export function VentasPageClient({
                                 )}
                                 <DropdownMenuItem
                                   onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedNCToCancel(sale)
-                                    setCancelNCDialogOpen(true)
+                                    e.stopPropagation();
+                                    setSelectedNCToCancel(sale);
+                                    setCancelNCDialogOpen(true);
                                   }}
                                 >
                                   <Ban className="size-4" />
@@ -851,10 +837,10 @@ export function VentasPageClient({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={(e) => {
-                                    e.stopPropagation()
+                                    e.stopPropagation();
                                     router.push(
                                       `/ventas/nueva?exchangeId=${sale.id}`,
-                                    )
+                                    );
                                   }}
                                 >
                                   <ArrowLeftRight className="size-4" />
@@ -862,10 +848,10 @@ export function VentasPageClient({
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={(e) => {
-                                    e.stopPropagation()
+                                    e.stopPropagation();
                                     router.push(
                                       `/ventas/nueva?duplicateId=${sale.id}`,
-                                    )
+                                    );
                                   }}
                                 >
                                   <Copy className="size-4" />
@@ -938,10 +924,10 @@ export function VentasPageClient({
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
+                              e.stopPropagation();
                               router.push(
                                 `/ventas/nueva?exchangeId=${sale.id}`,
-                              )
+                              );
                             }}
                           >
                             <ArrowLeftRight className="size-4" />
@@ -949,10 +935,10 @@ export function VentasPageClient({
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
+                              e.stopPropagation();
                               router.push(
                                 `/ventas/nueva?duplicateId=${sale.id}`,
-                              )
+                              );
                             }}
                           >
                             <Copy className="size-4" />
@@ -1065,11 +1051,11 @@ export function VentasPageClient({
         onOpenChange={setCancelNCDialogOpen}
         creditNote={selectedNCToCancel}
         onSuccess={() => {
-          setCancelNCDialogOpen(false)
-          setSelectedNCToCancel(null)
-          router.refresh()
+          setCancelNCDialogOpen(false);
+          setSelectedNCToCancel(null);
+          router.refresh();
         }}
       />
     </div>
-  )
+  );
 }

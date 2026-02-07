@@ -101,30 +101,35 @@ export function calculateItemTotal(item: CartItem): number {
   return subtotal - discountAmount;
 }
 
-/**
- * Calculate cart totals
- */
+export interface CartTotals {
+  grossSubtotal: number; // suma bruta (con IVA, antes de descuentos)
+  subtotal: number; // neto sin IVA (después de descuentos)
+  itemDiscounts: number;
+  globalDiscount: number;
+  taxes: number; // IVA extraído
+  total: number; // final después de descuentos
+}
+
 export function calculateCartTotals(
   items: CartItem[],
   globalDiscount: GlobalDiscount | null,
 ): CartTotals {
-  // Calculate subtotal (sum of all item subtotals before any discounts)
-  const subtotal = items.reduce(
+  // Bruto con IVA (antes de descuentos)
+  const grossSubtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
 
-  // Calculate total item discounts
+  // Descuentos por item
   const itemDiscounts = items.reduce(
     (sum, item) =>
       sum + calculateItemDiscount(item.price, item.quantity, item.discount),
     0,
   );
 
-  // Calculate subtotal after item discounts
-  const afterItemDiscounts = subtotal - itemDiscounts;
+  const afterItemDiscounts = grossSubtotal - itemDiscounts;
 
-  // Calculate global discount
+  // Descuento global
   let globalDiscountAmount = 0;
   if (globalDiscount) {
     if (globalDiscount.type === "percentage") {
@@ -134,13 +139,35 @@ export function calculateCartTotals(
     }
   }
 
-  // Calculate taxes (simplified - assuming prices include tax for now)
-  // In a real implementation, you might want to calculate this based on each item's tax rate
-  const taxes = 0;
+  const total = afterItemDiscounts - globalDiscountAmount;
 
-  const total = afterItemDiscounts - globalDiscountAmount + taxes;
+  // Extraer IVA de cada item proporcionalmente
+  let taxes = 0;
+  if (total > 0 && afterItemDiscounts > 0) {
+    const globalDiscountRatio =
+      afterItemDiscounts > 0 ? globalDiscountAmount / afterItemDiscounts : 0;
+
+    taxes = items.reduce((sum, item) => {
+      const itemGross = item.price * item.quantity;
+      const itemDiscountAmt = calculateItemDiscount(
+        item.price,
+        item.quantity,
+        item.discount,
+      );
+      const afterItemDisc = itemGross - itemDiscountAmt;
+      // Distribuir descuento global proporcionalmente
+      const afterAllDiscounts = afterItemDisc * (1 - globalDiscountRatio);
+      // Extraer IVA
+      const rate = item.taxRate / 100;
+      const tax = afterAllDiscounts - afterAllDiscounts / (1 + rate);
+      return sum + tax;
+    }, 0);
+  }
+
+  const subtotal = total - taxes;
 
   return {
+    grossSubtotal,
     subtotal,
     itemDiscounts,
     globalDiscount: globalDiscountAmount,

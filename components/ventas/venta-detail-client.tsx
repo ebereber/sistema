@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AddNoteDialog } from "@/components/ventas/add-note-dialog";
 import { updateSaleNotesAction } from "@/lib/actions/sales";
+import { downloadSalePdf } from "@/lib/pdf/client";
 import type { SaleWithDetails } from "@/lib/services/sales";
 
 function formatCurrency(amount: number) {
@@ -150,9 +151,10 @@ export function VentaDetailClient({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="default">
-            <Download className="size-4" />
-            Descargar remito
+          <Button
+            onClick={() => downloadSalePdf(sale.id, `${sale.sale_number}.pdf`)}
+          >
+            Descargar
           </Button>
           <Button variant="outline" size="default" asChild>
             <Link href={`/ventas/nueva-nc?saleId=${sale.id}`}>
