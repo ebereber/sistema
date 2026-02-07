@@ -1543,6 +1543,7 @@ export type Database = {
           id: string
           is_system: boolean
           name: string
+          organization_id: string | null
           permissions: Json
           special_actions: Json
           updated_at: string
@@ -1553,6 +1554,7 @@ export type Database = {
           id?: string
           is_system?: boolean
           name: string
+          organization_id?: string | null
           permissions?: Json
           special_actions?: Json
           updated_at?: string
@@ -1563,11 +1565,20 @@ export type Database = {
           id?: string
           is_system?: boolean
           name?: string
+          organization_id?: string | null
           permissions?: Json
           special_actions?: Json
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sale_items: {
         Row: {
@@ -2243,6 +2254,119 @@ export type Database = {
           },
         ]
       }
+      transfer_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          quantity_received: number
+          transfer_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          quantity_received?: number
+          transfer_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          quantity_received?: number
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          destination_location_id: string
+          id: string
+          notes: string | null
+          organization_id: string
+          source_location_id: string
+          status: string
+          transfer_date: string
+          transfer_number: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          destination_location_id: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          source_location_id: string
+          status?: string
+          transfer_date?: string
+          transfer_number: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          destination_location_id?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          source_location_id?: string
+          status?: string
+          transfer_date?: string
+          transfer_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_source_location_id_fkey"
+            columns: ["source_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_cash_registers: {
         Row: {
           cash_register_id: string
@@ -2383,7 +2507,7 @@ export type Database = {
           id: string
           max_discount_percentage: number
           name: string | null
-          organization_id: string
+          organization_id: string | null
           role: Database["public"]["Enums"]["user_role"]
           role_id: string | null
           updated_at: string
@@ -2397,7 +2521,7 @@ export type Database = {
           id: string
           max_discount_percentage?: number
           name?: string | null
-          organization_id: string
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           role_id?: string | null
           updated_at?: string
@@ -2411,7 +2535,7 @@ export type Database = {
           id?: string
           max_discount_percentage?: number
           name?: string | null
-          organization_id?: string
+          organization_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           role_id?: string | null
           updated_at?: string

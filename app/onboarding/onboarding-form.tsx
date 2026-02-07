@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { completeOnboardingAction } from "@/lib/actions/organization";
+/* function formatCuit(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 10) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
+}
+
+function unformatCuit(value: string): string {
+  return value.replace(/\D/g, "");
+} */
+
+import React from "react";
 
 function formatCuit(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -22,7 +28,6 @@ function unformatCuit(value: string): string {
 }
 
 export function OnboardingForm() {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -38,63 +43,93 @@ export function OnboardingForm() {
     if (!isValid) return;
 
     setIsSubmitting(true);
-    try {
-      await completeOnboardingAction({
-        name: form.name.trim(),
-        cuit: cuitDigits,
-        phone: form.phone.trim() || undefined,
-      });
-      toast.success("Organización creada correctamente");
-      router.push("/");
-    } catch (error) {
-      console.error("Error creating organization:", error);
-      toast.error("Error al crear la organización");
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Replace with your actual action:
+    // await completeOnboardingAction({ name, cuit, phone })
+    await new Promise((r) => setTimeout(r, 1500));
+    setIsSubmitting(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* --- Company name --- */}
       <div className="space-y-2">
-        <Label htmlFor="onboarding-name">Nombre de la empresa *</Label>
-        <Input
-          id="onboarding-name"
+        <label
+          htmlFor="ob-name"
+          className="block text-sm text-muted-foreground"
+        >
+          Nombre de la empresa
+        </label>
+        <input
+          id="ob-name"
+          type="text"
           placeholder="Ej: Comercio de Juan"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           autoFocus
+          className="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-foreground/25"
         />
       </div>
+
+      {/* --- CUIT --- */}
       <div className="space-y-2">
-        <Label htmlFor="onboarding-cuit">CUIT *</Label>
-        <Input
-          id="onboarding-cuit"
+        <label
+          htmlFor="ob-cuit"
+          className="block text-sm text-muted-foreground"
+        >
+          CUIT
+        </label>
+        <input
+          id="ob-cuit"
+          type="text"
           placeholder="XX-XXXXXXXX-X"
           value={formatCuit(form.cuit)}
           onChange={(e) =>
             setForm({ ...form, cuit: unformatCuit(e.target.value) })
           }
           maxLength={13}
+          className="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-foreground/25"
         />
+        <p className="text-xs text-muted-foreground/60 leading-relaxed">
+          Clave Unica de Identificacion Tributaria de tu empresa. La encontras
+          en tu constancia de AFIP.
+        </p>
       </div>
+
+      <div className="h-px bg-border" />
+
+      {/* --- Phone --- */}
       <div className="space-y-2">
-        <Label htmlFor="onboarding-phone">Teléfono (opcional)</Label>
-        <Input
-          id="onboarding-phone"
+        <label
+          htmlFor="ob-phone"
+          className="block text-sm text-muted-foreground"
+        >
+          Telefono
+        </label>
+        <input
+          id="ob-phone"
+          type="text"
           placeholder="Ej: 11 1234-5678"
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          className="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-colors focus:border-foreground/25"
         />
+        <p className="text-xs text-muted-foreground/60 leading-relaxed">
+          Opcional. Lo usamos para contactarte si hay algun problema con tu
+          cuenta.
+        </p>
       </div>
-      <Button
+
+      <div className="h-px bg-border" />
+
+      {/* --- Submit --- */}
+      <button
         type="submit"
-        className="w-full"
         disabled={!isValid || isSubmitting}
+        className="w-full rounded-lg bg-foreground py-3 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Crear organización
-      </Button>
+        {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+        Crear organizacion
+      </button>
     </form>
   );
 }

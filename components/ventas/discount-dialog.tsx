@@ -37,7 +37,7 @@ interface CartItem {
   sku: string;
   price: number;
   quantity: number;
-  discount: ItemDiscount | null;
+  discount?: ItemDiscount | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { getOrganizationId } from "../auth/get-organization";
 import { QuotePdfData } from "./quote";
 import { SaleVoucherData } from "./sale-voucher";
 import { formatCurrency } from "./shared";
+import { type TransferPdfData } from "./transfer";
 
 // ─── Shared: fetch fiscal config ─────────────────────────
 
@@ -283,5 +284,55 @@ export async function getQuotePdfData(quoteId: string): Promise<QuotePdfData> {
     discount: Number(quote.discount),
     total: Number(quote.total),
     notes: quote.notes,
+  };
+}
+
+export async function getTransferPdfData(
+  transferId: string,
+): Promise<TransferPdfData> {
+  const organizationId = await getOrganizationId();
+  const supabase = await createClient();
+
+  const { data: transfer, error } = await supabase
+    .from("transfers")
+    .select(
+      `
+      *,
+      source_location:locations!transfers_source_location_id_fkey(name),
+      destination_location:locations!transfers_destination_location_id_fkey(name),
+      items:transfer_items(
+        id, product_id, quantity,
+        product:products(name, sku)
+      )
+    `,
+    )
+    .eq("id", transferId)
+    .eq("organization_id", organizationId)
+    .single();
+
+  if (error || !transfer) {
+    console.error("Supabase error:", error);
+    throw new Error(`Transfer not found: ${transferId}`);
+  }
+
+  const emitter = await getEmitterData(organizationId);
+
+  const items = (transfer.items || []).map((item) => ({
+    sku: item.product?.sku || null,
+    description: item.product?.name || "Producto eliminado",
+    quantity: item.quantity,
+  }));
+
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  return {
+    transferNumber: transfer.transfer_number,
+    transferDate: transfer.transfer_date,
+    emitter,
+    sourceLocation: transfer.source_location?.name || "—",
+    destinationLocation: transfer.destination_location?.name || "—",
+    items,
+    totalQuantity,
+    notes: transfer.notes,
   };
 }

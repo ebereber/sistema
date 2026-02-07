@@ -99,6 +99,11 @@ const NAV_ITEMS = [
         url: "/transferencias",
         permission: "products:read",
       },
+      {
+        title: "Inventario",
+        url: "/inventario",
+        permission: "products:read",
+      },
     ],
   },
   {

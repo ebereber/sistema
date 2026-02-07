@@ -72,3 +72,25 @@ export async function downloadQuotePdf(quoteId: string, filename?: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export function openTransferPdf(transferId: string) {
+  window.open(`/api/pdf/transfer/${transferId}`, "_blank");
+}
+
+export async function downloadTransferPdf(
+  transferId: string,
+  filename?: string,
+) {
+  const response = await fetch(`/api/pdf/transfer/${transferId}`);
+  if (!response.ok) throw new Error("Error downloading PDF");
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || `remito-${transferId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
