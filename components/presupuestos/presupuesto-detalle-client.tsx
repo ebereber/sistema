@@ -13,20 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { deleteQuoteAction } from "@/lib/actions/quotes";
-import {
-  parseQuoteItems,
-  type QuoteItemData,
-} from "@/lib/services/quotes";
+import { downloadQuotePdf } from "@/lib/pdf/client";
+import { parseQuoteItems, type QuoteItemData } from "@/lib/services/quotes";
 import type { Tables } from "@/lib/supabase/types";
 import { formatPrice } from "@/lib/validations/sale";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import {
-  ArrowLeft,
-  Download,
-  ShoppingCart,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Download, ShoppingCart, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -81,10 +74,14 @@ export function PresupuestoDetalleClient({
   };
 
   const handleDownloadPDF = () => {
-    toast.info("Próximamente", {
+    toast.info("Descar", {
       description: "La descarga de PDF estará disponible pronto.",
     });
+    downloadQuotePdf(quote.id, `presupuesto-${quote.quote_number}.pdf`);
   };
+  /*   const handleDownloadPDF = () => {
+  downloadQuotePdf(quote.id, `presupuesto-${quote.quote_number}.pdf`);
+}; */
 
   const handleDeleteConfirm = async () => {
     setIsDeleting(true);
@@ -174,7 +171,7 @@ export function PresupuestoDetalleClient({
             <TableRow>
               <TableHead>Producto</TableHead>
               <TableHead className="text-right">Cant.</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
+              <TableHead className="text-right">Precio Unitario</TableHead>
               {hasDiscounts && (
                 <TableHead className="text-right">Desc.</TableHead>
               )}

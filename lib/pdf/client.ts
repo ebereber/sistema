@@ -47,3 +47,28 @@ export async function downloadReceiptPdf(paymentId: string, filename?: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Open a quote PDF in a new tab
+ */
+export function openQuotePdf(quoteId: string) {
+  window.open(`/api/pdf/quote/${quoteId}`, "_blank");
+}
+
+/**
+ * Download a quote PDF
+ */
+export async function downloadQuotePdf(quoteId: string, filename?: string) {
+  const response = await fetch(`/api/pdf/quote/${quoteId}`);
+  if (!response.ok) throw new Error("Error downloading PDF");
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || `presupuesto-${quoteId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

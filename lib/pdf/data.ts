@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import type { PaymentReceiptData } from "./payment-receipt";
 
 import { getOrganizationId } from "../auth/get-organization";
+import { QuotePdfData } from "./quote";
 import { SaleVoucherData } from "./sale-voucher";
+import { formatCurrency } from "./shared";
 
 // ─── Shared: fetch fiscal config ─────────────────────────
 
@@ -192,5 +194,94 @@ export async function getPaymentReceiptData(
       amount: Number(method.amount),
     })),
     totalAmount: Number(payment.total_amount),
+  };
+}
+
+// ─── Quote PDF Data ──────────────────────────────────────
+
+interface QuoteItemJson {
+  sku: string | null;
+  name: string;
+  price: number;
+  taxRate: number;
+  discount: { type: "percentage" | "fixed"; value: number } | null;
+  quantity: number;
+  basePrice: number;
+  productId: string | null;
+  imageUrl: string | null;
+}
+
+interface QuoteItemsJson {
+  cartItems: QuoteItemJson[];
+  globalDiscount: { type: "percentage" | "fixed"; value: number } | null;
+}
+
+export async function getQuotePdfData(quoteId: string): Promise<QuotePdfData> {
+  const organizationId = await getOrganizationId();
+  const supabase = await createClient();
+
+  const { data: quote, error } = await supabase
+    .from("quotes")
+    .select(
+      `
+      *,
+      customer:customers(id, name, tax_id, tax_id_type, tax_category, city)
+    `,
+    )
+    .eq("id", quoteId)
+    .eq("organization_id", organizationId)
+    .single();
+
+  if (error || !quote) {
+    console.error("Supabase error:", error);
+    throw new Error(`Quote not found: ${quoteId}`);
+  }
+
+  const emitter = await getEmitterData(organizationId);
+  const parsed = quote.items as unknown as QuoteItemsJson;
+  const cartItems = parsed.cartItems || [];
+
+  const items = cartItems.map((item) => {
+    const gross = item.price * item.quantity;
+    let discountAmount = 0;
+    let discountLabel = "0,00%";
+
+    if (item.discount) {
+      if (item.discount.type === "percentage") {
+        discountAmount = gross * (item.discount.value / 100);
+        discountLabel = `${item.discount.value}%`;
+      } else {
+        discountAmount = Math.min(item.discount.value * item.quantity, gross);
+        discountLabel = formatCurrency(item.discount.value);
+      }
+    }
+
+    return {
+      sku: item.sku === "CUSTOM" ? null : item.sku,
+      description: item.name,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      discountLabel,
+      subtotal: gross - discountAmount,
+    };
+  });
+
+  return {
+    quoteNumber: quote.quote_number,
+    createdAt: quote.created_at,
+    validUntil: quote.valid_until,
+    emitter,
+    customer: {
+      name: quote.customer?.name || quote.customer_name || "Consumidor Final",
+      taxId: quote.customer?.tax_id || null,
+      taxIdType: quote.customer?.tax_id_type || "DNI",
+      taxCategory: quote.customer?.tax_category || "Consumidor Final",
+      city: quote.customer?.city || null,
+    },
+    items,
+    subtotal: Number(quote.subtotal),
+    discount: Number(quote.discount),
+    total: Number(quote.total),
+    notes: quote.notes,
   };
 }
