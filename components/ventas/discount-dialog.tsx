@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { DollarSign, Percent, ShoppingBag, Tag, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -399,17 +400,21 @@ function DiscountDialogContent({
         </TabsContent>
 
         {/* Products Tab */}
-        <TabsContent
-          value="products"
-          className="flex-1 overflow-hidden mt-0 flex flex-col"
-        >
+        <TabsContent value="products" className="mt-0">
           <div className="px-6 pt-4 pb-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
               {items.length} producto{items.length !== 1 ? "s" : ""} en el
               carrito
             </p>
           </div>
-          <ScrollArea className="flex-1 px-6 pb-4">
+          <ScrollArea
+            className={cn(
+              "w-full px-6 mb-4",
+              // Si hay más de 3 productos, fijamos la altura para forzar el scroll
+              // Si hay menos, dejamos que crezca naturalmente hasta el max-h del Dialog
+              items.length > 3 ? "h-[400px]" : "h-auto",
+            )}
+          >
             <div className="space-y-2">
               {items.map((item) => {
                 const itemDiscount = itemDiscounts[item.id];
