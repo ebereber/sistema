@@ -163,7 +163,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const handleMouseLeave = () => {
     if (isHoverMode && !isDropdownOpen) {
       hoverTimeout.current = setTimeout(() => {
-        setOpen(false);
+        setOpen(false); // Cierra el sidebar principal
+        setOpenSection(null); // <--- ESTO cerrará cualquier ítem interno abierto
       }, 150);
     }
   };
@@ -311,6 +312,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   if (newMode === "collapsed" || newMode === "hover") {
                     setOpen(false);
                     setIsHovered(false);
+                    setOpenSection(null); // Asegura que se cierren al cambiar de modo
                   }
                 }}
               >
