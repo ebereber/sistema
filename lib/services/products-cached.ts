@@ -17,11 +17,7 @@ export type LocationForProducts = {
 export async function getCachedProducts(
   organizationId: string,
   params: GetProductsParams = {},
-): Promise<{
-  data: Product[];
-  count: number;
-  totalPages: number;
-}> {
+) {
   "use cache";
   cacheTag("products");
   cacheLife("minutes");
@@ -81,7 +77,7 @@ export async function getCachedProducts(
   if (error) throw error;
 
   return {
-    data: (data || []) as unknown as Product[],
+    data: data || [],
     count: count || 0,
     totalPages: Math.ceil((count || 0) / pageSize),
   };

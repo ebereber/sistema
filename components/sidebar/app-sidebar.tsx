@@ -4,6 +4,7 @@ import {
   ChartNoAxesColumnDecreasing,
   ChessRook,
   ChevronRight,
+  Import,
   Package,
   PanelLeft,
   Plus,
@@ -122,6 +123,12 @@ const NAV_ITEMS = [
     title: "Reportes",
     url: "/reportes",
     icon: ChartNoAxesColumnDecreasing,
+    permission: "settings:write",
+  },
+  {
+    title: "Importar",
+    url: "/importar",
+    icon: Import,
     permission: "settings:write",
   },
   {
