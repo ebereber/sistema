@@ -1,8 +1,10 @@
 "use server";
 
+import { LabelSettings } from "@/components/productos/labels/types";
 import {
   setGeneralPreferences,
   setPriceRounding,
+  setSetting,
   setTicketPreferences,
   type GeneralPreferences,
   type TicketPreferences,
@@ -21,5 +23,10 @@ export async function saveTicketPreferencesAction(prefs: TicketPreferences) {
 
 export async function savePriceRoundingAction(value: { type: string }) {
   await setPriceRounding(value);
+  revalidateTag("settings", "minutes");
+}
+
+export async function saveLabelSettingsAction(settings: LabelSettings) {
+  await setSetting("label_settings", settings);
   revalidateTag("settings", "minutes");
 }
