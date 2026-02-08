@@ -221,6 +221,9 @@ export function VentaDetailClient({
                   variant="outline"
                   className="w-full md:w-auto"
                   size="default"
+                  onClick={() =>
+                    window.open(`/api/ticket/sale/${sale.id}`, "_blank")
+                  }
                 >
                   <Printer className="size-4" />
                   Imprimir

@@ -7,6 +7,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   CirclePlus,
+  Download,
   Ellipsis,
   Eye,
   PackageCheck,
@@ -47,6 +48,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { downloadTransferPdf } from "@/lib/pdf/client";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -300,6 +302,22 @@ export function TransferenciasClient({ data }: TransferenciasClientProps) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Button
+                                variant="ghost"
+                                size="default"
+                                className="h-8"
+                                onClick={() =>
+                                  downloadTransferPdf(
+                                    transfer.id,
+                                    `remito-${transfer.transfer_number}.pdf`,
+                                  )
+                                }
+                              >
+                                <Download className="size-4" />
+                                Descargar remito
+                              </Button>
+                            </DropdownMenuItem>
                             <DropdownMenuItem asChild>
                               <Link href={`/transferencias/${transfer.id}`}>
                                 <Eye className="mr-2 h-4 w-4" />
