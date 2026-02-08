@@ -17,23 +17,27 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { createClient } from "@/lib/supabase/client";
-import { getLocations, type Location } from "@/lib/services/locations";
+/* import { getLocations, type Location } from "@/lib/services/locations"; */
 import { updateProductStockAction } from "@/lib/actions/products";
-import type { Product } from "@/lib/services/products";
+import { type Location } from "@/lib/services/locations";
 
 interface StockManagementDialogProps {
-  product: Product;
+  product: { id: string; name: string };
   onClose: () => void;
   onSuccess: () => void;
+  locations: Location[];
 }
 
 export function StockManagementDialog({
   product,
   onClose,
   onSuccess,
+  locations,
 }: StockManagementDialogProps) {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [stockByLocation, setStockByLocation] = useState<Record<string, number>>({});
+  /* const [locations, setLocations] = useState<Location[]>([]); */
+  const [stockByLocation, setStockByLocation] = useState<
+    Record<string, number>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -43,8 +47,8 @@ export function StockManagementDialog({
       const supabase = createClient();
 
       // Load locations
-      const locs = await getLocations();
-      setLocations(locs);
+      /*  const locs = await getLocations();
+      setLocations(locs); */
 
       // Load current stock
       const { data: stockData } = await supabase
@@ -59,7 +63,7 @@ export function StockManagementDialog({
       });
 
       // Initialize locations without stock with 0
-      locs.forEach((loc) => {
+      locations.forEach((loc) => {
         if (stockMap[loc.id] === undefined) {
           stockMap[loc.id] = 0;
         }
@@ -72,7 +76,7 @@ export function StockManagementDialog({
     } finally {
       setIsLoading(false);
     }
-  }, [product.id]);
+  }, [product.id, locations]);
 
   useEffect(() => {
     loadData();
@@ -80,7 +84,7 @@ export function StockManagementDialog({
 
   const totalStock = Object.values(stockByLocation).reduce(
     (sum, qty) => sum + qty,
-    0
+    0,
   );
 
   async function handleUpdate() {
@@ -101,7 +105,7 @@ export function StockManagementDialog({
           ([location_id, quantity]) => ({
             location_id,
             quantity,
-          })
+          }),
         ),
         userId: user.id,
       });

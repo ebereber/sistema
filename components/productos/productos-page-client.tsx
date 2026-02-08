@@ -1,7 +1,6 @@
-"use client"
+"use client";
 
 import {
-  AlertCircle,
   Archive,
   ChevronDown,
   Copy,
@@ -17,27 +16,27 @@ import {
   Trash,
   Truck,
   X,
-} from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { useCallback, useEffect, useRef, useState, useTransition } from "react"
-import { toast } from "sonner"
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 
-import { ArchiveProductDialog } from "@/components/productos/archive-product-dialog"
-import { BulkActionsBar } from "@/components/productos/bulk-actions-bar"
-import { BulkArchiveDialog } from "@/components/productos/bulk-archive-dialog"
-import { BulkCategoryAssignDialog } from "@/components/productos/bulk-category-assign-dialog"
-import { BulkDeleteDialog } from "@/components/productos/bulk-delete-dialog"
-import { BulkPriceUpdateDialog } from "@/components/productos/bulk-price-update-dialog"
-import { BulkStockUpdateDialog } from "@/components/productos/bulk-stock-update-dialog"
-import { DeleteProductDialog } from "@/components/productos/delete-product-dialog"
-import { PriceHistoryDialog } from "@/components/productos/price-history-dialog"
-import { StockManagementDialog } from "@/components/productos/stock-management-dialog"
-import { StockMovementsDialog } from "@/components/productos/stock-movements-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { ArchiveProductDialog } from "@/components/productos/archive-product-dialog";
+import { BulkActionsBar } from "@/components/productos/bulk-actions-bar";
+import { BulkArchiveDialog } from "@/components/productos/bulk-archive-dialog";
+import { BulkCategoryAssignDialog } from "@/components/productos/bulk-category-assign-dialog";
+import { BulkDeleteDialog } from "@/components/productos/bulk-delete-dialog";
+import { BulkPriceUpdateDialog } from "@/components/productos/bulk-price-update-dialog";
+import { BulkStockUpdateDialog } from "@/components/productos/bulk-stock-update-dialog";
+import { DeleteProductDialog } from "@/components/productos/delete-product-dialog";
+import { PriceHistoryDialog } from "@/components/productos/price-history-dialog";
+import { StockManagementDialog } from "@/components/productos/stock-management-dialog";
+import { StockMovementsDialog } from "@/components/productos/stock-movements-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -46,15 +45,15 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command"
+} from "@/components/ui/command";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -62,13 +61,12 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination"
+} from "@/components/ui/pagination";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -76,40 +74,42 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
-import { useDebounce } from "@/hooks/use-debounce"
-import { getAllProductIdsAction } from "@/lib/actions/products"
-import type { Category, CategoryWithChildren } from "@/lib/services/categories"
-import type { BulkFilters, Product } from "@/lib/services/products"
+import { useDebounce } from "@/hooks/use-debounce";
+import { getAllProductIdsAction } from "@/lib/actions/products";
+import type { Category, CategoryWithChildren } from "@/lib/services/categories";
+import { type Location } from "@/lib/services/locations";
+import type { BulkFilters, Product } from "@/lib/services/products";
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 const VISIBILITY_OPTIONS = [
   { value: "SALES_AND_PURCHASES", label: "Ventas y Compras" },
   { value: "SALES_ONLY", label: "Solo Ventas" },
   { value: "PURCHASES_ONLY", label: "Solo Compras" },
-]
+];
 
 const STOCK_OPTIONS = [
   { value: "WITH_STOCK", label: "Con stock" },
   { value: "WITHOUT_STOCK", label: "Sin stock" },
   { value: "NEGATIVE_STOCK", label: "Stock negativo" },
-]
+];
 
 interface ProductosPageClientProps {
-  products: Product[]
-  count: number
-  totalPages: number
-  categories: Category[]
+  products: Product[];
+  count: number;
+  totalPages: number;
+  categories: Category[];
+  locations: Location[];
   currentFilters: {
-    search: string
-    status: string
-    category: string
-    visibility: string
-    stock: string
-    page: number
-  }
+    search: string;
+    status: string;
+    category: string;
+    visibility: string;
+    stock: string;
+    page: number;
+  };
 }
 
 export function ProductosPageClient({
@@ -118,16 +118,17 @@ export function ProductosPageClient({
   totalPages,
   categories: flatCategories,
   currentFilters,
+  locations,
 }: ProductosPageClientProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const [isPending, startTransition] = useTransition()
-  const isFirstRender = useRef(true)
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const isFirstRender = useRef(true);
 
   // Local search state with debounce
-  const [search, setSearch] = useState(currentFilters.search)
-  const debouncedSearch = useDebounce(search, 300)
+  const [search, setSearch] = useState(currentFilters.search);
+  const debouncedSearch = useDebounce(search, 300);
 
   // Parse current filter values from props
   const statusFilter = currentFilters.status
@@ -138,46 +139,46 @@ export function ProductosPageClient({
         : currentFilters.status === "all"
           ? ["active", "archived"]
           : ["active"]
-    : ["active"]
-  const categoryFilter = currentFilters.category || null
+    : ["active"];
+  const categoryFilter = currentFilters.category || null;
   const visibilityFilter = currentFilters.visibility
     ? currentFilters.visibility.split(",").filter(Boolean)
-    : []
-  const stockFilter = currentFilters.stock || null
-  const page = currentFilters.page
+    : [];
+  const stockFilter = currentFilters.stock || null;
+  const page = currentFilters.page;
 
   // Popover states
-  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false)
-  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)
-  const [visibilityPopoverOpen, setVisibilityPopoverOpen] = useState(false)
-  const [stockPopoverOpen, setStockPopoverOpen] = useState(false)
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+  const [visibilityPopoverOpen, setVisibilityPopoverOpen] = useState(false);
+  const [stockPopoverOpen, setStockPopoverOpen] = useState(false);
 
   // Selection state
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
     new Set(),
-  )
-  const [allSelected, setAllSelected] = useState(false)
+  );
+  const [allSelected, setAllSelected] = useState(false);
 
   // Dialog states for individual actions
   const [stockManagementProduct, setStockManagementProduct] =
-    useState<Product | null>(null)
+    useState<Product | null>(null);
   const [priceHistoryProduct, setPriceHistoryProduct] =
-    useState<Product | null>(null)
+    useState<Product | null>(null);
   const [stockMovementsProduct, setStockMovementsProduct] =
-    useState<Product | null>(null)
-  const [archiveProduct, setArchiveProduct] = useState<Product | null>(null)
+    useState<Product | null>(null);
+  const [archiveProduct, setArchiveProduct] = useState<Product | null>(null);
   const [deleteProductDialog, setDeleteProductDialog] =
-    useState<Product | null>(null)
+    useState<Product | null>(null);
 
   // Bulk dialog states
-  const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = useState(false)
-  const [bulkStockDialogOpen, setBulkStockDialogOpen] = useState(false)
-  const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false)
-  const [bulkArchiveDialogOpen, setBulkArchiveDialogOpen] = useState(false)
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
+  const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = useState(false);
+  const [bulkStockDialogOpen, setBulkStockDialogOpen] = useState(false);
+  const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
+  const [bulkArchiveDialogOpen, setBulkArchiveDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   // Build category hierarchy from flat list
-  const categories = buildCategoryHierarchy(flatCategories)
+  const categories = buildCategoryHierarchy(flatCategories);
 
   // Build current filters object for bulk operations
   const bulkFilters: BulkFilters = {
@@ -187,7 +188,7 @@ export function ProductosPageClient({
     categoryId: categoryFilter || undefined,
     visibility: visibilityFilter.length > 0 ? visibilityFilter : undefined,
     stockFilter: stockFilter as BulkFilters["stockFilter"],
-  }
+  };
 
   // Check if any filter is active (besides default status)
   const hasActiveFilters =
@@ -195,132 +196,132 @@ export function ProductosPageClient({
     (currentFilters.status && currentFilters.status !== "active") ||
     currentFilters.category ||
     currentFilters.visibility ||
-    currentFilters.stock
+    currentFilters.stock;
 
   // URL update helper
   const updateURL = useCallback(
     (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString())
+      const params = new URLSearchParams(searchParams.toString());
 
       for (const [key, value] of Object.entries(updates)) {
         if (value === null || value === "" || value === undefined) {
-          params.delete(key)
+          params.delete(key);
         } else {
-          params.set(key, value)
+          params.set(key, value);
         }
       }
 
       // Remove page when filters change (unless page is being set explicitly)
       if (!("page" in updates)) {
-        params.delete("page")
+        params.delete("page");
       }
 
       // Remove status=active since it's the default
       if (params.get("status") === "active") {
-        params.delete("status")
+        params.delete("status");
       }
 
-      const query = params.toString()
+      const query = params.toString();
       startTransition(() => {
-        router.push(query ? `${pathname}?${query}` : pathname)
-      })
+        router.push(query ? `${pathname}?${query}` : pathname);
+      });
     },
     [searchParams, pathname, router],
-  )
+  );
 
   // Debounced search -> URL
   useEffect(() => {
     if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
+      isFirstRender.current = false;
+      return;
     }
-    updateURL({ search: debouncedSearch || null })
-  }, [debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+    updateURL({ search: debouncedSearch || null });
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear selection when URL changes
   useEffect(() => {
-    setSelectedProducts(new Set())
-    setAllSelected(false)
-  }, [searchParams])
+    setSelectedProducts(new Set());
+    setAllSelected(false);
+  }, [searchParams]);
 
   // Filter functions
   function toggleStatus(status: string) {
     const newFilter = statusFilter.includes(status)
       ? statusFilter.filter((s) => s !== status)
-      : [...statusFilter, status]
+      : [...statusFilter, status];
 
-    let statusParam: string | null
+    let statusParam: string | null;
     if (newFilter.length === 0 || newFilter.length === 2) {
-      statusParam = "all"
+      statusParam = "all";
     } else {
-      statusParam = newFilter[0]
+      statusParam = newFilter[0];
     }
-    updateURL({ status: statusParam })
+    updateURL({ status: statusParam });
   }
 
   function toggleVisibility(visibility: string) {
     const newFilter = visibilityFilter.includes(visibility)
       ? visibilityFilter.filter((v) => v !== visibility)
-      : [...visibilityFilter, visibility]
+      : [...visibilityFilter, visibility];
 
     updateURL({
       visibility: newFilter.length > 0 ? newFilter.join(",") : null,
-    })
+    });
   }
 
   function clearFilters() {
-    setSearch("")
+    setSearch("");
     startTransition(() => {
-      router.push(pathname)
-    })
+      router.push(pathname);
+    });
   }
 
   // Selection functions
   function toggleProductSelection(productId: string) {
     setSelectedProducts((prev) => {
-      const newSet = new Set(prev)
+      const newSet = new Set(prev);
       if (newSet.has(productId)) {
-        newSet.delete(productId)
+        newSet.delete(productId);
       } else {
-        newSet.add(productId)
+        newSet.add(productId);
       }
-      return newSet
-    })
-    setAllSelected(false)
+      return newSet;
+    });
+    setAllSelected(false);
   }
 
   function toggleAllOnPage() {
-    const allOnPageSelected = products.every((p) => selectedProducts.has(p.id))
+    const allOnPageSelected = products.every((p) => selectedProducts.has(p.id));
     if (allOnPageSelected) {
       setSelectedProducts((prev) => {
-        const newSet = new Set(prev)
-        products.forEach((p) => newSet.delete(p.id))
-        return newSet
-      })
-      setAllSelected(false)
+        const newSet = new Set(prev);
+        products.forEach((p) => newSet.delete(p.id));
+        return newSet;
+      });
+      setAllSelected(false);
     } else {
       setSelectedProducts((prev) => {
-        const newSet = new Set(prev)
-        products.forEach((p) => newSet.add(p.id))
-        return newSet
-      })
+        const newSet = new Set(prev);
+        products.forEach((p) => newSet.add(p.id));
+        return newSet;
+      });
     }
   }
 
   async function selectAllProducts() {
     try {
-      const allIds = await getAllProductIdsAction(bulkFilters)
-      setSelectedProducts(new Set(allIds))
-      setAllSelected(true)
+      const allIds = await getAllProductIdsAction(bulkFilters);
+      setSelectedProducts(new Set(allIds));
+      setAllSelected(true);
     } catch (error) {
-      console.error("Error selecting all products:", error)
-      toast.error("Error al seleccionar todos los productos")
+      console.error("Error selecting all products:", error);
+      toast.error("Error al seleccionar todos los productos");
     }
   }
 
   function clearSelection() {
-    setSelectedProducts(new Set())
-    setAllSelected(false)
+    setSelectedProducts(new Set());
+    setAllSelected(false);
   }
 
   // Format currency
@@ -328,65 +329,65 @@ export function ProductosPageClient({
     return new Intl.NumberFormat("es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(amount)
+    }).format(amount);
   }
 
   // Get category name by id
   function getCategoryName(id: string): string {
     function findInTree(cats: CategoryWithChildren[]): string | null {
       for (const cat of cats) {
-        if (cat.id === id) return cat.name
+        if (cat.id === id) return cat.name;
         if (cat.children && cat.children.length > 0) {
-          const found = findInTree(cat.children)
-          if (found) return found
+          const found = findInTree(cat.children);
+          if (found) return found;
         }
       }
-      return null
+      return null;
     }
-    return findInTree(categories) || "Categoria"
+    return findInTree(categories) || "Categoria";
   }
 
   // Get status label
   function getStatusLabel(): string {
     if (statusFilter.length === 0 || statusFilter.length === 2) {
-      return "Todos"
+      return "Todos";
     }
-    return statusFilter.includes("active") ? "Activo" : "Archivado"
+    return statusFilter.includes("active") ? "Activo" : "Archivado";
   }
 
   // Get visibility label
   function getVisibilityLabel(): string {
-    if (visibilityFilter.length === 0) return ""
+    if (visibilityFilter.length === 0) return "";
     if (visibilityFilter.length === 1) {
       return (
         VISIBILITY_OPTIONS.find((v) => v.value === visibilityFilter[0])
           ?.label || ""
-      )
+      );
     }
-    return `${visibilityFilter.length} seleccionados`
+    return `${visibilityFilter.length} seleccionados`;
   }
 
   // Get stock label
   function getStockLabel(): string {
-    if (!stockFilter) return ""
-    return STOCK_OPTIONS.find((s) => s.value === stockFilter)?.label || ""
+    if (!stockFilter) return "";
+    return STOCK_OPTIONS.find((s) => s.value === stockFilter)?.label || "";
   }
 
   // Bulk action handlers
   function handleBulkSuccess() {
-    clearSelection()
-    router.refresh()
+    clearSelection();
+    router.refresh();
   }
 
   function handleDialogSuccess() {
-    router.refresh()
+    router.refresh();
   }
 
   // Check if all products on page are selected
   const allOnPageSelected =
-    products.length > 0 && products.every((p) => selectedProducts.has(p.id))
+    products.length > 0 && products.every((p) => selectedProducts.has(p.id));
   const someOnPageSelected =
-    products.some((p) => selectedProducts.has(p.id)) && !allOnPageSelected
+    products.some((p) => selectedProducts.has(p.id)) && !allOnPageSelected;
 
   return (
     <div className="space-y-6">
@@ -473,8 +474,8 @@ export function ProductosPageClient({
                   <CommandGroup>
                     <CommandItem
                       onSelect={() => {
-                        updateURL({ status: null })
-                        setStatusPopoverOpen(false)
+                        updateURL({ status: null });
+                        setStatusPopoverOpen(false);
                       }}
                       className="justify-center text-sm"
                     >
@@ -523,8 +524,8 @@ export function ProductosPageClient({
                                 categoryFilter === category.id
                                   ? null
                                   : category.id,
-                            })
-                            setCategoryPopoverOpen(false)
+                            });
+                            setCategoryPopoverOpen(false);
                           }}
                         >
                           <Checkbox
@@ -540,11 +541,9 @@ export function ProductosPageClient({
                             onSelect={() => {
                               updateURL({
                                 category:
-                                  categoryFilter === child.id
-                                    ? null
-                                    : child.id,
-                              })
-                              setCategoryPopoverOpen(false)
+                                  categoryFilter === child.id ? null : child.id,
+                              });
+                              setCategoryPopoverOpen(false);
                             }}
                             className="pl-8"
                           >
@@ -565,8 +564,8 @@ export function ProductosPageClient({
                       <CommandGroup>
                         <CommandItem
                           onSelect={() => {
-                            updateURL({ category: null })
-                            setCategoryPopoverOpen(false)
+                            updateURL({ category: null });
+                            setCategoryPopoverOpen(false);
                           }}
                           className="justify-center text-sm"
                         >
@@ -628,8 +627,8 @@ export function ProductosPageClient({
                       <CommandGroup>
                         <CommandItem
                           onSelect={() => {
-                            updateURL({ visibility: null })
-                            setVisibilityPopoverOpen(false)
+                            updateURL({ visibility: null });
+                            setVisibilityPopoverOpen(false);
                           }}
                           className="justify-center text-sm"
                         >
@@ -677,8 +676,8 @@ export function ProductosPageClient({
                               stockFilter === option.value
                                 ? null
                                 : option.value,
-                          })
-                          setStockPopoverOpen(false)
+                          });
+                          setStockPopoverOpen(false);
                         }}
                       >
                         <Checkbox
@@ -694,8 +693,8 @@ export function ProductosPageClient({
                     <CommandGroup>
                       <CommandItem
                         onSelect={() => {
-                          updateURL({ stock: null })
-                          setStockPopoverOpen(false)
+                          updateURL({ stock: null });
+                          setStockPopoverOpen(false);
                         }}
                         className="justify-center text-sm"
                       >
@@ -799,11 +798,11 @@ export function ProductosPageClient({
                       checked={allOnPageSelected}
                       ref={(el) => {
                         if (el) {
-                          ;(
+                          (
                             el as HTMLButtonElement & {
-                              indeterminate: boolean
+                              indeterminate: boolean;
                             }
-                          ).indeterminate = someOnPageSelected
+                          ).indeterminate = someOnPageSelected;
                         }
                       }}
                       onCheckedChange={toggleAllOnPage}
@@ -889,9 +888,7 @@ export function ProductosPageClient({
                       className="text-center"
                       onClick={() => router.push(`/productos/${product.id}`)}
                     >
-                      <Badge
-                        variant={product.active ? "default" : "secondary"}
-                      >
+                      <Badge variant={product.active ? "default" : "secondary"}>
                         {product.active ? "Activo" : "Archivado"}
                       </Badge>
                     </TableCell>
@@ -910,8 +907,8 @@ export function ProductosPageClient({
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
-                              router.push(`/productos/${product.id}`)
+                              e.stopPropagation();
+                              router.push(`/productos/${product.id}`);
                             }}
                           >
                             <Pencil className="mr-2 h-4 w-4" />
@@ -920,8 +917,8 @@ export function ProductosPageClient({
 
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
-                              setStockManagementProduct(product)
+                              e.stopPropagation();
+                              setStockManagementProduct(product);
                             }}
                           >
                             <Package className="mr-2 h-4 w-4" />
@@ -930,10 +927,10 @@ export function ProductosPageClient({
 
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
+                              e.stopPropagation();
                               router.push(
                                 `/productos/nuevo?duplicate=${product.id}`,
-                              )
+                              );
                             }}
                           >
                             <Copy className="mr-2 h-4 w-4" />
@@ -942,8 +939,8 @@ export function ProductosPageClient({
 
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
-                              setPriceHistoryProduct(product)
+                              e.stopPropagation();
+                              setPriceHistoryProduct(product);
                             }}
                           >
                             <History className="mr-2 h-4 w-4" />
@@ -952,8 +949,8 @@ export function ProductosPageClient({
 
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
-                              setStockMovementsProduct(product)
+                              e.stopPropagation();
+                              setStockMovementsProduct(product);
                             }}
                           >
                             <Truck className="mr-2 h-4 w-4" />
@@ -964,8 +961,8 @@ export function ProductosPageClient({
 
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
-                              setArchiveProduct(product)
+                              e.stopPropagation();
+                              setArchiveProduct(product);
                             }}
                             className="text-destructive focus:text-destructive"
                           >
@@ -975,8 +972,8 @@ export function ProductosPageClient({
 
                           <DropdownMenuItem
                             onClick={(e) => {
-                              e.stopPropagation()
-                              setDeleteProductDialog(product)
+                              e.stopPropagation();
+                              setDeleteProductDialog(product);
                             }}
                             className="text-destructive focus:text-destructive"
                           >
@@ -1011,8 +1008,7 @@ export function ProductosPageClient({
                       <PaginationPrevious
                         onClick={() =>
                           updateURL({
-                            page:
-                              page > 1 ? String(page - 1) : null,
+                            page: page > 1 ? String(page - 1) : null,
                           })
                         }
                         className={
@@ -1024,26 +1020,25 @@ export function ProductosPageClient({
                     </PaginationItem>
 
                     {[...Array(Math.min(totalPages, 5))].map((_, i) => {
-                      let pageNum: number
+                      let pageNum: number;
                       if (totalPages <= 5) {
-                        pageNum = i + 1
+                        pageNum = i + 1;
                       } else if (page <= 3) {
-                        pageNum = i + 1
+                        pageNum = i + 1;
                       } else if (page >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i
+                        pageNum = totalPages - 4 + i;
                       } else {
-                        pageNum = page - 2 + i
+                        pageNum = page - 2 + i;
                       }
 
-                      if (pageNum < 1 || pageNum > totalPages) return null
+                      if (pageNum < 1 || pageNum > totalPages) return null;
 
                       return (
                         <PaginationItem key={pageNum}>
                           <PaginationLink
                             onClick={() =>
                               updateURL({
-                                page:
-                                  pageNum > 1 ? String(pageNum) : null,
+                                page: pageNum > 1 ? String(pageNum) : null,
                               })
                             }
                             isActive={page === pageNum}
@@ -1052,7 +1047,7 @@ export function ProductosPageClient({
                             {pageNum}
                           </PaginationLink>
                         </PaginationItem>
-                      )
+                      );
                     })}
 
                     <PaginationItem>
@@ -1084,10 +1079,11 @@ export function ProductosPageClient({
       {stockManagementProduct && (
         <StockManagementDialog
           product={stockManagementProduct}
+          locations={locations}
           onClose={() => setStockManagementProduct(null)}
           onSuccess={() => {
-            setStockManagementProduct(null)
-            handleDialogSuccess()
+            setStockManagementProduct(null);
+            handleDialogSuccess();
           }}
         />
       )}
@@ -1098,7 +1094,7 @@ export function ProductosPageClient({
           productName={priceHistoryProduct.name}
           open={true}
           onOpenChange={(open) => {
-            if (!open) setPriceHistoryProduct(null)
+            if (!open) setPriceHistoryProduct(null);
           }}
         />
       )}
@@ -1109,7 +1105,7 @@ export function ProductosPageClient({
           productName={stockMovementsProduct.name}
           open={true}
           onOpenChange={(open) => {
-            if (!open) setStockMovementsProduct(null)
+            if (!open) setStockMovementsProduct(null);
           }}
         />
       )}
@@ -1119,8 +1115,8 @@ export function ProductosPageClient({
           product={archiveProduct}
           onClose={() => setArchiveProduct(null)}
           onSuccess={() => {
-            setArchiveProduct(null)
-            handleDialogSuccess()
+            setArchiveProduct(null);
+            handleDialogSuccess();
           }}
         />
       )}
@@ -1130,8 +1126,8 @@ export function ProductosPageClient({
           product={deleteProductDialog}
           onClose={() => setDeleteProductDialog(null)}
           onSuccess={() => {
-            setDeleteProductDialog(null)
-            handleDialogSuccess()
+            setDeleteProductDialog(null);
+            handleDialogSuccess();
           }}
         />
       )}
@@ -1155,6 +1151,7 @@ export function ProductosPageClient({
         open={bulkStockDialogOpen}
         onOpenChange={setBulkStockDialogOpen}
         onSuccess={handleBulkSuccess}
+        locations={locations}
       />
 
       <BulkCategoryAssignDialog
@@ -1190,28 +1187,28 @@ export function ProductosPageClient({
         onSuccess={handleBulkSuccess}
       />
     </div>
-  )
+  );
 }
 
 function buildCategoryHierarchy(
   flatCategories: Category[],
 ): CategoryWithChildren[] {
-  const categoryMap = new Map<string, CategoryWithChildren>()
-  const roots: CategoryWithChildren[] = []
+  const categoryMap = new Map<string, CategoryWithChildren>();
+  const roots: CategoryWithChildren[] = [];
 
   flatCategories.forEach((cat) => {
-    categoryMap.set(cat.id, { ...cat, children: [] })
-  })
+    categoryMap.set(cat.id, { ...cat, children: [] });
+  });
 
   flatCategories.forEach((cat) => {
-    const current = categoryMap.get(cat.id)!
+    const current = categoryMap.get(cat.id)!;
     if (cat.parent_id && categoryMap.has(cat.parent_id)) {
-      const parent = categoryMap.get(cat.parent_id)!
-      parent.children!.push(current)
+      const parent = categoryMap.get(cat.parent_id)!;
+      parent.children!.push(current);
     } else {
-      roots.push(current)
+      roots.push(current);
     }
-  })
+  });
 
-  return roots
+  return roots;
 }

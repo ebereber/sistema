@@ -1,151 +1,105 @@
-import { InventoryTable } from "@/components/inventario/inventory-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+
+import { Skeleton } from "@/components/ui/skeleton";
+
+import { InventoryPageClient } from "@/components/inventario/inventory-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
+import { getServerUser } from "@/lib/auth/get-server-user";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Download, Search } from "lucide-react";
-import { Metadata } from "next";
+  getCachedInventory,
+  getCachedTransitData,
+} from "@/lib/services/products-cached";
+
+import { getCachedLocations } from "@/lib/services/locations-cached";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Inventario",
   description: "Gestión de inventario y stock de productos",
 };
 
-// Datos de ejemplo
-const inventoryItems = [
-  {
-    id: "1",
-    name: "Alcohol Etílico 70% 500ml",
-    sku: "ALC-001",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "2",
-    name: "Desengrasante Multiuso Doypack",
-    sku: "DES-M-01",
-    reserved: 0,
-    available: 9,
-    onHand: 9,
-    incoming: 0,
-  },
-  {
-    id: "3",
-    name: "Desinfectante Aerosol 360ml",
-    sku: "AERO-D-01",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "4",
-    name: "Esponja de Cocina Doble Faz",
-    sku: "ESP-001",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "5",
-    name: "Jabón Limpia Manchas",
-    sku: "DKA-8745",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "6",
-    name: "Jabón Líquido para Ropa 3l",
-    sku: "JAB-R-03",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "7",
-    name: "Limpiador de Pisos Lavanda 900ml",
-    sku: "LIM-P-01",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "8",
-    name: "Lustramuebles Siliconado 400ml",
-    sku: "LUS-001",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-  {
-    id: "9",
-    name: "Suavizante para Ropa 1.5l",
-    sku: "SUA-001",
-    reserved: 0,
-    available: 10,
-    onHand: 10,
-    incoming: 0,
-  },
-];
+interface SearchParams {
+  search?: string;
+  location?: string;
+  page?: string;
+}
 
-export default function InventoryPage() {
+export default async function InventoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
   return (
-    <div className="flex h-full flex-1 flex-col space-y-8 p-6">
-      {/* Header */}
+    <Suspense fallback={<PageSkeleton />}>
+      <InventoryContent searchParams={params} />
+    </Suspense>
+  );
+}
+
+async function InventoryContent({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const user = await getServerUser();
+  if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
+
+  const locationId = searchParams.location || undefined;
+  const page = Number(searchParams.page) || 1;
+
+  const [result, locations, transitData] = await Promise.all([
+    getCachedInventory(organizationId, {
+      search: searchParams.search,
+      locationId,
+      page,
+      pageSize: 20,
+    }),
+    getCachedLocations(organizationId),
+    getCachedTransitData(organizationId, locationId),
+  ]);
+
+  return (
+    <InventoryPageClient
+      products={result.data}
+      count={result.count}
+      totalPages={result.totalPages}
+      locations={locations}
+      transitData={transitData}
+      currentFilters={{
+        search: searchParams.search || "",
+        location: searchParams.location || "",
+        page,
+      }}
+      userId={user.id}
+    />
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-bold text-2xl tracking-tight">Inventario</h2>
+        <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-10 w-24" />
       </div>
-
-      {/* Content */}
-      <div className="space-y-4">
-        {/* Filters */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-            {/* Warehouse Select */}
-            <Select defaultValue="principal">
-              <SelectTrigger className="h-8 w-full sm:w-[200px]">
-                <SelectValue placeholder="Seleccionar ubicación" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="principal">Principal</SelectItem>
-                <SelectItem value="deposito">Depósito</SelectItem>
-                <SelectItem value="sucursal">Sucursal Centro</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute top-2 left-2 size-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar producto…"
-                className="h-8 w-full pl-8 sm:w-[150px] lg:w-[250px]"
-                name="search"
-              />
-            </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-9 w-[200px]" />
+        <Skeleton className="h-9 w-[250px]" />
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4">
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 w-[80px]" />
+            <Skeleton className="h-8 w-[80px]" />
+            <Skeleton className="h-4 w-[60px]" />
+            <Skeleton className="h-4 w-[60px]" />
+            <Skeleton className="h-8 w-8" />
           </div>
-
-          {/* Export Button */}
-          <Button variant="outline" className="active:scale-[0.97]">
-            <Download className="mr-2 size-4" />
-            Exportar
-          </Button>
-        </div>
-
-        {/* Inventory Table */}
-        <InventoryTable items={inventoryItems} />
+        ))}
       </div>
     </div>
   );

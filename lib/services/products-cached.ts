@@ -135,7 +135,7 @@ export async function getCachedCategories(
   if (error) throw error;
   return data || [];
 }
-
+/* 
 export async function getCachedLocationsForProducts(
   organizationId: string,
 ): Promise<LocationForProducts[]> {
@@ -153,7 +153,7 @@ export async function getCachedLocationsForProducts(
 
   if (error) throw error;
   return data || [];
-}
+} */
 
 export async function getCachedAllProductIds(
   organizationId: string,
@@ -242,6 +242,149 @@ export async function getCachedAllProductsForPOS(
     categoryId: product.category_id,
     categoryName: normalizeRelation(product.category)?.name || null,
   }));
+}
+
+// ============================================================================
+// INVENTORY
+// ============================================================================
+
+export type InventoryProduct = {
+  id: string;
+  name: string;
+  sku: string | null;
+  stock_quantity: number;
+  location_stock: number | null;
+};
+
+export type InventoryParams = {
+  search?: string;
+  locationId?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export async function getCachedInventory(
+  organizationId: string,
+  params: InventoryParams = {},
+) {
+  "use cache";
+  cacheTag("products");
+  cacheLife("minutes");
+
+  const { search, locationId, page = 1, pageSize = 20 } = params;
+
+  let query = supabaseAdmin
+    .from("products")
+    .select("id, name, sku, stock_quantity", { count: "exact" })
+    .eq("organization_id", organizationId)
+    .eq("active", true);
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await query
+    .range(from, to)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+
+  const products = data || [];
+
+  // If a location is selected, fetch per-location stock for these product IDs
+  const locationStockMap: Record<string, number> = {};
+  if (locationId && products.length > 0) {
+    const productIds = products.map((p) => p.id);
+    const { data: stockData, error: stockError } = await supabaseAdmin
+      .from("stock")
+      .select("product_id, quantity")
+      .eq("location_id", locationId)
+      .in("product_id", productIds);
+
+    if (stockError) throw stockError;
+
+    for (const s of stockData || []) {
+      locationStockMap[s.product_id] = s.quantity;
+    }
+  }
+
+  const inventoryProducts: InventoryProduct[] = products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    stock_quantity: p.stock_quantity ?? 0,
+    location_stock: locationId ? (locationStockMap[p.id] ?? 0) : null,
+  }));
+
+  return {
+    data: inventoryProducts,
+    count: count || 0,
+    totalPages: Math.ceil((count || 0) / pageSize),
+  };
+}
+
+export type TransitData = {
+  incoming: Record<string, number>;
+  outgoing: Record<string, number>;
+};
+
+export async function getCachedTransitData(
+  organizationId: string,
+  locationId?: string,
+): Promise<TransitData> {
+  "use cache";
+  cacheTag("transfers");
+  cacheLife("minutes");
+
+  const empty: TransitData = { incoming: {}, outgoing: {} };
+  if (!locationId) return empty;
+
+  // Get in-transit transfers where this location is source or destination
+  const { data: transfers, error } = await supabaseAdmin
+    .from("transfers")
+    .select(
+      `
+      id,
+      source_location_id,
+      destination_location_id,
+      transfer_items(product_id, quantity, quantity_received)
+    `,
+    )
+    .eq("organization_id", organizationId)
+    .eq("status", "in_transit")
+    .or(
+      `source_location_id.eq.${locationId},destination_location_id.eq.${locationId}`,
+    );
+
+  if (error) throw error;
+
+  const incoming: Record<string, number> = {};
+  const outgoing: Record<string, number> = {};
+
+  for (const transfer of transfers || []) {
+    const items = Array.isArray(transfer.transfer_items)
+      ? transfer.transfer_items
+      : [];
+
+    for (const item of items) {
+      const remaining = item.quantity - (item.quantity_received ?? 0);
+      if (remaining <= 0) continue;
+
+      if (transfer.destination_location_id === locationId) {
+        incoming[item.product_id] =
+          (incoming[item.product_id] ?? 0) + remaining;
+      }
+      if (transfer.source_location_id === locationId) {
+        outgoing[item.product_id] =
+          (outgoing[item.product_id] ?? 0) + remaining;
+      }
+    }
+  }
+
+  return { incoming, outgoing };
 }
 
 export async function getCachedTopSellingProducts(

@@ -23,9 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { createClient } from "@/lib/supabase/client";
 import { bulkUpdatePricesAction } from "@/lib/actions/products";
 import type { BulkFilters } from "@/lib/services/products";
+import { createClient } from "@/lib/supabase/client";
 
 interface BulkPriceUpdateDialogProps {
   selectedIds: string[];
@@ -46,7 +46,9 @@ export function BulkPriceUpdateDialog({
   onOpenChange,
   onSuccess,
 }: BulkPriceUpdateDialogProps) {
-  const [operation, setOperation] = useState<"increase" | "decrease">("increase");
+  const [operation, setOperation] = useState<"increase" | "decrease">(
+    "increase",
+  );
   const [type, setType] = useState<"percentage" | "fixed">("percentage");
   const [value, setValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -63,7 +65,9 @@ export function BulkPriceUpdateDialog({
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         toast.error("Error de autenticación");
@@ -116,7 +120,8 @@ export function BulkPriceUpdateDialog({
             Actualizar precios
           </DialogTitle>
           <DialogDescription>
-            Se actualizarán los precios de {count} producto{count !== 1 ? "s" : ""}
+            Se actualizarán los precios de {count} producto
+            {count !== 1 ? "s" : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -175,7 +180,11 @@ export function BulkPriceUpdateDialog({
             <div className="rounded-lg bg-muted p-3 text-sm">
               <p>
                 Se{" "}
-                <span className={operation === "increase" ? "text-green-600" : "text-red-600"}>
+                <span
+                  className={
+                    operation === "increase" ? "text-green-600" : "text-red-600"
+                  }
+                >
                   {operation === "increase" ? "aumentarán" : "disminuirán"}
                 </span>{" "}
                 los precios en{" "}

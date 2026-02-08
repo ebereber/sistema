@@ -1,60 +1,59 @@
-import { redirect } from "next/navigation"
-import { Suspense } from "react"
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { ProductosPageClient } from "@/components/productos/productos-page-client"
-import { getOrganizationId } from "@/lib/auth/get-organization"
-import { getServerUser } from "@/lib/auth/get-server-user"
+import { ProductosPageClient } from "@/components/productos/productos-page-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
+import { getServerUser } from "@/lib/auth/get-server-user";
+import { getCachedLocations } from "@/lib/services/locations-cached";
 import {
-  getCachedProducts,
   getCachedCategories,
-} from "@/lib/services/products-cached"
+  getCachedProducts,
+} from "@/lib/services/products-cached";
 
 interface SearchParams {
-  search?: string
-  status?: string
-  category?: string
-  visibility?: string
-  stock?: string
-  page?: string
+  search?: string;
+  status?: string;
+  category?: string;
+  visibility?: string;
+  stock?: string;
+  page?: string;
 }
 
 export default async function ProductosPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams
+  const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>
       <ProductosContent searchParams={params} />
     </Suspense>
-  )
+  );
 }
 
 async function ProductosContent({
   searchParams,
 }: {
-  searchParams: SearchParams
+  searchParams: SearchParams;
 }) {
-  const user = await getServerUser()
-  if (!user) redirect("/login")
-  const organizationId = await getOrganizationId()
+  const user = await getServerUser();
+  if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
   // Parse filters from URL
-  const statusParam = searchParams.status || "active"
+  const statusParam = searchParams.status || "active";
   const active =
     statusParam === "active"
       ? true
       : statusParam === "archived"
         ? false
-        : undefined
-  const visibility = searchParams.visibility
-    ?.split(",")
-    .filter(Boolean)
+        : undefined;
+  const visibility = searchParams.visibility?.split(",").filter(Boolean);
 
-  const [result, categories] = await Promise.all([
+  const [result, categories, locations] = await Promise.all([
     getCachedProducts(organizationId, {
       page: Number(searchParams.page) || 1,
       pageSize: 20,
@@ -69,7 +68,8 @@ async function ProductosContent({
         | undefined,
     }),
     getCachedCategories(organizationId),
-  ])
+    getCachedLocations(organizationId),
+  ]);
 
   return (
     <ProductosPageClient
@@ -77,6 +77,7 @@ async function ProductosContent({
       count={result.count}
       totalPages={result.totalPages}
       categories={categories}
+      locations={locations}
       currentFilters={{
         search: searchParams.search || "",
         status: searchParams.status || "active",
@@ -86,7 +87,7 @@ async function ProductosContent({
         page: Number(searchParams.page) || 1,
       }}
     />
-  )
+  );
 }
 
 function PageSkeleton() {
@@ -123,5 +124,5 @@ function PageSkeleton() {
         ))}
       </div>
     </div>
-  )
+  );
 }
