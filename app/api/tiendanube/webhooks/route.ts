@@ -67,9 +67,8 @@ export async function POST(request: NextRequest) {
       case "order/paid":
         if (entityId) {
           try {
-            const { createPaymentForTiendanubeOrderAction } = await import(
-              "@/lib/actions/tiendanube"
-            );
+            const { createPaymentForTiendanubeOrderAction } =
+              await import("@/lib/actions/tiendanube");
             await createPaymentForTiendanubeOrderAction(
               storeId,
               entityId,
@@ -123,7 +122,6 @@ async function handleProductUpdated(
 ) {
   const { extractI18n, parsePrice } = await import("@/lib/tiendanube");
 
-  // Check if we have a mapping for this product
   const { data: mapping } = await supabaseAdmin
     .from("tiendanube_product_map")
     .select("local_product_id")
@@ -131,9 +129,8 @@ async function handleProductUpdated(
     .eq("tiendanube_product_id", tiendanubeProductId)
     .maybeSingle();
 
-  if (!mapping) return; // Product not synced, nothing to do
+  if (!mapping) return;
 
-  // Fetch the updated product from Tiendanube
   const { getTiendanubeProduct } = await import("@/lib/services/tiendanube");
 
   try {
@@ -141,7 +138,25 @@ async function handleProductUpdated(
     const variant = tnProduct.variants[0];
     if (!variant) return;
 
-    // Update local product
+    // Get local product tax_rate
+    const { data: localProduct } = await supabaseAdmin
+      .from("products")
+      .select("tax_rate")
+      .eq("id", mapping.local_product_id)
+      .single();
+
+    const taxRate = localProduct?.tax_rate ?? 21;
+    const price = parsePrice(variant.price) ?? 0;
+    const cost = parsePrice(variant.cost) ?? null;
+
+    // Calculate margin from Tienda Nube price
+    let marginPercentage: number | null = null;
+    if (cost && cost > 0 && price > 0) {
+      const precioSinIVA = price / (1 + taxRate / 100);
+      marginPercentage = ((precioSinIVA - cost) / cost) * 100;
+      marginPercentage = Math.round(marginPercentage * 100) / 100;
+    }
+
     await supabaseAdmin
       .from("products")
       .update({
@@ -149,8 +164,9 @@ async function handleProductUpdated(
         description: extractI18n(tnProduct.description) || null,
         sku: variant.sku || `TN-${tnProduct.id}`,
         barcode: variant.barcode || null,
-        price: parsePrice(variant.price) ?? 0,
-        cost: parsePrice(variant.cost) ?? null,
+        price,
+        cost,
+        margin_percentage: marginPercentage,
         image_url: tnProduct.images[0]?.src || null,
         active: tnProduct.published,
         stock_quantity: variant.stock ?? 0,
@@ -207,7 +223,6 @@ async function handleProductUpdated(
       }
     }
 
-    // Update sync timestamp
     await supabaseAdmin
       .from("tiendanube_product_map")
       .update({ last_synced_at: new Date().toISOString() })
