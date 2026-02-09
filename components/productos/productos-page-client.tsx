@@ -125,7 +125,7 @@ export function ProductosPageClient({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const isFirstRender = useRef(true);
-
+  const [prevParams, setPrevParams] = useState(searchParams.toString());
   // Local search state with debounce
   const [search, setSearch] = useState(currentFilters.search);
   const debouncedSearch = useDebounce(search, 300);
@@ -237,12 +237,6 @@ export function ProductosPageClient({
     }
     updateURL({ search: debouncedSearch || null });
   }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Clear selection when URL changes
-  useEffect(() => {
-    setSelectedProducts(new Set());
-    setAllSelected(false);
-  }, [searchParams]);
 
   // Filter functions
   function toggleStatus(status: string) {
@@ -388,6 +382,12 @@ export function ProductosPageClient({
     products.length > 0 && products.every((p) => selectedProducts.has(p.id));
   const someOnPageSelected =
     products.some((p) => selectedProducts.has(p.id)) && !allOnPageSelected;
+
+  if (prevParams !== searchParams.toString()) {
+    setPrevParams(searchParams.toString());
+    setSelectedProducts(new Set());
+    setAllSelected(false);
+  }
 
   return (
     <div className="space-y-6">

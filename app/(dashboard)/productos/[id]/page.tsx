@@ -1,43 +1,59 @@
-import { notFound, redirect } from "next/navigation"
-import { Suspense } from "react"
+import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { EditarProductoClient } from "@/components/productos/editar-producto-client"
-import { getOrganizationId } from "@/lib/auth/get-organization"
-import { getServerUser } from "@/lib/auth/get-server-user"
-import { getCachedProductById } from "@/lib/services/products-cached"
+import { EditarProductoClient } from "@/components/productos/editar-producto-client";
+import { getOrganizationId } from "@/lib/auth/get-organization";
+import { getServerUser } from "@/lib/auth/get-server-user";
+import { getCachedCategories } from "@/lib/services/categories-cached";
+import { getCachedLocations } from "@/lib/services/locations-cached";
+import { getCachedProductById } from "@/lib/services/products-cached";
+import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
 
 export default async function ProductoDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = await params
+  const { id } = await params;
   return (
     <Suspense fallback={<DetailSkeleton />}>
       <ProductoDetailContent id={id} />
     </Suspense>
-  )
+  );
 }
 
 async function ProductoDetailContent({ id }: { id: string }) {
-  const user = await getServerUser()
-  if (!user) redirect("/login")
-  const organizationId = await getOrganizationId()
+  const user = await getServerUser();
+  if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
 
-  const product = await getCachedProductById(organizationId, id)
-  if (!product) notFound()
+  const [product, locations, categories, suppliers] = await Promise.all([
+    getCachedProductById(organizationId, id),
+    getCachedLocations(organizationId),
+    getCachedCategories(organizationId),
+    getCachedSuppliers(organizationId),
+  ]);
 
-  // Map stock data
+  if (!product) notFound();
+
   const stockData = (product.stock || []).map((s) => ({
     location_id: s.location_id,
     location_name: s.location.name,
     is_main: s.location.is_main ?? false,
     quantity: s.quantity,
-  }))
+  }));
 
-  return <EditarProductoClient product={product} stockData={stockData} />
+  return (
+    <EditarProductoClient
+      product={product}
+      stockData={stockData}
+      locations={locations}
+      categories={categories}
+      suppliers={suppliers}
+    />
+  );
 }
 
 function DetailSkeleton() {
@@ -57,5 +73,5 @@ function DetailSkeleton() {
         <Skeleton className="h-48" />
       </div>
     </div>
-  )
+  );
 }

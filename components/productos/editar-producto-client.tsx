@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { Copy, Loader2 } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
-import { toast } from "sonner"
+import { Copy, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
 
-import { ProductForm } from "@/components/productos/product-form"
-import { Badge } from "@/components/ui/badge"
+import { ProductForm } from "@/components/productos/product-form";
+import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,59 +15,68 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
 
 import {
-  updateProductAction,
-  archiveProductAction,
   activateProductAction,
-  isSkuUniqueAction,
+  archiveProductAction,
   isBarcodeUniqueAction,
-} from "@/lib/actions/products"
-import type { Product } from "@/lib/services/products"
-import { createClient } from "@/lib/supabase/client"
+  isSkuUniqueAction,
+  updateProductAction,
+} from "@/lib/actions/products";
+import { type Category } from "@/lib/services/categories";
+import { type Location } from "@/lib/services/locations";
+import type { Product } from "@/lib/services/products";
+import { type Supplier } from "@/lib/services/suppliers-cached";
+import { createClient } from "@/lib/supabase/client";
 import type {
   ProductFormInput,
   StockByLocationData,
-} from "@/lib/validations/product"
+} from "@/lib/validations/product";
 
 interface EditarProductoClientProps {
-  product: Product
-  stockData: StockByLocationData[]
+  product: Product;
+  stockData: StockByLocationData[];
+  locations: Location[];
+  categories: Category[];
+  suppliers: Supplier[];
 }
 
 export function EditarProductoClient({
   product,
   stockData,
+  locations,
+  categories,
+  suppliers,
 }: EditarProductoClientProps) {
-  const router = useRouter()
-  const [isSaving, setIsSaving] = useState(false)
-  const [currentProduct, setCurrentProduct] = useState(product)
+  const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentProduct, setCurrentProduct] = useState(product);
 
   const handleSubmit = useCallback(
     async (data: ProductFormInput, stock: StockByLocationData[]) => {
-      setIsSaving(true)
+      setIsSaving(true);
 
       try {
-        const supabase = createClient()
+        const supabase = createClient();
         const {
           data: { user },
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser();
 
         if (!user) {
           toast.error("Error de autenticacion", {
             description: "No se pudo obtener el usuario actual",
-          })
-          setIsSaving(false)
-          return
+          });
+          setIsSaving(false);
+          return;
         }
 
         // Validate SKU uniqueness (excluding current product)
@@ -75,13 +84,13 @@ export function EditarProductoClient({
           const skuIsUnique = await isSkuUniqueAction(
             data.sku,
             currentProduct.id,
-          )
+          );
           if (!skuIsUnique) {
             toast.error("SKU duplicado", {
               description: "Ya existe un producto con este SKU",
-            })
-            setIsSaving(false)
-            return
+            });
+            setIsSaving(false);
+            return;
           }
         }
 
@@ -90,13 +99,13 @@ export function EditarProductoClient({
           const barcodeIsUnique = await isBarcodeUniqueAction(
             data.barcode,
             currentProduct.id,
-          )
+          );
           if (!barcodeIsUnique) {
             toast.error("Codigo de barras duplicado", {
               description: "Ya existe un producto con este codigo de barras",
-            })
-            setIsSaving(false)
-            return
+            });
+            setIsSaving(false);
+            return;
           }
         }
 
@@ -119,7 +128,7 @@ export function EditarProductoClient({
           visibility: data.visibility || "SALES_AND_PURCHASES",
           image_url: data.image_url || null,
           active: data.active ?? true,
-        }
+        };
 
         const updatedProduct = await updateProductAction(currentProduct.id, {
           product: productData,
@@ -128,65 +137,65 @@ export function EditarProductoClient({
             quantity: s.quantity,
           })),
           userId: user.id,
-        })
+        });
 
         toast.success("Producto actualizado", {
           description: `${updatedProduct.name} se actualizo correctamente`,
-        })
+        });
 
-        router.refresh()
+        router.refresh();
       } catch (error: unknown) {
         const errorMessage =
-          error instanceof Error ? error.message : "Error desconocido"
+          error instanceof Error ? error.message : "Error desconocido";
         toast.error("Error al actualizar producto", {
           description: errorMessage,
-        })
+        });
       } finally {
-        setIsSaving(false)
+        setIsSaving(false);
       }
     },
     [currentProduct, router],
-  )
+  );
 
   const handleArchive = useCallback(async () => {
-    setIsSaving(true)
+    setIsSaving(true);
 
     try {
-      await archiveProductAction(currentProduct.id)
-      setCurrentProduct({ ...currentProduct, active: false })
-      toast.success("Producto archivado")
+      await archiveProductAction(currentProduct.id);
+      setCurrentProduct({ ...currentProduct, active: false });
+      toast.success("Producto archivado");
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido"
-      toast.error("Error al archivar producto", { description: errorMessage })
+        error instanceof Error ? error.message : "Error desconocido";
+      toast.error("Error al archivar producto", { description: errorMessage });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }, [currentProduct])
+  }, [currentProduct]);
 
   const handleActivate = useCallback(async () => {
-    setIsSaving(true)
+    setIsSaving(true);
 
     try {
-      await activateProductAction(currentProduct.id)
-      setCurrentProduct({ ...currentProduct, active: true })
-      toast.success("Producto activado")
+      await activateProductAction(currentProduct.id);
+      setCurrentProduct({ ...currentProduct, active: true });
+      toast.success("Producto activado");
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido"
-      toast.error("Error al activar producto", { description: errorMessage })
+        error instanceof Error ? error.message : "Error desconocido";
+      toast.error("Error al activar producto", { description: errorMessage });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }, [currentProduct])
+  }, [currentProduct]);
 
   function copyToClipboard(text: string, label: string) {
-    navigator.clipboard.writeText(text)
-    toast.success(`${label} copiado al portapapeles`)
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado al portapapeles`);
   }
 
   const productTypeLabel =
-    currentProduct.product_type === "SERVICE" ? "Servicio" : "Producto"
+    currentProduct.product_type === "SERVICE" ? "Servicio" : "Producto";
 
   return (
     <div className="space-y-6">
@@ -219,9 +228,7 @@ export function EditarProductoClient({
                   <button
                     type="button"
                     className="flex items-center gap-1 hover:text-foreground transition-colors"
-                    onClick={() =>
-                      copyToClipboard(currentProduct.sku, "SKU")
-                    }
+                    onClick={() => copyToClipboard(currentProduct.sku, "SKU")}
                   >
                     SKU {currentProduct.sku}
                     <Copy className="h-3 w-3" />
@@ -245,9 +252,9 @@ export function EditarProductoClient({
           form="product-form"
           disabled={isSaving}
           onClick={() => {
-            const form = document.querySelector("form")
+            const form = document.querySelector("form");
             if (form) {
-              form.requestSubmit()
+              form.requestSubmit();
             }
           }}
         >
@@ -274,8 +281,11 @@ export function EditarProductoClient({
           onArchive={handleArchive}
           onActivate={handleActivate}
           isLoading={isSaving}
+          categories={categories}
+          suppliers={suppliers}
+          locations={locations}
         />
       </div>
     </div>
-  )
+  );
 }
