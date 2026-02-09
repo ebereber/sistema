@@ -403,17 +403,28 @@ export function ProductosPageClient({
             <span className="hidden sm:block">Exportar</span>
           </Button>
 
-          <Button asChild>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">Crear ...</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href="/productos/nuevo">Producto</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/productos/nuevo?type=combo">Combo</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {/* <Button asChild>
             <Link href="/productos/nuevo">
-              <Plus className="sm:mr-2 h-4 w-4" />
+           
               <div className="hidden sm:block">
                 Crear...
-                <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                  N
-                </kbd>
+                
               </div>
             </Link>
-          </Button>
+          </Button> */}
         </div>
       </div>
 

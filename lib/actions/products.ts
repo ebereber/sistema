@@ -17,8 +17,10 @@ export async function createProductAction(data: {
   product: Omit<ProductInsert, "organization_id">;
   stockByLocation: Array<{ location_id: string; quantity: number }>;
   userId: string;
+  comboItems?: Array<{ product_id: string; quantity: number }>;
 }): Promise<{ id: string; name: string }> {
   const organizationId = await getOrganizationId();
+  const isCombo = data.product.product_type === "COMBO";
   const totalStock = data.stockByLocation.reduce(
     (sum, s) => sum + s.quantity,
     0,
@@ -29,7 +31,7 @@ export async function createProductAction(data: {
     .from("products")
     .insert({
       ...data.product,
-      stock_quantity: totalStock,
+      stock_quantity: isCombo ? 0 : totalStock,
       organization_id: organizationId,
     })
     .select("id, name")
@@ -37,8 +39,23 @@ export async function createProductAction(data: {
 
   if (productError) throw productError;
 
-  // 2. Create stock records
-  if (data.stockByLocation.length > 0) {
+  // 2. Create combo items (if combo)
+  if (isCombo && data.comboItems && data.comboItems.length > 0) {
+    const comboItemsData = data.comboItems.map((item) => ({
+      combo_product_id: product.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+    }));
+
+    const { error: comboError } = await supabaseAdmin
+      .from("combo_items")
+      .insert(comboItemsData);
+
+    if (comboError) throw comboError;
+  }
+
+  // 3. Create stock records (skip for combos)
+  if (!isCombo && data.stockByLocation.length > 0) {
     const stockRecords = data.stockByLocation.map((s) => ({
       product_id: product.id,
       location_id: s.location_id,
@@ -51,37 +68,41 @@ export async function createProductAction(data: {
     if (stockError) throw stockError;
   }
 
-  // 3. Create initial price history
-  const { error: historyError } = await supabaseAdmin
-    .from("price_history")
-    .insert({
-      product_id: product.id,
-      cost: data.product.cost,
-      price: data.product.price,
-      margin_percentage: data.product.margin_percentage,
-      tax_rate: data.product.tax_rate,
-      reason: "Creacion inicial del producto",
-      created_by: data.userId,
-    });
-  if (historyError) throw historyError;
+  // 4. Create initial price history (skip for combos)
+  if (!isCombo) {
+    const { error: historyError } = await supabaseAdmin
+      .from("price_history")
+      .insert({
+        product_id: product.id,
+        cost: data.product.cost,
+        price: data.product.price,
+        margin_percentage: data.product.margin_percentage,
+        tax_rate: data.product.tax_rate,
+        reason: "Creacion inicial del producto",
+        created_by: data.userId,
+      });
+    if (historyError) throw historyError;
+  }
 
-  // 4. Create initial stock movements for locations with quantity > 0
-  const stockMovements = data.stockByLocation
-    .filter((s) => s.quantity > 0)
-    .map((s) => ({
-      product_id: product.id,
-      location_to_id: s.location_id,
-      quantity: s.quantity,
-      reason: "Stock inicial del producto",
-      reference_type: "INITIAL",
-      created_by: data.userId,
-    }));
+  // 5. Create initial stock movements for locations with quantity > 0 (skip for combos)
+  if (!isCombo) {
+    const stockMovements = data.stockByLocation
+      .filter((s) => s.quantity > 0)
+      .map((s) => ({
+        product_id: product.id,
+        location_to_id: s.location_id,
+        quantity: s.quantity,
+        reason: "Stock inicial del producto",
+        reference_type: "INITIAL",
+        created_by: data.userId,
+      }));
 
-  if (stockMovements.length > 0) {
-    const { error: movementError } = await supabaseAdmin
-      .from("stock_movements")
-      .insert(stockMovements);
-    if (movementError) throw movementError;
+    if (stockMovements.length > 0) {
+      const { error: movementError } = await supabaseAdmin
+        .from("stock_movements")
+        .insert(stockMovements);
+      if (movementError) throw movementError;
+    }
   }
 
   revalidateTag("products", "minutes");
@@ -95,20 +116,23 @@ export async function updateProductAction(
     product: ProductUpdate;
     stockByLocation?: Array<{ location_id: string; quantity: number }>;
     userId: string;
+    comboItems?: Array<{ product_id: string; quantity: number }>;
   },
 ): Promise<{ id: string; name: string }> {
+  const isCombo = data.product.product_type === "COMBO";
+
   // Get current product for comparison
   const { data: currentProduct, error: fetchError } = await supabaseAdmin
     .from("products")
-    .select("cost, price, margin_percentage, tax_rate")
+    .select("cost, price, margin_percentage, tax_rate, product_type")
     .eq("id", id)
     .single();
 
   if (fetchError) throw fetchError;
 
-  // Calculate new total stock if provided
+  // Calculate new total stock if provided (not for combos)
   let updateData = { ...data.product };
-  if (data.stockByLocation) {
+  if (!isCombo && data.stockByLocation) {
     const totalStock = data.stockByLocation.reduce(
       (sum, s) => sum + s.quantity,
       0,
@@ -126,28 +150,51 @@ export async function updateProductAction(
 
   if (updateError) throw updateError;
 
-  // 2. If price changed, create price history
-  const priceChanged =
-    currentProduct &&
-    (currentProduct.cost !== data.product.cost ||
-      currentProduct.price !== data.product.price ||
-      currentProduct.margin_percentage !== data.product.margin_percentage);
+  // 2. Update combo items (if combo)
+  if (isCombo && data.comboItems) {
+    // Delete existing combo items
+    await supabaseAdmin.from("combo_items").delete().eq("combo_product_id", id);
 
-  if (priceChanged) {
-    await supabaseAdmin.from("price_history").insert({
-      product_id: id,
-      cost: data.product.cost ?? currentProduct.cost,
-      price: data.product.price ?? currentProduct.price,
-      margin_percentage:
-        data.product.margin_percentage ?? currentProduct.margin_percentage,
-      tax_rate: data.product.tax_rate ?? currentProduct.tax_rate,
-      reason: "Actualizacion manual",
-      created_by: data.userId,
-    });
+    // Insert new combo items
+    if (data.comboItems.length > 0) {
+      const comboItemsData = data.comboItems.map((item) => ({
+        combo_product_id: id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+      }));
+
+      const { error: comboError } = await supabaseAdmin
+        .from("combo_items")
+        .insert(comboItemsData);
+
+      if (comboError) throw comboError;
+    }
   }
 
-  // 3. If stock changed, update stock and create movements
-  if (data.stockByLocation) {
+  // 3. If price changed, create price history (skip for combos)
+  if (!isCombo) {
+    const priceChanged =
+      currentProduct &&
+      (currentProduct.cost !== data.product.cost ||
+        currentProduct.price !== data.product.price ||
+        currentProduct.margin_percentage !== data.product.margin_percentage);
+
+    if (priceChanged) {
+      await supabaseAdmin.from("price_history").insert({
+        product_id: id,
+        cost: data.product.cost ?? currentProduct.cost,
+        price: data.product.price ?? currentProduct.price,
+        margin_percentage:
+          data.product.margin_percentage ?? currentProduct.margin_percentage,
+        tax_rate: data.product.tax_rate ?? currentProduct.tax_rate,
+        reason: "Actualizacion manual",
+        created_by: data.userId,
+      });
+    }
+  }
+
+  // 4. If stock changed, update stock and create movements (skip for combos)
+  if (!isCombo && data.stockByLocation) {
     for (const stockItem of data.stockByLocation) {
       const { data: currentStock } = await supabaseAdmin
         .from("stock")

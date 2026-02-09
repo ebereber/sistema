@@ -1,8 +1,6 @@
-"use client";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Archive, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,19 +25,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
-import { CategoryCombobox } from "./category-combobox";
-import { ImageUpload } from "./image-upload";
-import { PriceHistoryDialog } from "./price-history-dialog";
-import { StockMovementsDialog } from "./stock-movements-dialog";
-import { StockTable } from "./stock-table";
-import { SupplierCombobox } from "./supplier-combobox";
+import { CategoryCombobox } from "@/components/productos/category-combobox";
+import { ImageUpload } from "@/components/productos/image-upload";
+import { PriceHistoryDialog } from "@/components/productos/price-history-dialog";
+import { StockMovementsDialog } from "@/components/productos/stock-movements-dialog";
+import { StockTable } from "@/components/productos/stock-table";
+import { SupplierCombobox } from "@/components/productos/supplier-combobox";
 
-import type { Category } from "@/lib/services/categories";
-import type { Product } from "@/lib/services/products";
-import type { LocationForProducts } from "@/lib/services/products-cached";
-import type { Supplier } from "@/lib/services/suppliers";
+/* import type { LocationForProducts } from "@/lib/services/locations"; */
+
+import { type Category } from "@/lib/services/categories";
+import { type Product } from "@/lib/services/products";
+import { type LocationForProducts } from "@/lib/services/products-cached";
+import { type Supplier } from "@/lib/services/suppliers";
 import {
   productSchema,
   TAX_RATES,
@@ -58,6 +60,8 @@ interface ProductFormProps {
   categories?: Category[];
   suppliers?: Supplier[];
   locations?: LocationForProducts[];
+  isCombo?: boolean;
+  comboContent?: ReactNode;
 }
 
 export function ProductForm({
@@ -71,13 +75,15 @@ export function ProductForm({
   categories = [],
   suppliers = [],
   locations = [],
+  isCombo = false,
+  comboContent,
 }: ProductFormProps) {
   const form = useForm<ProductFormInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",
       description: "",
-      product_type: "PRODUCT",
+      product_type: isCombo ? "COMBO" : "PRODUCT",
       sku: "",
       barcode: "",
       oem_code: "",
@@ -88,7 +94,7 @@ export function ProductForm({
       price: 0,
       tax_rate: 21,
       currency: "ARS",
-      track_stock: true,
+      track_stock: isCombo ? false : true,
       min_stock: null,
       visibility: "SALES_AND_PURCHASES",
       image_url: null,
@@ -118,8 +124,10 @@ export function ProductForm({
 
   // Update price when calculations change
   useEffect(() => {
-    form.setValue("price", priceCalculations.precioConIVA);
-  }, [priceCalculations.precioConIVA, form]);
+    if (!isCombo) {
+      form.setValue("price", priceCalculations.precioConIVA);
+    }
+  }, [priceCalculations.precioConIVA, form, isCombo]);
 
   // Load initial data (for edit mode or duplication)
   useEffect(() => {
@@ -127,7 +135,10 @@ export function ProductForm({
       form.reset({
         name: initialData.name,
         description: initialData.description || "",
-        product_type: initialData.product_type as "PRODUCT" | "SERVICE",
+        product_type: initialData.product_type as
+          | "PRODUCT"
+          | "SERVICE"
+          | "COMBO",
         sku: initialData.sku,
         barcode: initialData.barcode || "",
         oem_code: initialData.oem_code || "",
@@ -205,7 +216,9 @@ export function ProductForm({
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Ej: Tornillo M8"
+                          placeholder={
+                            isCombo ? "Ej: Combo Limpieza" : "Ej: Tornillo M8"
+                          }
                           {...field}
                           disabled={isLoading}
                         />
@@ -227,7 +240,7 @@ export function ProductForm({
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="SKU-001"
+                            placeholder={isCombo ? "COMBO-001" : "SKU-001"}
                             {...field}
                             disabled={isLoading}
                           />
@@ -277,103 +290,82 @@ export function ProductForm({
                   )}
                 />
 
-                {/* Description */}
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descripción</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Descripción del producto (opcional)"
-                          className="resize-none"
-                          rows={3}
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Supplier */}
-                <FormField
-                  control={form.control}
-                  name="default_supplier_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Proveedor principal</FormLabel>
-                      <FormControl>
-                        <SupplierCombobox
-                          value={field.value}
-                          onChange={field.onChange}
-                          disabled={isLoading}
-                          suppliers={suppliers}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Prices Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Precios</CardTitle>
-                {mode === "edit" && initialData && (
-                  <PriceHistoryDialog
-                    productId={initialData.id}
-                    productName={initialData.name}
-                  />
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Cost and Margin */}
-                <div className="grid gap-4 sm:grid-cols-2">
+                {/* Description - solo producto */}
+                {!isCombo && (
                   <FormField
                     control={form.control}
-                    name="cost"
+                    name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Costo sin IVA</FormLabel>
+                        <FormLabel>Descripción</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            placeholder="0"
+                          <Textarea
+                            placeholder="Descripción del producto (opcional)"
+                            className="resize-none"
+                            rows={3}
                             {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              field.onChange(
-                                val === "" ? undefined : parseFloat(val),
-                              );
-                            }}
+                            value={field.value ?? ""}
                             disabled={isLoading}
-                            className="[&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                )}
 
+                {/* Supplier - solo producto */}
+                {!isCombo && (
                   <FormField
                     control={form.control}
-                    name="margin_percentage"
+                    name="default_supplier_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Margen</FormLabel>
+                        <FormLabel>Proveedor principal</FormLabel>
                         <FormControl>
-                          <div className="relative">
+                          <SupplierCombobox
+                            value={field.value}
+                            onChange={field.onChange}
+                            disabled={isLoading}
+                            suppliers={suppliers}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Combo Content - productos del combo + precio */}
+            {isCombo && comboContent}
+
+            {/* Prices Card - solo producto */}
+            {!isCombo && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Precios</CardTitle>
+                  {mode === "edit" && initialData && (
+                    <PriceHistoryDialog
+                      productId={initialData.id}
+                      productName={initialData.name}
+                    />
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Cost and Margin */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="cost"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Costo sin IVA</FormLabel>
+                          <FormControl>
                             <Input
                               type="number"
+                              min={0}
                               step={0.01}
                               placeholder="0"
                               {...field}
@@ -385,219 +377,279 @@ export function ProductForm({
                                 );
                               }}
                               disabled={isLoading}
-                              className="pr-8 [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                              className="[&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                              %
-                            </span>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Price and Tax */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Precio con IVA</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            value={priceCalculations.precioConIVA.toFixed(2)}
-                            disabled
-                            className="bg-muted [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="tax_rate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IVA</FormLabel>
-                        <Select
-                          onValueChange={(value) =>
-                            field.onChange(parseFloat(value))
-                          }
-                          value={field.value?.toString()}
-                          disabled={isLoading}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar IVA" />
-                            </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
-                            {TAX_RATES.map((rate) => (
-                              <SelectItem key={rate} value={rate.toString()}>
-                                {rate}%
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                {/* Calculated Info */}
-                <Separator />
-                <div className="text-sm space-y-1">
-                  <p className="text-muted-foreground">
-                    {formatCurrency(priceCalculations.precioSinIVA)} sin IVA
-                  </p>
-                  <p
-                    className={
-                      priceCalculations.ganancia < 0
-                        ? "text-red-600 font-medium"
-                        : "text-green-600 font-medium"
-                    }
-                  >
-                    Ganancia: {formatCurrency(priceCalculations.ganancia)} (
-                    {priceCalculations.porcentajeGanancia.toFixed(2)}%)
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                    <FormField
+                      control={form.control}
+                      name="margin_percentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Margen</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                step={0.01}
+                                placeholder="0"
+                                {...field}
+                                value={field.value || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  field.onChange(
+                                    val === "" ? undefined : parseFloat(val),
+                                  );
+                                }}
+                                disabled={isLoading}
+                                className="pr-8 [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                %
+                              </span>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-            {/* Inventory Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Inventario</CardTitle>
-                {mode === "edit" && initialData && (
-                  <StockMovementsDialog
-                    productId={initialData.id}
-                    productName={initialData.name}
+                  {/* Price and Tax */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Precio con IVA</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              value={priceCalculations.precioConIVA.toFixed(2)}
+                              disabled
+                              className="bg-muted [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tax_rate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IVA</FormLabel>
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(parseFloat(value))
+                            }
+                            value={field.value?.toString()}
+                            disabled={isLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar IVA" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {TAX_RATES.map((rate) => (
+                                <SelectItem key={rate} value={rate.toString()}>
+                                  {rate}%
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Calculated Info */}
+                  <Separator />
+                  <div className="text-sm space-y-1">
+                    <p className="text-muted-foreground">
+                      {formatCurrency(priceCalculations.precioSinIVA)} sin IVA
+                    </p>
+                    <p
+                      className={
+                        priceCalculations.ganancia < 0
+                          ? "text-red-600 font-medium"
+                          : "text-green-600 font-medium"
+                      }
+                    >
+                      Ganancia: {formatCurrency(priceCalculations.ganancia)} (
+                      {priceCalculations.porcentajeGanancia.toFixed(2)}%)
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Inventory Card - solo producto */}
+            {!isCombo && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Inventario</CardTitle>
+                  {mode === "edit" && initialData && (
+                    <StockMovementsDialog
+                      productId={initialData.id}
+                      productName={initialData.name}
+                    />
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <StockTable
+                    value={internalStock}
+                    onChange={setInternalStock}
+                    disabled={isLoading}
+                    locations={locations}
                   />
-                )}
-              </CardHeader>
-              <CardContent>
-                <StockTable
-                  value={internalStock}
-                  onChange={setInternalStock}
-                  disabled={isLoading}
-                  locations={locations}
-                />
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column */}
           <div className="space-y-6">
-            {/* Visibility Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Visibilidad</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="visibility"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={isLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar visibilidad" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {VISIBILITY_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {visibilityLabels[option]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Define en qué contextos aparece el producto
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Image Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Imagen</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="image_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <ImageUpload
-                          value={field.value}
-                          onChange={field.onChange}
+            {isCombo ? (
+              /* ─── Combo: solo switch Activo ─── */
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <Label htmlFor="combo-active" className="text-sm">
+                      Combo Activo
+                    </Label>
+                    <FormField
+                      control={form.control}
+                      name="active"
+                      render={({ field }) => (
+                        <Switch
+                          id="combo-active"
+                          checked={field.value ?? true}
+                          onCheckedChange={field.onChange}
                           disabled={isLoading}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Status Card (only in edit mode) */}
-            {mode === "edit" && initialData && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Estado</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Badge
-                    variant={initialData.active ? "default" : "secondary"}
-                    className="text-sm"
-                  >
-                    {initialData.active ? "Activo" : "Archivado"}
-                  </Badge>
-                  {initialData.active ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full text-destructive hover:text-destructive"
-                      onClick={onArchive}
-                      disabled={isLoading}
-                    >
-                      <Archive className="mr-2 h-4 w-4" />
-                      Archivar producto
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={onActivate}
-                      disabled={isLoading}
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Activar producto
-                    </Button>
-                  )}
+                      )}
+                    />
+                  </div>
                 </CardContent>
               </Card>
+            ) : (
+              /* ─── Producto: Visibilidad + Imagen + Estado ─── */
+              <>
+                {/* Visibility Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Visibilidad</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FormField
+                      control={form.control}
+                      name="visibility"
+                      render={({ field }) => (
+                        <FormItem>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            disabled={isLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar visibilidad" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {VISIBILITY_OPTIONS.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {visibilityLabels[option]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Define en qué contextos aparece el producto
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Image Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Imagen</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FormField
+                      control={form.control}
+                      name="image_url"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <ImageUpload
+                              value={field.value}
+                              onChange={field.onChange}
+                              disabled={isLoading}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Status Card (only in edit mode) */}
+                {mode === "edit" && initialData && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Estado</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Badge
+                        variant={initialData.active ? "default" : "secondary"}
+                        className="text-sm"
+                      >
+                        {initialData.active ? "Activo" : "Archivado"}
+                      </Badge>
+                      {initialData.active ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full text-destructive hover:text-destructive"
+                          onClick={onArchive}
+                          disabled={isLoading}
+                        >
+                          <Archive className="mr-2 h-4 w-4" />
+                          Archivar producto
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={onActivate}
+                          disabled={isLoading}
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Activar producto
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>

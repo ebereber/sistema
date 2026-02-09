@@ -223,6 +223,45 @@ export type Database = {
           },
         ]
       }
+      combo_items: {
+        Row: {
+          combo_product_id: string
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          combo_product_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity?: number
+        }
+        Update: {
+          combo_product_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combo_items_combo_product_id_fkey"
+            columns: ["combo_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_note_applications: {
         Row: {
           amount: number
@@ -2617,7 +2656,7 @@ export type Database = {
       }
     }
     Enums: {
-      product_type: "PRODUCT" | "SERVICE"
+      product_type: "PRODUCT" | "SERVICE" | "COMBO"
       user_role: "ADMIN" | "SELLER" | "VIEWER"
     }
     CompositeTypes: {
@@ -2746,7 +2785,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      product_type: ["PRODUCT", "SERVICE"],
+      product_type: ["PRODUCT", "SERVICE", "COMBO"],
       user_role: ["ADMIN", "SELLER", "VIEWER"],
     },
   },

@@ -8,22 +8,47 @@ import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCategories } from "@/lib/services/categories-cached";
 import { getCachedLocations } from "@/lib/services/locations-cached";
-import { getCachedProductById } from "@/lib/services/products-cached";
+import {
+  getCachedProductById,
+  getCachedProducts,
+} from "@/lib/services/products-cached";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
+
+import { type Product } from "@/lib/services/products";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Nuevo Producto",
+};
+
+interface SearchParams {
+  duplicate?: string;
+  type?: string;
+}
+
 export default async function NuevoProductoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ duplicate?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
   return (
     <Suspense fallback={<FormSkeleton />}>
-      <NuevoProductoContent duplicateId={params.duplicate} />
+      <NuevoProductoContent
+        duplicateId={params.duplicate}
+        productType={params.type}
+      />
     </Suspense>
   );
 }
 
-async function NuevoProductoContent({ duplicateId }: { duplicateId?: string }) {
+async function NuevoProductoContent({
+  duplicateId,
+  productType,
+}: {
+  duplicateId?: string;
+  productType?: string;
+}) {
   const user = await getServerUser();
   if (!user) redirect("/login");
   const organizationId = await getOrganizationId();
@@ -39,12 +64,25 @@ async function NuevoProductoContent({ duplicateId }: { duplicateId?: string }) {
     duplicateProduct = await getCachedProductById(organizationId, duplicateId);
   }
 
+  // For combo mode, fetch available products (non-combo, active)
+  let comboProducts: Product[] = [];
+  if (productType === "combo") {
+    const result = await getCachedProducts(organizationId, {
+      page: 1,
+      pageSize: 1000,
+      active: true,
+    });
+    comboProducts = result.data.filter((p) => p.product_type !== "COMBO");
+  }
+
   return (
     <NuevoProductoClient
       locations={locations}
       categories={categories}
       suppliers={suppliers}
       duplicateProduct={duplicateProduct}
+      productType={productType === "combo" ? "COMBO" : undefined}
+      comboProducts={comboProducts}
     />
   );
 }
