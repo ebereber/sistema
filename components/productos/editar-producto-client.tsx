@@ -3,9 +3,13 @@
 import { Copy, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  ComboItemsSection,
+  type ComboItem,
+} from "@/components/productos/combo-items-section";
 import { ProductForm } from "@/components/productos/product-form";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -48,6 +52,8 @@ interface EditarProductoClientProps {
   locations: Location[];
   categories: Category[];
   suppliers: Supplier[];
+  comboItems?: ComboItem[];
+  comboProducts?: Product[];
 }
 
 export function EditarProductoClient({
@@ -56,10 +62,33 @@ export function EditarProductoClient({
   locations,
   categories,
   suppliers,
+  comboItems: initialComboItems,
+  comboProducts = [],
 }: EditarProductoClientProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(product);
+
+  const isCombo = currentProduct.product_type === "COMBO";
+
+  // Combo state
+  const [comboItems, setComboItems] = useState<ComboItem[]>(
+    initialComboItems ?? [],
+  );
+
+  const initialPriceAdjustment = useMemo(() => {
+    if (!isCombo || !initialComboItems || initialComboItems.length === 0)
+      return -10;
+    const basePrice = initialComboItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+    if (basePrice === 0) return 0;
+    return Math.round(((product.price / basePrice - 1) * 100) * 100) / 100;
+  }, [isCombo, initialComboItems, product.price]);
+
+  const [priceAdjustment, setPriceAdjustment] =
+    useState<number>(initialPriceAdjustment);
 
   const handleSubmit = useCallback(
     async (data: ProductFormInput, stock: StockByLocationData[]) => {
@@ -109,52 +138,90 @@ export function EditarProductoClient({
           }
         }
 
+        // Combo: validate items
+        if (isCombo && comboItems.length === 0) {
+          toast.error("Combo vacío", {
+            description: "Agregá al menos un producto al combo",
+          });
+          setIsSaving(false);
+          return;
+        }
+
+        // Combo: calculate final price from items
+        let finalPrice = data.price;
+        if (isCombo) {
+          const basePrice = comboItems.reduce(
+            (sum, item) => sum + item.price * item.quantity,
+            0,
+          );
+          finalPrice = basePrice + (basePrice * priceAdjustment) / 100;
+          finalPrice = Math.round(finalPrice * 100) / 100;
+        }
+
         const productData = {
           name: data.name,
-          description: data.description || null,
-          product_type: data.product_type || "PRODUCT",
+          description: isCombo ? null : data.description || null,
+          product_type: isCombo
+            ? ("COMBO" as const)
+            : data.product_type || "PRODUCT",
           sku: data.sku,
           barcode: data.barcode || null,
-          oem_code: data.oem_code || null,
+          oem_code: isCombo ? null : data.oem_code || null,
           category_id: data.category_id || null,
-          default_supplier_id: data.default_supplier_id || null,
-          cost: data.cost || null,
-          margin_percentage: data.margin_percentage || null,
-          price: data.price,
+          default_supplier_id: isCombo
+            ? null
+            : data.default_supplier_id || null,
+          cost: isCombo ? null : data.cost || null,
+          margin_percentage: isCombo ? null : data.margin_percentage || null,
+          price: finalPrice,
           tax_rate: data.tax_rate || 21,
           currency: data.currency || "ARS",
-          track_stock: data.track_stock ?? true,
-          min_stock: data.min_stock || null,
+          track_stock: isCombo ? false : (data.track_stock ?? true),
+          min_stock: isCombo ? null : data.min_stock || null,
           visibility: data.visibility || "SALES_AND_PURCHASES",
-          image_url: data.image_url || null,
+          image_url: isCombo ? null : data.image_url || null,
           active: data.active ?? true,
         };
 
         const updatedProduct = await updateProductAction(currentProduct.id, {
           product: productData,
-          stockByLocation: stock.map((s) => ({
-            location_id: s.location_id,
-            quantity: s.quantity,
-          })),
+          stockByLocation: isCombo
+            ? []
+            : stock.map((s) => ({
+                location_id: s.location_id,
+                quantity: s.quantity,
+              })),
           userId: user.id,
+          comboItems: isCombo
+            ? comboItems.map((item) => ({
+                product_id: item.product_id,
+                quantity: item.quantity,
+              }))
+            : undefined,
         });
 
-        toast.success("Producto actualizado", {
-          description: `${updatedProduct.name} se actualizo correctamente`,
-        });
+        toast.success(
+          isCombo ? "Combo actualizado" : "Producto actualizado",
+          {
+            description: `${updatedProduct.name} se actualizo correctamente`,
+          },
+        );
 
         router.refresh();
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Error desconocido";
-        toast.error("Error al actualizar producto", {
-          description: errorMessage,
-        });
+        toast.error(
+          isCombo
+            ? "Error al actualizar combo"
+            : "Error al actualizar producto",
+          { description: errorMessage },
+        );
       } finally {
         setIsSaving(false);
       }
     },
-    [currentProduct, router],
+    [currentProduct, router, isCombo, comboItems, priceAdjustment],
   );
 
   const handleArchive = useCallback(async () => {
@@ -194,8 +261,11 @@ export function EditarProductoClient({
     toast.success(`${label} copiado al portapapeles`);
   }
 
-  const productTypeLabel =
-    currentProduct.product_type === "SERVICE" ? "Servicio" : "Producto";
+  const productTypeLabel = isCombo
+    ? "Combo"
+    : currentProduct.product_type === "SERVICE"
+      ? "Servicio"
+      : "Producto";
 
   return (
     <div className="space-y-6">
@@ -284,6 +354,19 @@ export function EditarProductoClient({
           categories={categories}
           suppliers={suppliers}
           locations={locations}
+          isCombo={isCombo}
+          comboContent={
+            isCombo ? (
+              <ComboItemsSection
+                items={comboItems}
+                onItemsChange={setComboItems}
+                priceAdjustment={priceAdjustment}
+                onPriceAdjustmentChange={setPriceAdjustment}
+                products={comboProducts}
+                disabled={isSaving}
+              />
+            ) : undefined
+          }
         />
       </div>
     </div>

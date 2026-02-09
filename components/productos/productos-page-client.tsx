@@ -130,7 +130,6 @@ export function ProductosPageClient({
   const [search, setSearch] = useState(currentFilters.search);
   const debouncedSearch = useDebounce(search, 300);
 
-  // Parse current filter values from props
   const statusFilter = currentFilters.status
     ? currentFilters.status === "active"
       ? ["active"]
@@ -138,8 +137,8 @@ export function ProductosPageClient({
         ? ["archived"]
         : currentFilters.status === "all"
           ? ["active", "archived"]
-          : ["active"]
-    : ["active"];
+          : []
+    : [];
   const categoryFilter = currentFilters.category || null;
   const visibilityFilter = currentFilters.visibility
     ? currentFilters.visibility.split(",").filter(Boolean)
@@ -862,7 +861,16 @@ export function ProductosPageClient({
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium truncate">{product.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium truncate">
+                              {product.name}
+                            </p>
+                            {product.product_type === "COMBO" && (
+                              <Badge variant="secondary" className="text-xs">
+                                Combo
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             SKU {product.sku}
                           </p>

@@ -8,8 +8,12 @@ import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCategories } from "@/lib/services/categories-cached";
 import { getCachedLocations } from "@/lib/services/locations-cached";
-import { getCachedProductById } from "@/lib/services/products-cached";
+import {
+  getCachedProductById,
+  getCachedProducts,
+} from "@/lib/services/products-cached";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export default async function ProductoDetailPage({
   params,
@@ -45,6 +49,37 @@ async function ProductoDetailContent({ id }: { id: string }) {
     quantity: s.quantity,
   }));
 
+  const isCombo = product.product_type === "COMBO";
+
+  let comboItems: {
+    product_id: string;
+    quantity: number;
+    product: { id: string; name: string; sku: string; price: number };
+  }[] = [];
+  let comboProducts: typeof product[] = [];
+
+  if (isCombo) {
+    const [comboItemsResult, productsResult] = await Promise.all([
+      supabaseAdmin
+        .from("combo_items")
+        .select(
+          "product_id, quantity, product:products!combo_items_product_id_fkey(id, name, sku, price)",
+        )
+        .eq("combo_product_id", id),
+      getCachedProducts(organizationId, {
+        page: 1,
+        pageSize: 1000,
+        active: true,
+      }),
+    ]);
+
+    if (comboItemsResult.error) throw comboItemsResult.error;
+    comboItems = (comboItemsResult.data || []) as typeof comboItems;
+    comboProducts = productsResult.data.filter(
+      (p) => p.product_type !== "COMBO",
+    );
+  }
+
   return (
     <EditarProductoClient
       product={product}
@@ -52,6 +87,18 @@ async function ProductoDetailContent({ id }: { id: string }) {
       locations={locations}
       categories={categories}
       suppliers={suppliers}
+      comboItems={
+        isCombo
+          ? comboItems.map((ci) => ({
+              product_id: ci.product_id,
+              name: ci.product.name,
+              sku: ci.product.sku,
+              price: ci.product.price,
+              quantity: ci.quantity,
+            }))
+          : undefined
+      }
+      comboProducts={isCombo ? comboProducts : undefined}
     />
   );
 }

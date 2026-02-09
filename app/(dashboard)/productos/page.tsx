@@ -80,7 +80,7 @@ async function ProductosContent({
       locations={locations}
       currentFilters={{
         search: searchParams.search || "",
-        status: searchParams.status || "active",
+        status: searchParams.status || "",
         category: searchParams.category || "",
         visibility: searchParams.visibility || "",
         stock: searchParams.stock || "",
