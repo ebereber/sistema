@@ -31,6 +31,7 @@ import { BulkDeleteDialog } from "@/components/productos/bulk-delete-dialog";
 import { BulkPriceUpdateDialog } from "@/components/productos/bulk-price-update-dialog";
 import { BulkStockUpdateDialog } from "@/components/productos/bulk-stock-update-dialog";
 import { DeleteProductDialog } from "@/components/productos/delete-product-dialog";
+import { ExportProductsDialog } from "@/components/productos/export-products-dialog";
 import { PriceHistoryDialog } from "@/components/productos/price-history-dialog";
 import { StockManagementDialog } from "@/components/productos/stock-management-dialog";
 import { StockMovementsDialog } from "@/components/productos/stock-movements-dialog";
@@ -175,6 +176,7 @@ export function ProductosPageClient({
   const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
   const [bulkArchiveDialogOpen, setBulkArchiveDialogOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Build category hierarchy from flat list
   const categories = buildCategoryHierarchy(flatCategories);
@@ -396,7 +398,7 @@ export function ProductosPageClient({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => toast.info("Exportacion proximamente")}
+            onClick={() => setExportDialogOpen(true)}
           >
             <Download className="sm:mr-2 h-4 w-4" />
             <span className="hidden sm:block">Exportar</span>
@@ -1204,6 +1206,15 @@ export function ProductosPageClient({
         open={bulkDeleteDialogOpen}
         onOpenChange={setBulkDeleteDialogOpen}
         onSuccess={handleBulkSuccess}
+      />
+
+      <ExportProductsDialog
+        selectedIds={selectedProducts}
+        allSelected={allSelected}
+        filters={bulkFilters}
+        totalCount={count}
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
       />
     </div>
   );

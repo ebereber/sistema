@@ -40,6 +40,7 @@ import { type Category } from "@/lib/services/categories";
 import { type Location } from "@/lib/services/locations";
 import type { Product } from "@/lib/services/products";
 import { type Supplier } from "@/lib/services/suppliers-cached";
+import type { PriceRoundingType } from "@/types/types";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ProductFormInput,
@@ -54,6 +55,7 @@ interface EditarProductoClientProps {
   suppliers: Supplier[];
   comboItems?: ComboItem[];
   comboProducts?: Product[];
+  priceRounding: PriceRoundingType;
 }
 
 export function EditarProductoClient({
@@ -64,6 +66,7 @@ export function EditarProductoClient({
   suppliers,
   comboItems: initialComboItems,
   comboProducts = [],
+  priceRounding,
 }: EditarProductoClientProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
@@ -354,6 +357,7 @@ export function EditarProductoClient({
           categories={categories}
           suppliers={suppliers}
           locations={locations}
+          priceRounding={priceRounding}
           isCombo={isCombo}
           comboContent={
             isCombo ? (

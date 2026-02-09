@@ -48,6 +48,7 @@ import {
   type ProductFormInput,
   type StockByLocationData,
 } from "@/lib/validations/product";
+import { PriceRoundingType } from "@/types/types";
 
 interface ProductFormProps {
   mode: "create" | "edit";
@@ -62,6 +63,7 @@ interface ProductFormProps {
   locations?: LocationForProducts[];
   isCombo?: boolean;
   comboContent?: ReactNode;
+  priceRounding: PriceRoundingType;
 }
 
 export function ProductForm({
@@ -77,7 +79,10 @@ export function ProductForm({
   locations = [],
   isCombo = false,
   comboContent,
+  priceRounding,
 }: ProductFormProps) {
+  console.log(parseInt(priceRounding) + "PRICE");
+
   const form = useForm<ProductFormInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -110,17 +115,26 @@ export function ProductForm({
   // Calculate derived values
   const priceCalculations = useMemo(() => {
     const precioSinIVA = cost * (1 + marginPercentage / 100);
-    const precioConIVA = precioSinIVA * (1 + taxRate / 100);
-    const ganancia = precioSinIVA - cost;
+    let precioConIVA = precioSinIVA * (1 + taxRate / 100);
+
+    // Redondear según preferencia
+    const roundTo = parseInt(priceRounding);
+    if (roundTo > 0) {
+      precioConIVA = Math.round(precioConIVA / roundTo) * roundTo;
+    }
+
+    // Recalcular hacia atrás desde el precio redondeado
+    const precioSinIVAReal = precioConIVA / (1 + taxRate / 100);
+    const ganancia = precioSinIVAReal - cost;
     const porcentajeGanancia = cost > 0 ? (ganancia / cost) * 100 : 0;
 
     return {
-      precioSinIVA,
+      precioSinIVA: precioSinIVAReal,
       precioConIVA,
       ganancia,
       porcentajeGanancia,
     };
-  }, [cost, marginPercentage, taxRate]);
+  }, [cost, marginPercentage, taxRate, priceRounding]);
 
   // Update price when calculations change
   useEffect(() => {

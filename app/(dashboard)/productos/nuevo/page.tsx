@@ -15,6 +15,8 @@ import {
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
 
 import { type Product } from "@/lib/services/products";
+import { getPriceRounding } from "@/lib/services/settings";
+import { PriceRoundingType } from "@/types/types";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -53,10 +55,11 @@ async function NuevoProductoContent({
   if (!user) redirect("/login");
   const organizationId = await getOrganizationId();
 
-  const [locations, categories, suppliers] = await Promise.all([
+  const [locations, categories, suppliers, priceRounding] = await Promise.all([
     getCachedLocations(organizationId),
     getCachedCategories(organizationId),
     getCachedSuppliers(organizationId),
+    getPriceRounding(),
   ]);
 
   let duplicateProduct = null;
@@ -83,6 +86,7 @@ async function NuevoProductoContent({
       duplicateProduct={duplicateProduct}
       productType={productType === "combo" ? "COMBO" : undefined}
       comboProducts={comboProducts}
+      priceRounding={priceRounding.type as PriceRoundingType}
     />
   );
 }

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { Package, Search, TrendingUp } from "lucide-react"
+import { Package, Search, TrendingUp } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -8,43 +8,41 @@ import {
   useImperativeHandle,
   useMemo,
   useState,
-} from "react"
+} from "react";
 
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { Category } from "@/lib/services/categories"
-import type { ProductForSale } from "@/lib/services/sales"
-import { applyPriceRounding, PriceRoundingType } from "@/lib/utils/currency"
-import { ProductItem } from "./product-item"
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Category } from "@/lib/services/categories";
+import type { ProductForSale } from "@/lib/services/sales";
+
+import { ProductItem } from "./product-item";
 
 export interface ProductSearchPanelRef {
   updateStock: (
     soldItems: { productId: string | null; quantity: number }[],
-  ) => void
+  ) => void;
 }
 
 interface ProductSearchPanelProps {
-  allProducts: ProductForSale[]
-  topSellingProducts: ProductForSale[]
-  categories: Category[]
-  onProductSelect: (product: ProductForSale) => void
+  allProducts: ProductForSale[];
+  topSellingProducts: ProductForSale[];
+  categories: Category[];
+  onProductSelect: (product: ProductForSale) => void;
 }
 
 export const ProductSearchPanel = forwardRef<
   ProductSearchPanelRef,
   ProductSearchPanelProps
 >(({ allProducts, topSellingProducts, categories, onProductSelect }, ref) => {
-  const [search, setSearch] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [products, setProducts] = useState<ProductForSale[]>(allProducts)
-
-  const roundingType: PriceRoundingType = "multiples_100"
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductForSale[]>(allProducts);
 
   // Keep products in sync when server data changes
   useEffect(() => {
-    setProducts(allProducts)
-  }, [allProducts])
+    setProducts(allProducts);
+  }, [allProducts]);
 
   // Expose function to update stock locally after a sale
   useImperativeHandle(ref, () => ({
@@ -53,81 +51,72 @@ export const ProductSearchPanel = forwardRef<
         prev.map((product) => {
           const soldItem = soldItems.find(
             (item) => item.productId === product.id,
-          )
+          );
           if (soldItem) {
             return {
               ...product,
               stockQuantity: product.stockQuantity - soldItem.quantity,
-            }
+            };
           }
-          return product
+          return product;
         }),
-      )
+      );
     },
-  }))
+  }));
 
   // Client-side filtering with useMemo -- instant results
   const displayedProducts = useMemo(() => {
-    const searchTerm = search.trim().toLowerCase()
+    const searchTerm = search.trim().toLowerCase();
 
     // No filters active: show top selling
     if (!searchTerm && !selectedCategory) {
       if (topSellingProducts.length > 0) {
         return topSellingProducts.map((p) => ({
           ...p,
-          // Use fresh stock data from products state
           stockQuantity:
             products.find((sp) => sp.id === p.id)?.stockQuantity ??
             p.stockQuantity,
-          price: applyPriceRounding(
-            products.find((sp) => sp.id === p.id)?.price ?? p.price,
-            roundingType,
-          ),
-        }))
+        }));
       }
-      return []
+      return [];
     }
 
-    return products
-      .filter((product) => {
-        const matchesSearch =
-          !searchTerm ||
-          product.name.toLowerCase().includes(searchTerm) ||
-          product.sku?.toLowerCase().includes(searchTerm) ||
-          product.barcode?.toLowerCase().includes(searchTerm)
+    return products.filter((product) => {
+      const matchesSearch =
+        !searchTerm ||
+        product.name.toLowerCase().includes(searchTerm) ||
+        product.sku?.toLowerCase().includes(searchTerm) ||
+        product.barcode?.toLowerCase().includes(searchTerm);
 
-        const matchesCategory =
-          !selectedCategory || product.categoryId === selectedCategory
+      const matchesCategory =
+        !selectedCategory || product.categoryId === selectedCategory;
 
-        return matchesSearch && matchesCategory
-      })
-      .map((p) => ({
-        ...p,
-        price: applyPriceRounding(p.price, roundingType),
-      }))
-  }, [products, topSellingProducts, search, selectedCategory, roundingType])
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, topSellingProducts, search, selectedCategory]);
 
   // Handle keyboard shortcut for search focus
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-        e.preventDefault()
-        document.getElementById("pos-product-search")?.focus()
+        e.preventDefault();
+        document.getElementById("pos-product-search")?.focus();
       }
     }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleCategoryChange = useCallback((value: string) => {
-    setSelectedCategory(value === "all" ? null : value)
-  }, [])
+    setSelectedCategory(value === "all" ? null : value);
+  }, []);
 
-  const hasFilters = search.trim() || selectedCategory
+  const hasFilters = search.trim() || selectedCategory;
   const showTopSellingHeader =
-    !hasFilters && topSellingProducts.length > 0 && displayedProducts.length > 0
-  const showEmptyPrompt =
-    !hasFilters && topSellingProducts.length === 0
+    !hasFilters &&
+    topSellingProducts.length > 0 &&
+    displayedProducts.length > 0;
+  const showEmptyPrompt = !hasFilters && topSellingProducts.length === 0;
 
   return (
     <div className="flex h-full flex-col  ">
@@ -219,7 +208,7 @@ export const ProductSearchPanel = forwardRef<
         </div>
       </ScrollArea>
     </div>
-  )
-})
+  );
+});
 
-ProductSearchPanel.displayName = "ProductSearchPanel"
+ProductSearchPanel.displayName = "ProductSearchPanel";

@@ -8,6 +8,7 @@ import type {
 } from "@/lib/services/products";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
+import * as XLSX from "xlsx";
 
 // ============================================================================
 // INDIVIDUAL MUTATIONS
@@ -729,4 +730,93 @@ export async function uploadProductImageAction(
     .getPublicUrl(fileName);
 
   return data.publicUrl;
+}
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+const VISIBILITY_LABELS: Record<string, string> = {
+  SALES_AND_PURCHASES: "Ventas y Compras",
+  SALES_ONLY: "Solo Ventas",
+  PURCHASES_ONLY: "Solo Compras",
+};
+
+export async function exportProductsAction(params: {
+  mode: "all" | "selected";
+  productIds?: string[];
+  filters?: BulkFilters;
+}): Promise<string> {
+  const organizationId = await getOrganizationId();
+
+  let query = supabaseAdmin
+    .from("products")
+    .select(
+      "sku, name, category:categories(name), supplier:suppliers!products_default_supplier_id_fkey(name), cost, margin_percentage, tax_rate, price, stock_quantity, barcode, visibility, active",
+    )
+    .eq("organization_id", organizationId)
+    .order("name");
+
+  if (params.mode === "selected" && params.productIds?.length) {
+    query = query.in("id", params.productIds);
+  } else if (params.mode === "all" && params.filters) {
+    const f = params.filters;
+    if (f.search) {
+      query = query.or(
+        `name.ilike.%${f.search}%,sku.ilike.%${f.search}%`,
+      );
+    }
+    if (f.active !== undefined) {
+      query = query.eq("active", f.active);
+    }
+    if (f.categoryId) {
+      query = query.eq("category_id", f.categoryId);
+    }
+    if (f.visibility && f.visibility.length > 0) {
+      query = query.in("visibility", f.visibility);
+    }
+    if (f.stockFilter === "WITH_STOCK") {
+      query = query.gt("stock_quantity", 0);
+    } else if (f.stockFilter === "WITHOUT_STOCK") {
+      query = query.eq("stock_quantity", 0);
+    } else if (f.stockFilter === "NEGATIVE_STOCK") {
+      query = query.lt("stock_quantity", 0);
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = (data || []).map((p) => ({
+    SKU: p.sku,
+    Nombre: p.name,
+    Categoría: (p.category as { name: string } | null)?.name || "",
+    Proveedor: (p.supplier as { name: string } | null)?.name || "",
+    "Costo sin IVA": p.cost ?? 0,
+    "Margen %": p.margin_percentage ?? 0,
+    "IVA %": p.tax_rate ?? 21,
+    "Precio con IVA": p.price,
+    Stock: p.stock_quantity ?? 0,
+    "Código de barras": p.barcode || "",
+    Visibilidad: VISIBILITY_LABELS[p.visibility ?? ""] || p.visibility || "",
+    Estado: p.active ? "Activo" : "Archivado",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Auto-size columns
+  const colWidths = Object.keys(rows[0] || {}).map((key) => {
+    const maxLen = Math.max(
+      key.length,
+      ...rows.map((r) => String(r[key as keyof typeof r] ?? "").length),
+    );
+    return { wch: Math.min(maxLen + 2, 40) };
+  });
+  ws["!cols"] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Productos");
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  return Buffer.from(buffer).toString("base64");
 }

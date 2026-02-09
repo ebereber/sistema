@@ -12,8 +12,10 @@ import {
   getCachedProductById,
   getCachedProducts,
 } from "@/lib/services/products-cached";
+import { getPriceRounding } from "@/lib/services/settings";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { PriceRoundingType } from "@/types/types";
 
 export default async function ProductoDetailPage({
   params,
@@ -33,12 +35,14 @@ async function ProductoDetailContent({ id }: { id: string }) {
   if (!user) redirect("/login");
   const organizationId = await getOrganizationId();
 
-  const [product, locations, categories, suppliers] = await Promise.all([
-    getCachedProductById(organizationId, id),
-    getCachedLocations(organizationId),
-    getCachedCategories(organizationId),
-    getCachedSuppliers(organizationId),
-  ]);
+  const [product, locations, categories, suppliers, priceRounding] =
+    await Promise.all([
+      getCachedProductById(organizationId, id),
+      getCachedLocations(organizationId),
+      getCachedCategories(organizationId),
+      getCachedSuppliers(organizationId),
+      getPriceRounding(),
+    ]);
 
   if (!product) notFound();
 
@@ -99,6 +103,7 @@ async function ProductoDetailContent({ id }: { id: string }) {
           : undefined
       }
       comboProducts={isCombo ? comboProducts : undefined}
+      priceRounding={priceRounding.type as PriceRoundingType}
     />
   );
 }

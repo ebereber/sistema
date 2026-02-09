@@ -36,6 +36,7 @@ import type {
   ProductFormInput,
   StockByLocationData,
 } from "@/lib/validations/product";
+import { PriceRoundingType } from "@/types/types";
 
 interface NuevoProductoClientProps {
   locations: LocationForProducts[];
@@ -44,6 +45,7 @@ interface NuevoProductoClientProps {
   suppliers: Supplier[];
   productType?: "COMBO";
   comboProducts?: Product[];
+  priceRounding: PriceRoundingType;
 }
 
 export function NuevoProductoClient({
@@ -53,6 +55,7 @@ export function NuevoProductoClient({
   suppliers,
   productType,
   comboProducts = [],
+  priceRounding,
 }: NuevoProductoClientProps) {
   const router = useRouter();
   const isCombo = productType === "COMBO";
@@ -307,6 +310,7 @@ export function NuevoProductoClient({
         categories={categories}
         suppliers={suppliers}
         locations={locations}
+        priceRounding={priceRounding}
         isCombo={isCombo}
         comboContent={
           isCombo ? (
