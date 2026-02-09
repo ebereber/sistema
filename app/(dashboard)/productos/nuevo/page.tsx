@@ -7,10 +7,8 @@ import { NuevoProductoClient } from "@/components/productos/nuevo-producto-clien
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCategories } from "@/lib/services/categories-cached";
-import {
-  getCachedLocationsForProducts,
-  getCachedProductById,
-} from "@/lib/services/products-cached";
+import { getCachedLocations } from "@/lib/services/locations-cached";
+import { getCachedProductById } from "@/lib/services/products-cached";
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
 export default async function NuevoProductoPage({
   searchParams,
@@ -31,7 +29,7 @@ async function NuevoProductoContent({ duplicateId }: { duplicateId?: string }) {
   const organizationId = await getOrganizationId();
 
   const [locations, categories, suppliers] = await Promise.all([
-    getCachedLocationsForProducts(organizationId),
+    getCachedLocations(organizationId),
     getCachedCategories(organizationId),
     getCachedSuppliers(organizationId),
   ]);

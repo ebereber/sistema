@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { NuevaVentaClient } from "@/components/ventas/nueva-venta-client"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
+import { getCachedLocations } from "@/lib/services/locations-cached"
 import {
   getCachedAllProductsForPOS,
   getCachedCategories,
@@ -25,10 +26,11 @@ async function NuevaVentaContent() {
   if (!user.active) redirect("/acceso-pendiente")
   const organizationId = await getOrganizationId()
 
-  const [allProducts, topSelling, categories] = await Promise.all([
+  const [allProducts, topSelling, categories, locations] = await Promise.all([
     getCachedAllProductsForPOS(organizationId),
     getCachedTopSellingProducts(organizationId, 20),
     getCachedCategories(organizationId),
+    getCachedLocations(organizationId),
   ])
 
   return (
@@ -36,6 +38,7 @@ async function NuevaVentaContent() {
       initialProducts={allProducts}
       topSellingProducts={topSelling}
       categories={categories}
+      allLocations={locations}
     />
   )
 }

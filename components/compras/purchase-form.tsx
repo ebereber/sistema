@@ -73,7 +73,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import { getLocations, type Location } from "@/lib/services/locations";
+import { type Location } from "@/lib/services/locations";
 import { getProducts, type Product } from "@/lib/services/products";
 import { type PurchaseOrderWithDetails } from "@/lib/services/purchase-orders";
 import {
@@ -100,7 +100,7 @@ interface PurchaseFormProps {
   fromPurchaseOrder?: PurchaseOrderWithDetails;
   initialSuppliers?: Supplier[];
   initialProducts?: Product[];
-  initialLocations?: Location[];
+  initialLocations: Location[];
 }
 
 export function PurchaseForm({
@@ -173,7 +173,7 @@ export function PurchaseForm({
           ? Promise.resolve(initialSuppliers)
           : getSuppliers({ active: true }),
         initialProducts ? Promise.resolve(initialProducts) : getProducts(),
-        initialLocations ? Promise.resolve(initialLocations) : getLocations(),
+        Promise.resolve(initialLocations),
       ]);
 
       setSuppliers(suppliersData);

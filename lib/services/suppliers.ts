@@ -1,6 +1,6 @@
-import { getClientOrganizationId } from "@/lib/auth/get-client-organization";
-import { createClient } from "@/lib/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
+import { getClientOrganizationId } from "../auth/get-client-organization";
+import { createClient } from "../supabase/client";
 
 export type Supplier = Tables<"suppliers">;
 export type SupplierInsert = TablesInsert<"suppliers">;
@@ -97,7 +97,7 @@ export async function updateSupplier(
 /**
  * Archive a supplier (soft delete)
  */
-export async function archiveSupplier(id: string): Promise<void> {
+/* export async function archiveSupplier(id: string): Promise<void> {
   const supabase = createClient();
 
   const { error } = await supabase
@@ -107,11 +107,11 @@ export async function archiveSupplier(id: string): Promise<void> {
 
   if (error) throw error;
 }
-
+ */
 /**
  * Unarchive a supplier (restore)
  */
-export async function unarchiveSupplier(id: string): Promise<void> {
+/* export async function unarchiveSupplier(id: string): Promise<void> {
   const supabase = createClient();
 
   const { error } = await supabase
@@ -120,23 +120,23 @@ export async function unarchiveSupplier(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw error;
-}
+} */
 
 /**
  * Delete a supplier permanently
  */
-export async function deleteSupplier(id: string): Promise<void> {
+/* export async function deleteSupplier(id: string): Promise<void> {
   const supabase = createClient();
 
   const { error } = await supabase.from("suppliers").delete().eq("id", id);
 
   if (error) throw error;
-}
+} */
 
 /**
  * Get supplier purchase statistics
  */
-export async function getSupplierStats(supplierId: string): Promise<{
+/* export async function getSupplierStats(supplierId: string): Promise<{
   totalPurchases: number;
   totalAmount: number;
 }> {
@@ -166,12 +166,12 @@ export async function getSupplierStats(supplierId: string): Promise<{
     totalPurchases: count || 0,
     totalAmount,
   };
-}
+} */
 
 /**
  * Get recent purchases for a supplier
  */
-export async function getSupplierRecentPurchases(
+/* export async function getSupplierRecentPurchases(
   supplierId: string,
   limit: number = 5,
 ) {
@@ -190,4 +190,4 @@ export async function getSupplierRecentPurchases(
   }
 
   return data || [];
-}
+} */

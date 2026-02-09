@@ -446,22 +446,3 @@ export async function getProductsByLocation(locationId: string) {
 }
 
 // ─── Get Locations ───────────────────────────────────
-
-export async function getLocations() {
-  const supabase = await createClient();
-  const organizationId = await getOrganizationId();
-
-  const { data, error } = await supabase
-    .from("locations")
-    .select("id, name, is_main, active")
-    .eq("organization_id", organizationId)
-    .eq("active", true)
-    .order("is_main", { ascending: false })
-    .order("name");
-
-  if (error) {
-    throw new Error("Error al obtener ubicaciones");
-  }
-
-  return data || [];
-}

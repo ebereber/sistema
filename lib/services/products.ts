@@ -1,64 +1,71 @@
-import { createClient } from "@/lib/supabase/client"
-import type { Tables, TablesInsert, TablesUpdate, Enums } from "@/lib/supabase/types"
+import type {
+  Enums,
+  Tables,
+  TablesInsert,
+  TablesUpdate,
+} from "@/lib/supabase/types";
+import { createClient } from "../supabase/client";
 
 export type Product = Tables<"products"> & {
-  category?: { id: string; name: string } | null
-  supplier?: { id: string; name: string } | null
-  stock?: StockByLocation[]
-}
+  category?: { id: string; name: string } | null;
+  supplier?: { id: string; name: string } | null;
+  stock?: StockByLocation[];
+};
 
 export type StockByLocation = Tables<"stock"> & {
   location: {
-    id: string
-    name: string
-    is_main: boolean | null
-  }
-}
+    id: string;
+    name: string;
+    is_main: boolean | null;
+  };
+};
 
 export type PriceHistory = Tables<"price_history"> & {
-  user?: { name: string | null } | null
-}
+  user?: { name: string | null } | null;
+};
 
 export type StockMovement = Tables<"stock_movements"> & {
-  location_from?: { id: string; name: string } | null
-  location_to?: { id: string; name: string } | null
-  user?: { name: string | null } | null
-}
+  location_from?: { id: string; name: string } | null;
+  location_to?: { id: string; name: string } | null;
+  user?: { name: string | null } | null;
+};
 
-export type ProductInsert = Omit<TablesInsert<"products">, "stock_quantity">
-export type ProductUpdate = TablesUpdate<"products">
+export type ProductInsert = Omit<TablesInsert<"products">, "stock_quantity">;
+export type ProductUpdate = TablesUpdate<"products">;
 
-export type ProductType = Enums<"product_type">
+export type ProductType = Enums<"product_type">;
 
 export interface GetProductsParams {
-  search?: string
-  active?: boolean
-  categoryId?: string
-  visibility?: string[]
-  stockFilter?: "WITH_STOCK" | "WITHOUT_STOCK" | "NEGATIVE_STOCK"
-  page?: number
-  pageSize?: number
+  search?: string;
+  active?: boolean;
+  categoryId?: string;
+  visibility?: string[];
+  stockFilter?: "WITH_STOCK" | "WITHOUT_STOCK" | "NEGATIVE_STOCK";
+  page?: number;
+  pageSize?: number;
 }
 
 export interface BulkFilters {
-  search?: string
-  active?: boolean
-  categoryId?: string
-  visibility?: string[]
-  stockFilter?: "WITH_STOCK" | "WITHOUT_STOCK" | "NEGATIVE_STOCK"
+  search?: string;
+  active?: boolean;
+  categoryId?: string;
+  visibility?: string[];
+  stockFilter?: "WITH_STOCK" | "WITHOUT_STOCK" | "NEGATIVE_STOCK";
 }
 
 export interface GetProductsResult {
-  data: Product[]
-  count: number
+  data: Product[];
+  count: number;
 }
 
 /**
  * Get products with filters and pagination
  * @deprecated Use getCachedProducts from products-cached.ts instead
  */
-export async function getProducts(params: GetProductsParams = {}): Promise<GetProductsResult> {
-  const supabase = createClient()
+export async function getProducts(
+  params: GetProductsParams = {},
+): Promise<GetProductsResult> {
+  const supabase = createClient();
 
   const {
     search,
@@ -68,68 +75,65 @@ export async function getProducts(params: GetProductsParams = {}): Promise<GetPr
     stockFilter,
     page = 1,
     pageSize = 20,
-  } = params
+  } = params;
 
-  let query = supabase
-    .from("products")
-    .select(
-      `
+  let query = supabase.from("products").select(
+    `
       *,
       category:categories(id, name)
     `,
-      { count: "exact" }
-    )
+    { count: "exact" },
+  );
 
   // Search filter
   if (search) {
-    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
   }
 
   // Status filter
   if (active !== undefined) {
-    query = query.eq("active", active)
+    query = query.eq("active", active);
   }
 
   // Category filter
   if (categoryId) {
-    query = query.eq("category_id", categoryId)
+    query = query.eq("category_id", categoryId);
   }
 
   // Visibility filter
   if (visibility && visibility.length > 0) {
-    query = query.in("visibility", visibility)
+    query = query.in("visibility", visibility);
   }
 
   // Stock filter
   if (stockFilter === "WITH_STOCK") {
-    query = query.gt("stock_quantity", 0)
+    query = query.gt("stock_quantity", 0);
   } else if (stockFilter === "WITHOUT_STOCK") {
-    query = query.eq("stock_quantity", 0)
+    query = query.eq("stock_quantity", 0);
   } else if (stockFilter === "NEGATIVE_STOCK") {
-    query = query.lt("stock_quantity", 0)
+    query = query.lt("stock_quantity", 0);
   }
 
   // Pagination
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
   const { data, error, count } = await query
     .range(from, to)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  if (error) throw error
+  if (error) throw error;
 
   return {
     data: data || [],
     count: count || 0,
-  }
+  };
 }
-
 /**
  * Get product by ID with relations
  * @deprecated Use getCachedProductById from products-cached.ts instead
  */
-export async function getProductById(id: string): Promise<Product> {
+/* export async function getProductById(id: string): Promise<Product> {
   const supabase = createClient()
 
   const { data, error } = await supabase
@@ -150,13 +154,13 @@ export async function getProductById(id: string): Promise<Product> {
 
   if (error) throw error
   return data as unknown as Product
-}
+} */
 
 /**
  * Create a new product with stock and history
  * @deprecated Use createProductAction from lib/actions/products.ts instead
  */
-export async function createProduct(data: {
+/* export async function createProduct(data: {
   product: ProductInsert
   stockByLocation: Array<{ location_id: string; quantity: number }>
   userId: string
@@ -219,13 +223,13 @@ export async function createProduct(data: {
   }
 
   return product
-}
+} */
 
 /**
  * Update a product with stock and history tracking
  * @deprecated Use updateProductAction from lib/actions/products.ts instead
  */
-export async function updateProduct(
+/* export async function updateProduct(
   id: string,
   data: {
     product: ProductUpdate
@@ -321,13 +325,13 @@ export async function updateProduct(
   }
 
   return product
-}
+} */
 
 /**
  * Archive a product (soft delete)
  * @deprecated Use archiveProductAction from lib/actions/products.ts instead
  */
-export async function archiveProduct(id: string): Promise<void> {
+/* export async function archiveProduct(id: string): Promise<void> {
   const supabase = createClient()
 
   const { error } = await supabase
@@ -336,13 +340,13 @@ export async function archiveProduct(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
-}
+} */
 
 /**
  * Activate a product
  * @deprecated Use activateProductAction from lib/actions/products.ts instead
  */
-export async function activateProduct(id: string): Promise<void> {
+/* export async function activateProduct(id: string): Promise<void> {
   const supabase = createClient()
 
   const { error } = await supabase
@@ -351,89 +355,101 @@ export async function activateProduct(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
-}
+} */
 
 /**
  * Get price history for a product
  */
-export async function getPriceHistory(productId: string): Promise<PriceHistory[]> {
-  const supabase = createClient()
+export async function getPriceHistory(
+  productId: string,
+): Promise<PriceHistory[]> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("price_history")
-    .select(`
+    .select(
+      `
       *,
       user:users(name)
-    `)
+    `,
+    )
     .eq("product_id", productId)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  if (error) throw error
-  return data || []
+  if (error) throw error;
+  return data || [];
 }
 
 /**
  * Get stock movements for a product
  */
-export async function getStockMovements(productId: string): Promise<StockMovement[]> {
-  const supabase = createClient()
+export async function getStockMovements(
+  productId: string,
+): Promise<StockMovement[]> {
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("stock_movements")
-    .select(`
+    .select(
+      `
       *,
       location_from:locations!stock_movements_location_from_id_fkey(id, name),
       location_to:locations!stock_movements_location_to_id_fkey(id, name),
       user:users(name)
-    `)
+    `,
+    )
     .eq("product_id", productId)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  if (error) throw error
-  return data || []
+  if (error) throw error;
+  return data || [];
 }
 
 /**
  * Upload product image to Supabase Storage
  */
-export async function uploadProductImage(file: File): Promise<string> {
-  const supabase = createClient()
+/* export async function uploadProductImage(file: File): Promise<string> {
+  const supabase = createClient();
 
-  const fileExt = file.name.split(".").pop()
-  const fileName = `${crypto.randomUUID()}.${fileExt}`
-  const filePath = fileName
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${crypto.randomUUID()}.${fileExt}`;
+  const filePath = fileName;
 
   const { error: uploadError } = await supabase.storage
     .from("product-images")
-    .upload(filePath, file)
+    .upload(filePath, file);
 
-  if (uploadError) throw uploadError
+  if (uploadError) throw uploadError;
 
-  const { data } = supabase.storage.from("product-images").getPublicUrl(filePath)
+  const { data } = supabase.storage
+    .from("product-images")
+    .getPublicUrl(filePath);
 
-  return data.publicUrl
-}
+  return data.publicUrl;
+} */
 
 /**
  * Delete product image from Supabase Storage
  */
-export async function deleteProductImage(imageUrl: string): Promise<void> {
-  const supabase = createClient()
+/* export async function deleteProductImage(imageUrl: string): Promise<void> {
+  const supabase = createClient();
 
   // Extract file path from URL
-  const urlParts = imageUrl.split("/")
-  const filePath = urlParts[urlParts.length - 1]
+  const urlParts = imageUrl.split("/");
+  const filePath = urlParts[urlParts.length - 1];
 
-  const { error } = await supabase.storage.from("product-images").remove([filePath])
+  const { error } = await supabase.storage
+    .from("product-images")
+    .remove([filePath]);
 
-  if (error) throw error
-}
+  if (error) throw error;
+} */
 
 /**
  * Check if SKU is unique
  * @deprecated Use isSkuUniqueAction from lib/actions/products.ts instead
  */
-export async function isSkuUnique(sku: string, excludeId?: string): Promise<boolean> {
+/* export async function isSkuUnique(sku: string, excludeId?: string): Promise<boolean> {
   const supabase = createClient()
 
   let query = supabase.from("products").select("id").eq("sku", sku)
@@ -446,13 +462,13 @@ export async function isSkuUnique(sku: string, excludeId?: string): Promise<bool
 
   if (error) throw error
   return !data || data.length === 0
-}
+} */
 
 /**
  * Check if barcode is unique
  * @deprecated Use isBarcodeUniqueAction from lib/actions/products.ts instead
  */
-export async function isBarcodeUnique(
+/* export async function isBarcodeUnique(
   barcode: string,
   excludeId?: string
 ): Promise<boolean> {
@@ -468,13 +484,13 @@ export async function isBarcodeUnique(
 
   if (error) throw error
   return !data || data.length === 0
-}
+} */
 
 /**
  * Update product stock from stock management dialog
  * @deprecated Use updateProductStockAction from lib/actions/products.ts instead
  */
-export async function updateProductStock(
+/* export async function updateProductStock(
   productId: string,
   data: {
     stockByLocation: Array<{ location_id: string; quantity: number }>
@@ -526,13 +542,13 @@ export async function updateProductStock(
     .from("products")
     .update({ stock_quantity: totalStock, updated_at: new Date().toISOString() })
     .eq("id", productId)
-}
+} */
 
 /**
  * Delete a product permanently or archive if it has references
  * @deprecated Use deleteProductAction from lib/actions/products.ts instead
  */
-export async function deleteProduct(id: string): Promise<void> {
+/* export async function deleteProduct(id: string): Promise<void> {
   const supabase = createClient()
 
   // Check if product has sales references
@@ -562,7 +578,7 @@ export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from("products").delete().eq("id", id)
 
   if (error) throw error
-}
+} */
 
 // ============================================================================
 // BULK OPERATIONS
@@ -572,7 +588,7 @@ export async function deleteProduct(id: string): Promise<void> {
  * Get all product IDs matching filters (for "Select all" functionality)
  * @deprecated Use getAllProductIdsAction from lib/actions/products.ts instead
  */
-export async function getAllProductIds(filters: BulkFilters): Promise<string[]> {
+/* export async function getAllProductIds(filters: BulkFilters): Promise<string[]> {
   const supabase = createClient()
 
   let query = supabase.from("products").select("id")
@@ -605,13 +621,13 @@ export async function getAllProductIds(filters: BulkFilters): Promise<string[]> 
 
   if (error) throw error
   return data?.map((p) => p.id) || []
-}
+} */
 
 /**
  * Bulk update prices
  * @deprecated Use bulkUpdatePricesAction from lib/actions/products.ts instead
  */
-export async function bulkUpdatePrices(params: {
+/* export async function bulkUpdatePrices(params: {
   productIds?: string[]
   filters?: BulkFilters
   operation: "increase" | "decrease"
@@ -682,13 +698,13 @@ export async function bulkUpdatePrices(params: {
   }
 
   return updatedCount
-}
+} */
 
 /**
  * Bulk update stock
  * @deprecated Use bulkUpdateStockAction from lib/actions/products.ts instead
  */
-export async function bulkUpdateStock(params: {
+/* export async function bulkUpdateStock(params: {
   productIds?: string[]
   filters?: BulkFilters
   locationId: string
@@ -767,13 +783,13 @@ export async function bulkUpdateStock(params: {
   }
 
   return updatedCount
-}
+} */
 
 /**
  * Bulk assign category
  * @deprecated Use bulkAssignCategoryAction from lib/actions/products.ts instead
  */
-export async function bulkAssignCategory(params: {
+/* export async function bulkAssignCategory(params: {
   productIds?: string[]
   filters?: BulkFilters
   categoryId: string | null
@@ -798,13 +814,13 @@ export async function bulkAssignCategory(params: {
   if (error) throw error
 
   return productIds.length
-}
+} */
 
 /**
  * Get product status counts (active vs inactive) for bulk operations
  * @deprecated Use getProductStatusCountsAction from lib/actions/products.ts instead
  */
-export async function getProductStatusCounts(params: {
+/* export async function getProductStatusCounts(params: {
   productIds?: string[]
   filters?: BulkFilters
 }): Promise<{ active: number; inactive: number }> {
@@ -831,14 +847,14 @@ export async function getProductStatusCounts(params: {
   const inactive = data?.filter((p) => !p.active).length ?? 0
 
   return { active, inactive }
-}
+} */
 
 /**
  * Bulk archive/activate products
  * Only updates products that actually need to change state
  * @deprecated Use bulkArchiveAction from lib/actions/products.ts instead
  */
-export async function bulkArchive(params: {
+/* export async function bulkArchive(params: {
   productIds?: string[]
   filters?: BulkFilters
   archive: boolean
@@ -868,13 +884,13 @@ export async function bulkArchive(params: {
   if (error) throw error
 
   return data?.length ?? 0
-}
+} */
 
 /**
  * Check which products have references (for bulk delete preview)
  * @deprecated Use checkProductsWithReferencesAction from lib/actions/products.ts instead
  */
-export async function checkProductsWithReferences(productIds: string[]): Promise<{
+/* export async function checkProductsWithReferences(productIds: string[]): Promise<{
   canDelete: string[]
   hasReferences: string[]
 }> {
@@ -899,13 +915,13 @@ export async function checkProductsWithReferences(productIds: string[]): Promise
   }
 
   return { canDelete, hasReferences }
-}
+} */
 
 /**
  * Bulk delete products (archives those with references)
  * @deprecated Use bulkDeleteAction from lib/actions/products.ts instead
  */
-export async function bulkDelete(params: {
+/* export async function bulkDelete(params: {
   productIds?: string[]
   filters?: BulkFilters
 }): Promise<{ deleted: number; archived: number }> {
@@ -945,3 +961,4 @@ export async function bulkDelete(params: {
     archived: hasReferences.length,
   }
 }
+ */

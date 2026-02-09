@@ -51,7 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { getLocations, type Location } from "@/lib/services/locations";
+import { type Location } from "@/lib/services/locations";
 import { getProducts, type Product } from "@/lib/services/products";
 import {
   createPurchaseOrderAction,
@@ -72,6 +72,7 @@ import { cn } from "@/lib/utils";
 interface PurchaseOrderFormProps {
   mode: "create" | "edit";
   initialData?: PurchaseOrderWithDetails;
+  initialLocations: Location[];
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,7 @@ interface PurchaseOrderFormProps {
 export function PurchaseOrderForm({
   mode,
   initialData,
+  initialLocations,
 }: PurchaseOrderFormProps) {
   const router = useRouter();
 
@@ -160,7 +162,7 @@ export function PurchaseOrderForm({
       const [suppliersData, productsResult, locationsData] = await Promise.all([
         getSuppliers({ active: true }),
         getProducts(),
-        getLocations(),
+        Promise.resolve(initialLocations),
       ]);
 
       setSuppliers(suppliersData);

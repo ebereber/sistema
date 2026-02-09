@@ -4,7 +4,7 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar, Pencil, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -30,13 +30,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCurrentUser } from "@/lib/auth/user-provider";
-import { getLocations, type Location } from "@/lib/services/locations";
+import type { Location } from "@/lib/services/locations";
 
 interface LocationSelectorProps {
   location: { id: string; name: string } | null;
   onLocationChange: (location: { id: string; name: string }) => void;
   saleDate: Date;
   onSaleDateChange: (date: Date) => void;
+  allLocations: Location[];
 }
 
 export function LocationSelector({
@@ -44,44 +45,22 @@ export function LocationSelector({
   onLocationChange,
   saleDate,
   onSaleDateChange,
+  allLocations,
 }: LocationSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { user } = useCurrentUser();
 
-  // Cargar ubicaciones según permisos
-  useEffect(() => {
-    async function loadLocations() {
-      setIsLoading(true);
-      try {
-        const allLocations = await getLocations();
-
-        // Filtrar según permisos del usuario
-        if (user?.dataVisibilityScope === "all") {
-          // Dueño ve todas las ubicaciones activas
-          setLocations(allLocations.filter((l) => l.active));
-        } else if (user?.locationIds && user.locationIds.length > 0) {
-          // Usuario ve solo sus ubicaciones asignadas
-          setLocations(
-            allLocations.filter(
-              (l) => l.active && user.locationIds.includes(l.id),
-            ),
-          );
-        } else {
-          setLocations([]);
-        }
-      } catch (error) {
-        console.error("Error loading locations:", error);
-      } finally {
-        setIsLoading(false);
-      }
+  // Filter by user permissions (client-side)
+  const locations = useMemo(() => {
+    if (user?.dataVisibilityScope === "all") {
+      return allLocations.filter((l) => l.active);
+    } else if (user?.locationIds && user.locationIds.length > 0) {
+      return allLocations.filter(
+        (l) => l.active && user.locationIds.includes(l.id),
+      );
     }
-
-    if (open) {
-      loadLocations();
-    }
-  }, [open, user]);
+    return [];
+  }, [allLocations, user]);
 
   const formattedDate = format(saleDate, "d/M", { locale: es });
 
@@ -143,9 +122,7 @@ export function LocationSelector({
           {/* Ubicación */}
           <div className="space-y-2">
             <Label htmlFor="warehouse">Ubicación (stock)</Label>
-            {isLoading ? (
-              <div className="text-sm text-muted-foreground">Cargando...</div>
-            ) : locations.length === 0 ? (
+            {locations.length === 0 ? (
               <div className="text-sm text-muted-foreground">
                 No tenés ubicaciones asignadas
               </div>

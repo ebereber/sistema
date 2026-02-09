@@ -9,9 +9,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 import {
-  deleteProductImage,
-  uploadProductImage,
-} from "@/lib/services/products";
+  deleteProductImageAction,
+  uploadProductImageAction,
+} from "@/lib/actions/products";
 
 interface ImageUploadProps {
   value?: string | null;
@@ -28,7 +28,6 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
 
       const file = acceptedFiles[0];
 
-      // Validate file size (5MB max)
       if (file.size > 5 * 1024 * 1024) {
         toast.error("El archivo es muy grande", {
           description: "El tamaño máximo es 5MB",
@@ -39,16 +38,17 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
       setIsUploading(true);
 
       try {
-        // Delete old image if exists
         if (value) {
           try {
-            await deleteProductImage(value);
+            await deleteProductImageAction(value);
           } catch {
             // Ignore delete errors
           }
         }
 
-        const url = await uploadProductImage(file);
+        const formData = new FormData();
+        formData.append("file", file);
+        const url = await uploadProductImageAction(formData);
         onChange(url);
         toast.success("Imagen subida correctamente");
       } catch (error: unknown) {
@@ -59,7 +59,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
         setIsUploading(false);
       }
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -75,13 +75,11 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
 
   async function handleRemove(e: React.MouseEvent) {
     e.stopPropagation();
-
     if (!value) return;
 
     setIsUploading(true);
-
     try {
-      await deleteProductImage(value);
+      await deleteProductImageAction(value);
       onChange(null);
       toast.success("Imagen eliminada");
     } catch (error: unknown) {

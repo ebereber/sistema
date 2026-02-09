@@ -17,7 +17,6 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { createClient } from "@/lib/supabase/client";
-/* import { getLocations, type Location } from "@/lib/services/locations"; */
 import { updateProductStockAction } from "@/lib/actions/products";
 import { type Location } from "@/lib/services/locations";
 
@@ -34,7 +33,6 @@ export function StockManagementDialog({
   onSuccess,
   locations,
 }: StockManagementDialogProps) {
-  /* const [locations, setLocations] = useState<Location[]>([]); */
   const [stockByLocation, setStockByLocation] = useState<
     Record<string, number>
   >({});
@@ -45,10 +43,6 @@ export function StockManagementDialog({
     setIsLoading(true);
     try {
       const supabase = createClient();
-
-      // Load locations
-      /*  const locs = await getLocations();
-      setLocations(locs); */
 
       // Load current stock
       const { data: stockData } = await supabase

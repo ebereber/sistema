@@ -42,6 +42,7 @@ export function CheckoutDialog({
   exchangeTotals,
   shift,
   onSaleDateChange,
+  allLocations,
 }: CheckoutDialogProps) {
   const checkout = useCheckout({
     open,
@@ -272,6 +273,7 @@ export function CheckoutDialog({
                   onLocationChange={checkout.setLocation}
                   saleDate={saleDate}
                   onSaleDateChange={onSaleDateChange}
+                  allLocations={allLocations}
                 />
               </div>
             </form>

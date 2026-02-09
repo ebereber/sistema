@@ -11,6 +11,7 @@ import {
   type GlobalDiscount,
 } from "@/lib/validations/sale";
 import { Loader2 } from "lucide-react";
+import type { Location } from "@/lib/services/locations";
 import { CreditNotesSelector } from "./credit-notes-selector";
 import { LocationSelector } from "./location-selector-dialog";
 import type { AvailableCreditNote, CheckoutView } from "./types";
@@ -51,6 +52,7 @@ interface CheckoutSummaryProps {
   onLocationChange: (location: { id: string; name: string }) => void;
   saleDate: Date;
   onSaleDateChange: (date: Date) => void;
+  allLocations: Location[];
 }
 
 export function CheckoutSummary({
@@ -82,6 +84,7 @@ export function CheckoutSummary({
   onLocationChange,
   saleDate,
   onSaleDateChange,
+  allLocations,
 }: CheckoutSummaryProps) {
   const canSubmit = (() => {
     if (isSubmitting) return false;
@@ -124,6 +127,7 @@ export function CheckoutSummary({
         onLocationChange={onLocationChange}
         saleDate={saleDate}
         onSaleDateChange={onSaleDateChange}
+        allLocations={allLocations}
       />
 
       <div className="space-y-3">

@@ -1,4 +1,5 @@
 import type { AvailableCreditNote } from "@/lib/services/credit-note-applications";
+import type { Location } from "@/lib/services/locations";
 import { Shift } from "@/lib/services/shifts";
 import type {
   CartItem,
@@ -130,6 +131,7 @@ export interface CheckoutDialogProps {
   /* shiftId: string | null; */
   shift: Shift | null;
   onSaleDateChange: (date: Date) => void;
+  allLocations: Location[];
 }
 
 // Re-export types used by child components

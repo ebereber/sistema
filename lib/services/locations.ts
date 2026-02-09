@@ -33,32 +33,9 @@ export type LocationInsert = TablesInsert<"locations">;
 export type LocationUpdate = TablesUpdate<"locations">;
 
 /**
- * Get all active locations with their assigned POS
- */
-export async function getLocations(): Promise<Location[]> {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("locations")
-    .select(
-      `
-      *,
-      points_of_sale:point_of_sale(id, number, name, enabled_for_arca),
-      cash_registers(id, name, status, point_of_sale:point_of_sale(id, number, name))
-    `,
-    )
-    .order("is_main", { ascending: false })
-    .order("name");
-
-  if (error) throw error;
-
-  return data || [];
-}
-
-/**
  * Get location by ID with its assigned POS
  */
-export async function getLocationById(id: string): Promise<Location> {
+/* export async function getLocationById(id: string): Promise<Location> {
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -74,13 +51,13 @@ export async function getLocationById(id: string): Promise<Location> {
 
   if (error) throw error;
   return data;
-}
+} */
 
 /**
  * Create a new location
  * If is_main is true, unmarks other locations as main
  */
-export async function createLocation(
+/* export async function createLocation(
   location: LocationInsert,
 ): Promise<Location> {
   const supabase = createClient();
@@ -103,13 +80,13 @@ export async function createLocation(
 
   if (error) throw error;
   return data;
-}
+} */
 
 /**
  * Update a location
  * If is_main is true, unmarks other locations as main
  */
-export async function updateLocation(
+/* export async function updateLocation(
   id: string,
   location: LocationUpdate,
 ): Promise<Location> {
@@ -135,12 +112,12 @@ export async function updateLocation(
 
   if (error) throw error;
   return data;
-}
+} */
 
 /**
  * Archive a location (soft delete)
  */
-export async function archiveLocation(id: string): Promise<void> {
+/* export async function archiveLocation(id: string): Promise<void> {
   const supabase = createClient();
 
   // First, unassign all POS from this location
@@ -161,12 +138,12 @@ export async function archiveLocation(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw error;
-}
+} */
 
 /**
  * Delete a location (only if no POS are assigned)
  */
-export async function deleteLocation(id: string): Promise<void> {
+/* export async function deleteLocation(id: string): Promise<void> {
   const supabase = createClient();
 
   // Check if any POS are assigned to this location
@@ -188,7 +165,7 @@ export async function deleteLocation(id: string): Promise<void> {
   const { error } = await supabase.from("locations").delete().eq("id", id);
 
   if (error) throw error;
-}
+} */
 
 /**
  * Get the main location

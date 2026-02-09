@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PurchaseOrderForm } from "@/components/ordenes/purchase-order-form";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { getCachedLocations } from "@/lib/services/locations-cached";
 import { getCachedPurchaseOrderById } from "@/lib/services/purchase-orders-cached";
 
 export default async function EditarOrdenPage({
@@ -27,14 +28,17 @@ async function EditarOrdenContent({ id }: { id: string }) {
   if (!user) redirect("/login");
   const organizationId = await getOrganizationId();
 
-  const order = await getCachedPurchaseOrderById(organizationId, id);
+  const [order, locations] = await Promise.all([
+    getCachedPurchaseOrderById(organizationId, id),
+    getCachedLocations(organizationId),
+  ]);
   if (!order) notFound();
 
   if (order.status !== "draft" && order.status !== "confirmed") {
     redirect(`/ordenes/${id}`);
   }
 
-  return <PurchaseOrderForm mode="edit" initialData={order} />;
+  return <PurchaseOrderForm mode="edit" initialData={order} initialLocations={locations} />;
 }
 
 function LoadingSkeleton() {

@@ -22,6 +22,7 @@ import {
 } from "@/components/ventas/product-search-panel"
 import { useActiveShift } from "@/hooks/use-active-shift"
 import type { Category } from "@/lib/services/categories"
+import type { Location } from "@/lib/services/locations"
 import {
   type ProductForSale,
   getAdjustedPrice,
@@ -44,12 +45,14 @@ interface NuevaVentaClientProps {
   initialProducts: ProductForSale[]
   topSellingProducts: ProductForSale[]
   categories: Category[]
+  allLocations: Location[]
 }
 
 export function NuevaVentaClient({
   initialProducts,
   topSellingProducts,
   categories,
+  allLocations,
 }: NuevaVentaClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -584,6 +587,7 @@ export function NuevaVentaClient({
         exchangeTotals={exchangeTotals}
         shift={shift}
         onSaleDateChange={handleSaleDateChange}
+        allLocations={allLocations}
       />
     </div>
   )
