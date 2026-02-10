@@ -1,6 +1,8 @@
 "use server";
 
 import { getOrganizationId } from "@/lib/auth/get-organization";
+import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre";
+import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
 import type {
   BulkFilters,
   PriceHistory,
@@ -108,6 +110,12 @@ export async function createProductAction(data: {
   }
 
   revalidateTag("products", "minutes");
+
+  // Sync stock to integrations (fire-and-forget)
+  if (!isCombo && totalStock > 0) {
+    syncSaleStockToTiendanube([product.id]).catch(() => {});
+    syncSaleStockToMercadoLibre([product.id]).catch(() => {});
+  }
 
   return product;
 }
@@ -235,6 +243,12 @@ export async function updateProductAction(
 
   revalidateTag("products", "minutes");
   revalidateTag(`product-${id}`, "minutes");
+
+  // Sync stock to integrations (fire-and-forget)
+  if (!isCombo && data.stockByLocation) {
+    syncSaleStockToTiendanube([id]).catch(() => {});
+    syncSaleStockToMercadoLibre([id]).catch(() => {});
+  }
 
   return product;
 }
@@ -384,6 +398,10 @@ export async function updateProductStockAction(
 
   revalidateTag("products", "minutes");
   revalidateTag(`product-${productId}`, "minutes");
+
+  // Sync stock to integrations (fire-and-forget)
+  syncSaleStockToTiendanube([productId]).catch(() => {});
+  syncSaleStockToMercadoLibre([productId]).catch(() => {});
 }
 
 // ============================================================================
@@ -561,6 +579,13 @@ export async function bulkUpdateStockAction(params: {
   }
 
   revalidateTag("products", "minutes");
+
+  // Sync stock to integrations (fire-and-forget)
+  if (productIds.length > 0) {
+    syncSaleStockToTiendanube(productIds).catch(() => {});
+    syncSaleStockToMercadoLibre(productIds).catch(() => {});
+  }
+
   return updatedCount;
 }
 

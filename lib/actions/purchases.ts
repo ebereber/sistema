@@ -1,5 +1,7 @@
 "use server";
 
+import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre";
+import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 
@@ -50,6 +52,16 @@ export async function deletePurchaseAction(id: string) {
     }
   }
 
+  // Collect product IDs for integration sync before deleting
+  const stockProductIds: string[] = [];
+  if (purchase.products_received && purchase.items) {
+    for (const item of purchase.items) {
+      if (item.product_id && item.type === "product") {
+        stockProductIds.push(item.product_id);
+      }
+    }
+  }
+
   // Delete purchase (items will cascade)
   const { error } = await supabaseAdmin.from("purchases").delete().eq("id", id);
 
@@ -57,6 +69,12 @@ export async function deletePurchaseAction(id: string) {
 
   revalidateTag("purchases", "minutes");
   revalidateTag("products", "minutes");
+
+  // Sync stock to integrations (fire-and-forget)
+  if (stockProductIds.length > 0) {
+    syncSaleStockToTiendanube(stockProductIds).catch(() => {});
+    syncSaleStockToMercadoLibre(stockProductIds).catch(() => {});
+  }
 }
 
 export async function updatePurchaseNoteAction(

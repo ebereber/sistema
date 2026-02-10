@@ -743,6 +743,127 @@ export type Database = {
           },
         ]
       }
+      mercadolibre_accounts: {
+        Row: {
+          access_token: string
+          connected_at: string
+          id: string
+          meli_user_id: number
+          nickname: string | null
+          organization_id: string
+          price_list_id: string | null
+          refresh_token: string
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string
+          id?: string
+          meli_user_id: number
+          nickname?: string | null
+          organization_id: string
+          price_list_id?: string | null
+          refresh_token: string
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string
+          id?: string
+          meli_user_id?: number
+          nickname?: string | null
+          organization_id?: string
+          price_list_id?: string | null
+          refresh_token?: string
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadolibre_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadolibre_accounts_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadolibre_order_map: {
+        Row: {
+          id: string
+          imported_at: string | null
+          local_sale_id: string
+          meli_order_id: number
+          meli_user_id: number
+        }
+        Insert: {
+          id?: string
+          imported_at?: string | null
+          local_sale_id: string
+          meli_order_id: number
+          meli_user_id: number
+        }
+        Update: {
+          id?: string
+          imported_at?: string | null
+          local_sale_id?: string
+          meli_order_id?: number
+          meli_user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadolibre_order_map_local_sale_id_fkey"
+            columns: ["local_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mercadolibre_product_map: {
+        Row: {
+          id: string
+          last_synced_at: string | null
+          local_product_id: string
+          meli_item_id: string
+          meli_user_id: number
+        }
+        Insert: {
+          id?: string
+          last_synced_at?: string | null
+          local_product_id: string
+          meli_item_id: string
+          meli_user_id: number
+        }
+        Update: {
+          id?: string
+          last_synced_at?: string | null
+          local_product_id?: string
+          meli_item_id?: string
+          meli_user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadolibre_product_map_local_product_id_fkey"
+            columns: ["local_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           active: boolean | null

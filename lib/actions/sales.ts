@@ -1,5 +1,7 @@
 "use server"
 
+import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre"
+import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { revalidateTag } from "next/cache"
 
@@ -89,4 +91,15 @@ export async function cancelCreditNoteAction(
   revalidateTag("sales", "minutes")
   revalidateTag(`sale-${creditNoteId}`, "minutes")
   revalidateTag("products", "minutes")
+
+  // Sync stock to integrations if stock was reverted (fire-and-forget)
+  if (revertStock && creditNote.items) {
+    const productIds = creditNote.items
+      .map((i: { product_id: string | null }) => i.product_id)
+      .filter((id: string | null): id is string => id !== null)
+    if (productIds.length > 0) {
+      syncSaleStockToTiendanube(productIds).catch(() => {})
+      syncSaleStockToMercadoLibre(productIds).catch(() => {})
+    }
+  }
 }

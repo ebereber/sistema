@@ -14,6 +14,7 @@ import {
   type SaleItemInsert,
 } from "@/lib/services/sales";
 
+import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre";
 import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
 import {
   checkStockAvailability,
@@ -677,13 +678,16 @@ export function useCheckout({
         }
       }
 
-      // Sync stock to Tiendanube (non-blocking, fire-and-forget)
+      // Sync stock to integrations (non-blocking, fire-and-forget)
       const productIds = items
         .map((item) => item.product_id)
         .filter((id): id is string => id !== null);
       if (productIds.length > 0) {
         syncSaleStockToTiendanube(productIds).catch((err) => {
           console.error("Error syncing stock to Tiendanube:", err);
+        });
+        syncSaleStockToMercadoLibre(productIds).catch((err) => {
+          console.error("Error syncing stock to MercadoLibre:", err);
         });
       }
 

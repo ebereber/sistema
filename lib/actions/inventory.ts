@@ -1,6 +1,8 @@
 "use server"
 
 import { getOrganizationId } from "@/lib/auth/get-organization"
+import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre"
+import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { revalidateTag } from "next/cache"
 
@@ -68,6 +70,13 @@ export async function batchUpsertStockAction(data: {
   }
 
   revalidateTag("products", "minutes")
+
+  // Sync stock to integrations (fire-and-forget)
+  const changedProductIds = data.changes.map((c) => c.product_id)
+  if (changedProductIds.length > 0) {
+    syncSaleStockToTiendanube(changedProductIds).catch(() => {})
+    syncSaleStockToMercadoLibre(changedProductIds).catch(() => {})
+  }
 
   return { updated }
 }
