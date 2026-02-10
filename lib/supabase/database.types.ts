@@ -14,6 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
+      bank_account_movements: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          created_at: string
+          description: string | null
+          id: string
+          movement_date: string
+          notes: string | null
+          performed_by: string
+          reference: string | null
+          source_id: string | null
+          source_type: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          movement_date?: string
+          notes?: string | null
+          performed_by: string
+          reference?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          movement_date?: string
+          notes?: string | null
+          performed_by?: string
+          reference?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_account_movements_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_accounts: {
+        Row: {
+          account_name: string
+          balance_date: string
+          bank_name: string
+          created_at: string
+          currency: string
+          id: string
+          initial_balance: number
+          organization_id: string
+          status: string
+          updated_at: string
+          uses_checkbook: boolean
+        }
+        Insert: {
+          account_name: string
+          balance_date?: string
+          bank_name: string
+          created_at?: string
+          currency?: string
+          id?: string
+          initial_balance?: number
+          organization_id: string
+          status?: string
+          updated_at?: string
+          uses_checkbook?: boolean
+        }
+        Update: {
+          account_name?: string
+          balance_date?: string
+          bank_name?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          initial_balance?: number
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          uses_checkbook?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_register_movements: {
         Row: {
           amount: number

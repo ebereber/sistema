@@ -25,6 +25,7 @@ const menuItems = [
   { id: "puntos-de-venta", label: "Puntos de Venta", icon: MapPin },
   { id: "ubicaciones", label: "Ubicaciones", icon: Store },
   { id: "medios-de-pago", label: "Medios de Pago", icon: Wallet },
+  { id: "bancos", label: "Bancos", icon: Wallet },
   { id: "categorias", label: "Categorías", icon: FolderOpen },
   { id: "listas-precios", label: "Listas de Precios", icon: DollarSign },
   { id: "colaboradores", label: "Colaboradores", icon: Users },
