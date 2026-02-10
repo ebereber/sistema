@@ -16,6 +16,7 @@ export const cartItemSchema = z.object({
   sku: z.string(),
   basePrice: z.number().min(0), // Original price without price list adjustments
   price: z.number().min(0),
+  cost: z.number().nullable().default(null),
   quantity: z.number().int().min(1, "La cantidad debe ser al menos 1"),
   taxRate: z.number().min(0).max(100).default(21),
   discount: itemDiscountSchema.optional().nullable(),

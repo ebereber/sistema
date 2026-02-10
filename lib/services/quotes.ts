@@ -243,6 +243,7 @@ export function getQuoteCartData(quote: Quote) {
       sku: item.sku || "",
       basePrice: item.basePrice || item.price,
       price: item.price,
+      cost: null,
       quantity: item.quantity,
       taxRate: item.taxRate,
       discount: item.discount,

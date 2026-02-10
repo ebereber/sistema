@@ -14,11 +14,11 @@ import {
   type SaleItemInsert,
 } from "@/lib/services/sales";
 
+import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
 import {
   checkStockAvailability,
   type StockCheckResult,
 } from "@/lib/services/sales";
-import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
 import { Shift } from "@/lib/services/shifts";
 import { parseArgentineCurrency } from "@/lib/utils/currency";
 import {
@@ -660,6 +660,7 @@ export function useCheckout({
         sku: item.sku || null,
         quantity: item.quantity,
         unit_price: item.price,
+        unit_cost: item.cost,
         discount:
           item.discount?.type === "percentage"
             ? (item.price * item.quantity * item.discount.value) / 100

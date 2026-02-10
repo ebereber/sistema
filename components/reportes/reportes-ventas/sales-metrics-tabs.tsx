@@ -1,56 +1,38 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import type { ChartDataByMetric } from "@/lib/actions/reports";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { SalesChart } from "./sales-chart";
 
-const metrics = [
-  {
-    id: "total-vendido",
-    label: "Total Vendido",
-    value: "$ 14.245",
-    change: "+100.0%",
-    previousValue: "$ 0",
-  },
-  {
-    id: "cantidad-ventas",
-    label: "Cantidad de Ventas",
-    value: "56",
-    change: "+100.0%",
-    previousValue: "0",
-  },
-  {
-    id: "promedio-venta",
-    label: "Promedio por Venta",
-    value: "$ 254",
-    change: "+100.0%",
-    previousValue: "$ 0",
-  },
-  {
-    id: "unidades-vendidas",
-    label: "Unidades Vendidas",
-    value: "145",
-    change: "+100.0%",
-    previousValue: "0",
-  },
-  {
-    id: "margen-bruto",
-    label: "Margen Bruto",
-    value: "$ 11.894",
-    change: "+100.0%",
-    previousValue: "$ 0",
-  },
-];
+interface MetricTab {
+  id: string;
+  label: string;
+  value: string;
+  change: string;
+  changePositive: boolean;
+  previousValue: string;
+}
 
-export function SalesMetricsTabs() {
-  const [activeTab, setActiveTab] = useState("margen-bruto");
+interface SalesMetricsTabsProps {
+  metrics: MetricTab[];
+  chartData: ChartDataByMetric;
+}
 
+export function SalesMetricsTabs({
+  metrics,
+  chartData,
+}: SalesMetricsTabsProps) {
+  const [activeTab, setActiveTab] = useState(
+    metrics[metrics.length - 1]?.id || "",
+  );
+  console.log(activeTab, JSON.stringify(chartData[activeTab]?.slice(0, 3)));
   return (
     <Card className="flex flex-col py-4 sm:py-0">
       <CardHeader className="!p-0 flex flex-col items-stretch border-b sm:flex-row">
         <div className="flex w-full">
-          {metrics.map((metric, index) => (
+          {metrics.map((metric) => (
             <button
               key={metric.id}
               onClick={() => setActiveTab(metric.id)}
@@ -69,7 +51,12 @@ export function SalesMetricsTabs() {
                 {metric.value}
               </span>
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <span className="font-medium text-sm text-green-600">
+                <span
+                  className={cn(
+                    "font-medium text-sm",
+                    metric.changePositive ? "text-green-600" : "text-red-600",
+                  )}
+                >
                   {metric.change}
                 </span>
                 <span className="truncate">{metric.previousValue}</span>
@@ -79,7 +66,12 @@ export function SalesMetricsTabs() {
         </div>
       </CardHeader>
       <CardContent className="px-2 sm:p-6">
-        <SalesChart chartId="chart-desktop-main" />
+        <SalesChart
+          key={activeTab}
+          chartId="chart-desktop-main"
+          data={chartData[activeTab] || []}
+          metricId={activeTab}
+        />
       </CardContent>
     </Card>
   );

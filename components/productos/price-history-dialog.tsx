@@ -29,7 +29,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { getPriceHistory, type PriceHistory } from "@/lib/services/products";
+import { getPriceHistoryAction } from "@/lib/actions/products";
+import { type PriceHistory } from "@/lib/services/products";
 
 interface PriceHistoryDialogProps {
   productId: string;
@@ -51,7 +52,7 @@ export function PriceHistoryDialog({
   // Use controlled or internal state
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
-  const setOpen = isControlled ? (onOpenChange || (() => {})) : setInternalOpen;
+  const setOpen = isControlled ? onOpenChange || (() => {}) : setInternalOpen;
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<PriceHistory[]>([]);
 
@@ -64,7 +65,7 @@ export function PriceHistoryDialog({
   async function loadHistory() {
     setIsLoading(true);
     try {
-      const data = await getPriceHistory(productId);
+      const data = await getPriceHistoryAction(productId);
       setHistory(data);
     } catch (error: unknown) {
       const errorMessage =

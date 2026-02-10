@@ -3,6 +3,7 @@
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import type {
   BulkFilters,
+  PriceHistory,
   ProductInsert,
   ProductUpdate,
 } from "@/lib/services/products";
@@ -762,9 +763,7 @@ export async function exportProductsAction(params: {
   } else if (params.mode === "all" && params.filters) {
     const f = params.filters;
     if (f.search) {
-      query = query.or(
-        `name.ilike.%${f.search}%,sku.ilike.%${f.search}%`,
-      );
+      query = query.or(`name.ilike.%${f.search}%,sku.ilike.%${f.search}%`);
     }
     if (f.active !== undefined) {
       query = query.eq("active", f.active);
@@ -816,6 +815,116 @@ export async function exportProductsAction(params: {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Productos");
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  return Buffer.from(buffer).toString("base64");
+}
+
+export async function getPriceHistoryAction(
+  productId: string,
+): Promise<PriceHistory[]> {
+  const organizationId = await getOrganizationId();
+
+  const { data, error } = await supabaseAdmin
+    .from("price_history")
+    .select("*, user:users(name)")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateProductPricesAction(params: {
+  changes: Array<{
+    productId: string;
+    cost: number;
+    price: number;
+    marginPercentage: number;
+  }>;
+  userId: string;
+}): Promise<number> {
+  let updated = 0;
+
+  for (const change of params.changes) {
+    const { data: current, error: fetchError } = await supabaseAdmin
+      .from("products")
+      .select("cost, price, margin_percentage, tax_rate")
+      .eq("id", change.productId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const priceChanged =
+      current.cost !== change.cost ||
+      current.price !== change.price ||
+      current.margin_percentage !== change.marginPercentage;
+
+    if (!priceChanged) continue;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("products")
+      .update({
+        cost: change.cost,
+        price: change.price,
+        margin_percentage: change.marginPercentage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", change.productId);
+
+    if (updateError) throw updateError;
+
+    await supabaseAdmin.from("price_history").insert({
+      product_id: change.productId,
+      cost: change.cost,
+      price: change.price,
+      margin_percentage: change.marginPercentage,
+      tax_rate: current.tax_rate,
+      reason: "Actualización desde módulo de precios",
+      created_by: params.userId,
+    });
+
+    updated++;
+  }
+
+  revalidateTag("products", "minutes");
+  return updated;
+}
+
+export async function exportPricesAction(): Promise<string> {
+  const organizationId = await getOrganizationId();
+
+  const { data, error } = await supabaseAdmin
+    .from("products")
+    .select("sku, name, cost, margin_percentage, tax_rate, price")
+    .eq("organization_id", organizationId)
+    .eq("active", true)
+    .order("name");
+
+  if (error) throw error;
+
+  const rows = (data || []).map((p) => ({
+    SKU: p.sku,
+    Nombre: p.name,
+    "Costo sin IVA": p.cost ?? 0,
+    "Margen %": p.margin_percentage ?? 0,
+    "IVA %": p.tax_rate ?? 21,
+    "Precio con IVA": p.price,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  const colWidths = Object.keys(rows[0] || {}).map((key) => {
+    const maxLen = Math.max(
+      key.length,
+      ...rows.map((r) => String(r[key as keyof typeof r] ?? "").length),
+    );
+    return { wch: Math.min(maxLen + 2, 40) };
+  });
+  ws["!cols"] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Precios");
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   return Buffer.from(buffer).toString("base64");

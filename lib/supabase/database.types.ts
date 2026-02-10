@@ -1631,6 +1631,7 @@ export type Database = {
           sku: string | null
           tax_rate: number
           total: number
+          unit_cost: number | null
           unit_price: number
         }
         Insert: {
@@ -1644,6 +1645,7 @@ export type Database = {
           sku?: string | null
           tax_rate?: number
           total: number
+          unit_cost?: number | null
           unit_price: number
         }
         Update: {
@@ -1657,6 +1659,7 @@ export type Database = {
           sku?: string | null
           tax_rate?: number
           total?: number
+          unit_cost?: number | null
           unit_price?: number
         }
         Relationships: [

@@ -13,6 +13,7 @@ export interface ProductForSale {
   sku: string;
   barcode: string | null;
   price: number;
+  cost: number | null;
   taxRate: number;
   stockQuantity: number;
   imageUrl: string | null;
@@ -81,6 +82,7 @@ export async function searchProductsForSale(
     sku: product.sku,
     barcode: product.barcode,
     price: product.price,
+    cost: null,
     taxRate: product.tax_rate,
     stockQuantity: product.stock_quantity ?? 0,
     imageUrl: product.image_url,
@@ -151,6 +153,7 @@ export async function getProductByBarcode(
     sku: data.sku,
     barcode: data.barcode,
     price: data.price,
+    cost: null,
     taxRate: data.tax_rate,
     stockQuantity: data.stock_quantity ?? 0,
     imageUrl: data.image_url,
@@ -276,6 +279,7 @@ export interface SaleItemInsert {
   sku: string | null;
   quantity: number;
   unit_price: number;
+  unit_cost?: number | null;
   discount: number;
   tax_rate: number;
   total: number;

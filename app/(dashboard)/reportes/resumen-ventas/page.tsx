@@ -1,250 +1,250 @@
-import {
-  SalesByPaymentChart,
-  SalesByPosChart,
-  SalesByReceiptChart,
-  SalesBySellerChart,
-  SalesChart,
-  SalesMetricsTabs,
-} from "@/components/reportes/reportes-ventas";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import {
-  Calendar,
-  ChevronRight,
-  CirclePlus,
-  FileSpreadsheet,
-} from "lucide-react";
-import { Metadata } from "next";
-import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-export const metadata: Metadata = {
-  title: "Resumen de Ventas",
-  description: "Dashboard de ventas con métricas y gráficos",
-};
+import { ResumenVentasClient } from "@/components/reportes/resumen-ventas-client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getSalesReportAction } from "@/lib/actions/reports";
+import { getOrganizationId } from "@/lib/auth/get-organization";
+import { getServerUser } from "@/lib/auth/get-server-user";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-export default function ResumenVentasPage() {
+// ============================================================================
+// Date range calculation
+// ============================================================================
+
+function calculateDateRanges(
+  periodType: string,
+  periodValue: number,
+  periodUnit: string,
+) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let dateFrom: Date;
+  let dateTo: Date;
+  let prevDateFrom: Date;
+  let prevDateTo: Date;
+
+  if (periodType === "this") {
+    // "this" month/week/year — from start of unit to today
+    if (periodUnit === "months") {
+      dateFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+      dateTo = today;
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = new Date(
+        prevDateTo.getFullYear(),
+        prevDateTo.getMonth(),
+        1,
+      );
+    } else if (periodUnit === "weeks") {
+      const dayOfWeek = today.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      dateFrom = new Date(today);
+      dateFrom.setDate(dateFrom.getDate() + mondayOffset);
+      dateTo = today;
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = new Date(prevDateTo);
+      prevDateFrom.setDate(prevDateFrom.getDate() - 6);
+    } else if (periodUnit === "years") {
+      dateFrom = new Date(today.getFullYear(), 0, 1);
+      dateTo = today;
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = new Date(prevDateTo.getFullYear(), 0, 1);
+    } else {
+      // days — treat as "last 1 day"
+      dateFrom = today;
+      dateTo = today;
+      prevDateTo = new Date(today);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = prevDateTo;
+    }
+  } else if (periodType === "previous") {
+    // "previous" month/week/year
+    if (periodUnit === "months") {
+      dateFrom = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      dateTo = new Date(today.getFullYear(), today.getMonth(), 0);
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = new Date(
+        prevDateTo.getFullYear(),
+        prevDateTo.getMonth(),
+        1,
+      );
+    } else if (periodUnit === "weeks") {
+      const dayOfWeek = today.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(today);
+      thisMonday.setDate(thisMonday.getDate() + mondayOffset);
+      dateTo = new Date(thisMonday);
+      dateTo.setDate(dateTo.getDate() - 1);
+      dateFrom = new Date(dateTo);
+      dateFrom.setDate(dateFrom.getDate() - 6);
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = new Date(prevDateTo);
+      prevDateFrom.setDate(prevDateFrom.getDate() - 6);
+    } else if (periodUnit === "years") {
+      dateFrom = new Date(today.getFullYear() - 1, 0, 1);
+      dateTo = new Date(today.getFullYear() - 1, 11, 31);
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = new Date(prevDateTo.getFullYear(), 0, 1);
+    } else {
+      // days — treat as yesterday
+      dateTo = new Date(today);
+      dateTo.setDate(dateTo.getDate() - 1);
+      dateFrom = dateTo;
+      prevDateTo = new Date(dateFrom);
+      prevDateTo.setDate(prevDateTo.getDate() - 1);
+      prevDateFrom = prevDateTo;
+    }
+  } else {
+    // "last" N days/weeks/months/years
+    dateTo = today;
+    if (periodUnit === "weeks") {
+      dateFrom = new Date(today);
+      dateFrom.setDate(dateFrom.getDate() - periodValue * 7);
+    } else if (periodUnit === "months") {
+      dateFrom = new Date(today);
+      dateFrom.setMonth(dateFrom.getMonth() - periodValue);
+    } else if (periodUnit === "years") {
+      dateFrom = new Date(today);
+      dateFrom.setFullYear(dateFrom.getFullYear() - periodValue);
+    } else {
+      // days (default)
+      dateFrom = new Date(today);
+      dateFrom.setDate(dateFrom.getDate() - periodValue);
+    }
+
+    // Previous period = same duration before dateFrom
+    const durationMs = dateTo.getTime() - dateFrom.getTime();
+    prevDateTo = new Date(dateFrom);
+    prevDateTo.setDate(prevDateTo.getDate() - 1);
+    prevDateFrom = new Date(prevDateTo.getTime() - durationMs);
+  }
+
+  const fmt = (d: Date) => d.toISOString().substring(0, 10);
+  return {
+    dateFrom: fmt(dateFrom) + "T00:00:00",
+    dateTo: fmt(dateTo) + "T23:59:59",
+    prevDateFrom: fmt(prevDateFrom) + "T00:00:00",
+    prevDateTo: fmt(prevDateTo) + "T23:59:59",
+  };
+}
+
+// ============================================================================
+// Page
+// ============================================================================
+
+export default async function ResumenVentasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    periodType?: string;
+    periodValue?: string;
+    periodUnit?: string;
+    locationIds?: string;
+    sellerIds?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ResumenVentasContent searchParams={params} />
+    </Suspense>
+  );
+}
+
+async function ResumenVentasContent({
+  searchParams,
+}: {
+  searchParams: {
+    periodType?: string;
+    periodValue?: string;
+    periodUnit?: string;
+    locationIds?: string;
+    sellerIds?: string;
+  };
+}) {
+  const user = await getServerUser();
+  if (!user) redirect("/login");
+  const organizationId = await getOrganizationId();
+
+  // Parse filter params
+  const periodType = searchParams.periodType || "last";
+  const periodValue = Math.max(
+    1,
+    parseInt(searchParams.periodValue || "30", 10) || 30,
+  );
+  const periodUnit = searchParams.periodUnit || "days";
+  const locationIds = searchParams.locationIds
+    ? searchParams.locationIds.split(",").filter(Boolean)
+    : undefined;
+  const sellerIds = searchParams.sellerIds
+    ? searchParams.sellerIds.split(",").filter(Boolean)
+    : undefined;
+
+  // Calculate date ranges
+  const ranges = calculateDateRanges(periodType, periodValue, periodUnit);
+
+  // Fetch report data + filter options in parallel
+  const [reportData, locations, sellers] = await Promise.all([
+    getSalesReportAction({
+      ...ranges,
+      locationIds,
+      sellerIds,
+    }),
+    supabaseAdmin
+      .from("locations")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .order("name")
+      .then(({ data }) => data || []),
+    supabaseAdmin
+      .from("users")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .order("name")
+      .then(({ data }) => data || []),
+  ]);
+
+  return (
+    <ResumenVentasClient
+      reportData={reportData}
+      locations={locations}
+      sellers={sellers}
+      currentFilters={{
+        periodType,
+        periodValue: String(periodValue),
+        periodUnit,
+        locationIds: locationIds || [],
+        sellerIds: sellerIds || [],
+      }}
+    />
+  );
+}
+
+function PageSkeleton() {
   return (
     <div className="flex h-full flex-1 flex-col space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="gap-4">
-          <Link
-            href="/local-1/reportes"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:underline underline-offset-4"
-          >
-            Reportes
-            <ChevronRight className="size-3" />
-          </Link>
-          <h1 className="font-bold text-xl tracking-tight md:text-3xl">
-            Resumen de Ventas
-          </h1>
-        </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-8 w-48" />
       </div>
-
-      {/* Content */}
-      <div className="space-y-6">
-        {/* Filters */}
-        <div className="flex w-full flex-col items-start justify-between gap-2 md:w-auto md:flex-row md:items-center">
-          <div className="flex w-full flex-col items-start gap-2 md:w-auto md:flex-row md:items-center">
-            <Button
-              variant="outline"
-              className="w-full md:w-auto justify-start border-dashed active:scale-100"
-            >
-              <Calendar className="size-4" />
-              Período
-              <Separator orientation="vertical" className="mx-2 h-4" />
-              <span className="font-normal text-muted-foreground">
-                Últimos 30 días
-              </span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full md:w-auto justify-start border-dashed active:scale-[0.97]"
-            >
-              <CirclePlus className="mr-2 h-4 w-4" />
-              Punto de Venta
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full md:w-auto justify-start border-dashed active:scale-[0.97]"
-            >
-              <CirclePlus className="mr-2 h-4 w-4" />
-              Vendedor
-            </Button>
-          </div>
-
-          <Button variant="outline" className="active:scale-[0.97]">
-            <FileSpreadsheet className="size-4" />
-            Exportar Excel
-          </Button>
-        </div>
-
-        {/* Main Chart with Tabs - Desktop */}
-        <div className="hidden md:block">
-          <SalesMetricsTabs />
-        </div>
-
-        {/* Mobile Metrics Cards */}
-        <div className="grid grid-cols-1 gap-4 md:hidden">
-          <Card>
-            <CardHeader className="gap-0.5">
-              <CardDescription className="text-sm font-semibold text-foreground/80">
-                Total Vendido
-              </CardDescription>
-              <CardTitle className="mt-0 flex items-center gap-2 font-semibold text-2xl tabular-nums">
-                $ 14.245
-                <span className="font-medium text-sm text-green-600">
-                  +100.0%
-                </span>
-              </CardTitle>
-              <div className="text-muted-foreground text-sm">
-                $ 0 el período anterior
-              </div>
-            </CardHeader>
-            <CardContent>
-              <SalesChart chartId="chart-mobile-1" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="gap-0.5">
-              <CardDescription className="text-sm font-semibold text-foreground/80">
-                Cantidad de Ventas
-              </CardDescription>
-              <CardTitle className="mt-0 flex items-center gap-2 font-semibold text-2xl tabular-nums">
-                56
-                <span className="font-medium text-sm text-green-600">
-                  +100.0%
-                </span>
-              </CardTitle>
-              <div className="text-muted-foreground text-sm">
-                0 el período anterior
-              </div>
-            </CardHeader>
-            <CardContent>
-              <SalesChart chartId="chart-mobile-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="gap-0.5">
-              <CardDescription className="text-sm font-semibold text-foreground/80">
-                Promedio por Venta
-              </CardDescription>
-              <CardTitle className="mt-0 flex items-center gap-2 font-semibold text-2xl tabular-nums">
-                $ 254
-                <span className="font-medium text-sm text-green-600">
-                  +100.0%
-                </span>
-              </CardTitle>
-              <div className="text-muted-foreground text-sm">
-                $ 0 el período anterior
-              </div>
-            </CardHeader>
-            <CardContent>
-              <SalesChart chartId="chart-mobile-3" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="gap-0.5">
-              <CardDescription className="text-sm font-semibold text-foreground/80">
-                Unidades Vendidas
-              </CardDescription>
-              <CardTitle className="mt-0 flex items-center gap-2 font-semibold text-2xl tabular-nums">
-                145
-                <span className="font-medium text-sm text-green-600">
-                  +100.0%
-                </span>
-              </CardTitle>
-              <div className="text-muted-foreground text-sm">
-                0 el período anterior
-              </div>
-            </CardHeader>
-            <CardContent>
-              <SalesChart chartId="chart-mobile-4" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="gap-0.5">
-              <CardDescription className="text-sm font-semibold text-foreground/80">
-                Margen Bruto
-              </CardDescription>
-              <CardTitle className="mt-0 flex items-center gap-2 font-semibold text-2xl tabular-nums">
-                $ 11.894
-                <span className="font-medium text-sm text-green-600">
-                  +100.0%
-                </span>
-              </CardTitle>
-              <div className="text-muted-foreground text-sm">
-                $ 0 el período anterior
-              </div>
-            </CardHeader>
-            <CardContent>
-              <SalesChart chartId="chart-mobile-5" />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Secondary Charts */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base leading-snug font-medium">
-                Ventas por Vendedor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SalesBySellerChart />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base leading-snug font-medium">
-                Ventas por Punto de Venta
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SalesByPosChart />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Bottom Charts */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base leading-snug font-medium">
-                Ventas por Medio de Pago
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SalesByPaymentChart />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base leading-snug font-medium">
-                Ventas por Tipo de Comprobante
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SalesByReceiptChart />
-            </CardContent>
-          </Card>
-        </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-9 w-36" />
+        <Skeleton className="h-9 w-32" />
+      </div>
+      <Skeleton className="h-[400px] w-full" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Skeleton className="h-[280px]" />
+        <Skeleton className="h-[280px]" />
       </div>
     </div>
   );

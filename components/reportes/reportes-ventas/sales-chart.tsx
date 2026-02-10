@@ -1,25 +1,12 @@
 "use client";
 
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-
-const chartData = [
-  { date: "Ene 3", current: 0, previous: 0 },
-  { date: "Ene 6", current: 0, previous: 0 },
-  { date: "Ene 9", current: 0, previous: 0 },
-  { date: "Ene 13", current: 0, previous: 0 },
-  { date: "Ene 17", current: 0, previous: 0 },
-  { date: "Ene 21", current: 0, previous: 0 },
-  { date: "Ene 25", current: 0, previous: 0 },
-  { date: "Ene 29", current: 2000, previous: 0 },
-  { date: "Feb 1", current: 1500, previous: 0 },
-  { date: "Feb 2", current: 6500, previous: 0 },
-];
 
 const chartConfig = {
   current: {
@@ -32,17 +19,53 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-interface SalesChartProps {
-  chartId: string;
+const CURRENCY_METRICS = new Set([
+  "total-vendido",
+  "promedio-venta",
+  "margen-bruto",
+]);
+
+function formatCurrencyShort(value: number): string {
+  if (Math.abs(value) >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`;
+  }
+  return `$${value}`;
 }
 
-export function SalesChart({ chartId }: SalesChartProps) {
+function formatNumberShort(value: number): string {
+  if (Math.abs(value) >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`;
+  }
+  return `${value}`;
+}
+
+interface SalesChartProps {
+  chartId: string;
+  data: { date: string; current: number; previous: number }[];
+  metricId?: string;
+}
+
+export function SalesChart({ chartId, data, metricId }: SalesChartProps) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+        Sin datos para el período seleccionado
+      </div>
+    );
+  }
+
   return (
     <ChartContainer
       config={chartConfig}
       className="aspect-auto h-[300px] w-full"
     >
-      <LineChart data={chartData}>
+      <LineChart data={data}>
         <CartesianGrid strokeDasharray="0" vertical={false} />
         <XAxis
           dataKey="date"
@@ -56,14 +79,29 @@ export function SalesChart({ chartId }: SalesChartProps) {
           axisLine={false}
           tickMargin={8}
           fontSize={12}
-          tickFormatter={(value) => {
-            if (value >= 1000) {
-              return `${value / 1000}K`;
-            }
-            return value.toString();
-          }}
+          tickFormatter={
+            metricId && !CURRENCY_METRICS.has(metricId)
+              ? formatNumberShort
+              : formatCurrencyShort
+          }
         />
-        <ChartTooltip content={<ChartTooltipContent />} />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={(value) =>
+                metricId && !CURRENCY_METRICS.has(metricId)
+                  ? new Intl.NumberFormat("es-AR").format(
+                      Math.round(value as number),
+                    )
+                  : new Intl.NumberFormat("es-AR", {
+                      style: "currency",
+                      currency: "ARS",
+                      maximumFractionDigits: 0,
+                    }).format(value as number)
+              }
+            />
+          }
+        />
         <Line
           type="monotone"
           dataKey="previous"
@@ -76,7 +114,7 @@ export function SalesChart({ chartId }: SalesChartProps) {
         <Line
           type="monotone"
           dataKey="current"
-          stroke="hsl(var(--chart-1))"
+          stroke="#3b82f6"
           strokeWidth={2}
           dot={false}
         />
