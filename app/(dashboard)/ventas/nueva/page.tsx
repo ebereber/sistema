@@ -11,6 +11,7 @@ import {
   getCachedCategories,
   getCachedTopSellingProducts,
 } from "@/lib/services/products-cached"
+import { getCachedActiveSafeBoxes } from "@/lib/services/safe-boxes-cached"
 
 export default async function NuevaVentaPage() {
   return (
@@ -26,11 +27,12 @@ async function NuevaVentaContent() {
   if (!user.active) redirect("/acceso-pendiente")
   const organizationId = await getOrganizationId()
 
-  const [allProducts, topSelling, categories, locations] = await Promise.all([
+  const [allProducts, topSelling, categories, locations, activeSafeBoxes] = await Promise.all([
     getCachedAllProductsForPOS(organizationId),
     getCachedTopSellingProducts(organizationId, 20),
     getCachedCategories(organizationId),
     getCachedLocations(organizationId),
+    getCachedActiveSafeBoxes(organizationId),
   ])
 
   return (
@@ -39,6 +41,7 @@ async function NuevaVentaContent() {
       topSellingProducts={topSelling}
       categories={categories}
       allLocations={locations}
+      activeSafeBoxes={activeSafeBoxes}
     />
   )
 }

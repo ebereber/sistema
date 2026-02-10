@@ -25,17 +25,21 @@ import {
 import type { CashRegister } from "@/lib/services/cash-registers";
 import type { Location } from "@/lib/services/locations";
 import type { PointOfSale } from "@/lib/services/point-of-sale";
+import type { SafeBox } from "@/lib/services/safe-boxes-cached";
+import DepositSafesTab from "./ubicaciones/deposit-safes-tab";
 
 interface UbicacionesPageClientProps {
   initialLocations: Location[];
   initialCashRegisters: CashRegister[];
   initialPointsOfSale: PointOfSale[];
+  initialSafeBoxes: SafeBox[];
 }
 
 export function UbicacionesPageClient({
   initialLocations,
   initialCashRegisters,
   initialPointsOfSale,
+  initialSafeBoxes,
 }: UbicacionesPageClientProps) {
   const router = useRouter();
 
@@ -106,18 +110,8 @@ export function UbicacionesPageClient({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <TabsTrigger value="cajas">Cajas</TabsTrigger>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Próximamente</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <TabsTrigger value="cajas">Cajas</TabsTrigger>
+            <TabsTrigger value="cajas-fuertes">Cajas Fuertes</TabsTrigger>
           </TabsList>
         </div>
 
@@ -196,6 +190,15 @@ export function UbicacionesPageClient({
               id: p.id,
               name: p.name,
               number: p.number,
+            }))}
+          />
+        </TabsContent>
+        <TabsContent value="cajas-fuertes">
+          <DepositSafesTab
+            initialSafeBoxes={initialSafeBoxes}
+            locations={initialLocations.map((l) => ({
+              id: l.id,
+              name: l.name,
             }))}
           />
         </TabsContent>

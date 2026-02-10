@@ -1,24 +1,33 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import type { Shift, ShiftSummary } from "@/lib/services/shifts";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CashInDialog } from "./cash-in-dialog";
-import { CashOutDialog } from "./cash-out-dialog";
 import { CloseShiftDialog } from "./close-shift-dialog";
 
 // Types
@@ -37,13 +46,17 @@ interface ShiftActivity {
 interface ActiveShiftDialogProps {
   shift: Shift;
   summary: ShiftSummary;
-  onCashIn: (amount: number, notes?: string) => Promise<void>;
-  onCashOut: (amount: number, notes?: string) => Promise<void>;
+  safeBoxes: Array<{ id: string; name: string }>;
+  onDepositToSafeBox: (
+    safeBoxId: string,
+    amount: number,
+    notes?: string,
+  ) => Promise<void>;
   onCloseShift: (
     countedAmount: number,
     leftInCash: number,
-    discrepancyReason?: string,
     discrepancyNotes?: string,
+    safeBoxDeposit?: { safeBoxId: string; amount: number },
   ) => Promise<void>;
   onChangeCashRegister?: () => void;
   onRefresh?: () => void;
@@ -53,8 +66,8 @@ interface ActiveShiftDialogProps {
 export function ActiveShiftDialog({
   shift,
   summary,
-  onCashIn,
-  onCashOut,
+  safeBoxes,
+  onDepositToSafeBox,
   onCloseShift,
   onChangeCashRegister,
   onRefresh,
@@ -65,9 +78,12 @@ export function ActiveShiftDialog({
   const [activities, setActivities] = useState<ShiftActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
-  // Cash dialogs
-  const [cashInOpen, setCashInOpen] = useState(false);
-  const [cashOutOpen, setCashOutOpen] = useState(false);
+  // Safe box deposit dialog
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [depositSafeBoxId, setDepositSafeBoxId] = useState("");
+  const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [depositNotes, setDepositNotes] = useState("");
+  const [isDepositing, setIsDepositing] = useState(false);
 
   // Load activities when detail is expanded
   const loadActivities = useCallback(async () => {
@@ -154,16 +170,21 @@ export function ActiveShiftDialog({
 
       if (movements) {
         for (const movement of movements) {
+          const isSafeBoxDeposit =
+            movement.type === "cash_out" &&
+            movement.notes?.startsWith("Deposito en caja fuerte:");
+
           activitiesList.push({
             id: movement.id,
             type: movement.type as "cash_in" | "cash_out",
-            description:
-              movement.type === "cash_in"
+            description: isSafeBoxDeposit
+              ? `${movement.notes?.split(" - ")[0]}: ${formatCurrency(Number(movement.amount))}`
+              : movement.type === "cash_in"
                 ? `Ingreso efectivo: ${formatCurrency(Number(movement.amount))}`
                 : `Retiro efectivo: ${formatCurrency(Number(movement.amount))}`,
             time: movement.created_at,
             user: "",
-            notes: movement.notes,
+            notes: isSafeBoxDeposit ? null : movement.notes,
             amount: Number(movement.amount),
           });
         }
@@ -189,29 +210,41 @@ export function ActiveShiftDialog({
   }, [isOpen, showDetail, loadActivities]);
 
   // Handlers
-  const handleCashIn = async (amount: number, notes?: string) => {
-    await onCashIn(amount, notes);
-    onRefresh?.();
-    loadActivities();
+  const handleDepositToSafeBox = async () => {
+    if (!depositSafeBoxId || depositAmount <= 0) return;
+    setIsDepositing(true);
+    try {
+      await onDepositToSafeBox(
+        depositSafeBoxId,
+        depositAmount,
+        depositNotes || undefined,
+      );
+      setDepositDialogOpen(false);
+      resetDepositForm();
+      onRefresh?.();
+      loadActivities();
+    } finally {
+      setIsDepositing(false);
+    }
   };
 
-  const handleCashOut = async (amount: number, notes?: string) => {
-    await onCashOut(amount, notes);
-    onRefresh?.();
-    loadActivities();
+  const resetDepositForm = () => {
+    setDepositSafeBoxId("");
+    setDepositAmount(0);
+    setDepositNotes("");
   };
 
   const handleCloseShift = async (
     countedAmount: number,
     leftInCash: number,
-    discrepancyReason?: string,
     discrepancyNotes?: string,
+    safeBoxDeposit?: { safeBoxId: string; amount: number },
   ) => {
     await onCloseShift(
       countedAmount,
       leftInCash,
-      discrepancyReason,
       discrepancyNotes,
+      safeBoxDeposit,
     );
     setIsOpen(false);
   };
@@ -249,22 +282,17 @@ export function ActiveShiftDialog({
           <ScrollArea className="max-h-[500px] overflow-y-auto py-4">
             <div className="space-y-4">
               {/* Action buttons */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setCashOutOpen(true)}
-                >
-                  Retirar efectivo
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setCashInOpen(true)}
-                >
-                  Agregar efectivo
-                </Button>
-              </div>
+              {safeBoxes.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setDepositDialogOpen(true)}
+                  >
+                    Depositar en caja fuerte
+                  </Button>
+                </div>
+              )}
 
               {/* Collections summary */}
               <div className="rounded-lg border p-4">
@@ -367,26 +395,105 @@ export function ActiveShiftDialog({
                 cashRegisterName: shift.cash_register?.name || "Caja",
                 currentCashAmount: summary.currentCashAmount,
               }}
+              safeBoxes={safeBoxes}
               onCloseShift={handleCloseShift}
             />
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Cash In Dialog */}
-      <CashInDialog
-        open={cashInOpen}
-        onOpenChange={setCashInOpen}
-        onConfirm={handleCashIn}
-      />
+      {/* Deposit to safe box dialog */}
+      <Dialog
+        open={depositDialogOpen}
+        onOpenChange={(open) => {
+          setDepositDialogOpen(open);
+          if (!open) resetDepositForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Depositar en caja fuerte</DialogTitle>
+            <DialogDescription>
+              Transferi efectivo de la caja registradora a una caja fuerte.
+            </DialogDescription>
+          </DialogHeader>
 
-      {/* Cash Out Dialog */}
-      <CashOutDialog
-        open={cashOutOpen}
-        onOpenChange={setCashOutOpen}
-        onConfirm={handleCashOut}
-        maxAmount={summary.currentCashAmount}
-      />
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Caja fuerte *</Label>
+              <Select
+                value={depositSafeBoxId}
+                onValueChange={setDepositSafeBoxId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar caja fuerte" />
+                </SelectTrigger>
+                <SelectContent>
+                  {safeBoxes.map((sb) => (
+                    <SelectItem key={sb.id} value={sb.id}>
+                      {sb.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Monto *</Label>
+              <CurrencyInput
+                value={depositAmount}
+                onValueChange={setDepositAmount}
+                placeholder="0,00"
+                className="w-full"
+                isAllowed={(values) =>
+                  values.floatValue === undefined ||
+                  values.floatValue <= summary.currentCashAmount
+                }
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Disponible en caja:{" "}
+                {formatCurrency(summary.currentCashAmount)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Nota (opcional)</Label>
+              <Textarea
+                placeholder="Motivo del deposito..."
+                maxLength={500}
+                rows={2}
+                value={depositNotes}
+                onChange={(e) => setDepositNotes(e.target.value)}
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDepositDialogOpen(false);
+                resetDepositForm();
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleDepositToSafeBox}
+              disabled={
+                !depositSafeBoxId ||
+                depositAmount <= 0 ||
+                depositAmount > summary.currentCashAmount ||
+                isDepositing
+              }
+            >
+              {isDepositing ? "Depositando..." : "Confirmar deposito"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

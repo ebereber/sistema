@@ -28,6 +28,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
+import { depositFromShiftToSafeBoxAction } from "@/lib/actions/safe-boxes";
 import { useCurrentUser } from "@/lib/auth/user-provider";
 import {
   type CartItem as CartItemType,
@@ -86,6 +87,7 @@ interface CartPanelProps {
   onRemoveReturnItem?: (id: string) => void;
   onCancelExchange?: () => void;
   exchangeTotals?: ExchangeTotals;
+  activeSafeBoxes?: Array<{ id: string; name: string }>;
 }
 
 export function CartPanel({
@@ -111,6 +113,7 @@ export function CartPanel({
   onRemoveReturnItem,
   onCancelExchange,
   exchangeTotals,
+  activeSafeBoxes = [],
 }: CartPanelProps) {
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
@@ -124,8 +127,6 @@ export function CartPanel({
     isLoading: isShiftLoading,
     openNewShift,
     closeCurrentShift,
-    addCash,
-    removeCash,
     refetch: refetchShift,
   } = useActiveShift();
 
@@ -187,9 +188,20 @@ export function CartPanel({
     countedAmount: number,
     leftInCash: number,
     notes?: string,
+    safeBoxDeposit?: { safeBoxId: string; amount: number },
   ) => {
     try {
       await closeCurrentShift(countedAmount, leftInCash, undefined, notes);
+
+      // Deposit to safe box after closing shift if requested
+      if (safeBoxDeposit && shift) {
+        await depositFromShiftToSafeBoxAction({
+          shiftId: shift.id,
+          safeBoxId: safeBoxDeposit.safeBoxId,
+          amount: safeBoxDeposit.amount,
+        });
+      }
+
       toast.success("Turno cerrado");
     } catch (error) {
       console.error("Error closing shift:", error);
@@ -199,23 +211,24 @@ export function CartPanel({
     }
   };
 
-  const handleCashIn = async (amount: number, notes?: string) => {
+  const handleDepositToSafeBox = async (
+    safeBoxId: string,
+    amount: number,
+    notes?: string,
+  ) => {
+    if (!shift) return;
     try {
-      await addCash(amount, notes);
-      toast.success("Efectivo agregado");
+      await depositFromShiftToSafeBoxAction({
+        shiftId: shift.id,
+        safeBoxId,
+        amount,
+        notes,
+      });
+      await refetchShift();
+      toast.success("Deposito en caja fuerte realizado");
     } catch (error) {
-      console.error("Error adding cash:", error);
-      toast.error("Error al agregar efectivo");
-    }
-  };
-
-  const handleCashOut = async (amount: number, notes?: string) => {
-    try {
-      await removeCash(amount, notes);
-      toast.success("Efectivo retirado");
-    } catch (error) {
-      console.error("Error removing cash:", error);
-      toast.error("Error al retirar efectivo");
+      console.error("Error depositing to safe box:", error);
+      toast.error("Error al depositar en caja fuerte");
     }
   };
 
@@ -233,8 +246,8 @@ export function CartPanel({
             <ActiveShiftDialog
               shift={shift}
               summary={summary}
-              onCashIn={handleCashIn}
-              onCashOut={handleCashOut}
+              safeBoxes={activeSafeBoxes}
+              onDepositToSafeBox={handleDepositToSafeBox}
               onCloseShift={handleCloseShift}
               onRefresh={refetchShift}
               trigger={

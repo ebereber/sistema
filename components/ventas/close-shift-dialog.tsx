@@ -32,16 +32,19 @@ type Step = "count" | "discrepancy" | "distribute" | "confirm";
 
 interface CloseShiftDialogProps {
   shift: ActiveShiftData;
+  safeBoxes: Array<{ id: string; name: string }>;
   onCloseShift?: (
     countedAmount: number,
     leftInCash: number,
     notes?: string,
+    safeBoxDeposit?: { safeBoxId: string; amount: number },
   ) => void;
   trigger?: React.ReactNode;
 }
 
 export function CloseShiftDialog({
   shift,
+  safeBoxes,
   onCloseShift,
   trigger,
 }: CloseShiftDialogProps) {
@@ -55,10 +58,26 @@ export function CloseShiftDialog({
   const [discrepancyNotes, setDiscrepancyNotes] = useState("");
   const [leftInCash, setLeftInCash] = useState<number>(0);
 
+  // Safe box deposit
+  const [selectedSafeBoxId, setSelectedSafeBoxId] = useState<string>("none");
+  const [depositToSafeAmount, setDepositToSafeAmount] = useState<number>(0);
+
   // Calculations
   const expectedAmount = shift.currentCashAmount;
   const discrepancy = countedAmount - expectedAmount;
   const hasDiscrepancy = Math.abs(discrepancy) >= 1; // $1 tolerance
+
+  const safeDeposit = selectedSafeBoxId !== "none" ? depositToSafeAmount : 0;
+  const withdrawAmount = countedAmount - leftInCash - safeDeposit;
+  const isDistributionValid =
+    leftInCash + safeDeposit <= countedAmount &&
+    leftInCash >= 0 &&
+    safeDeposit >= 0;
+
+  const selectedSafeBoxName =
+    selectedSafeBoxId !== "none"
+      ? safeBoxes.find((sb) => sb.id === selectedSafeBoxId)?.name
+      : null;
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("es-AR", {
@@ -92,6 +111,8 @@ export function CloseShiftDialog({
 
   const handleCloseAndLeaveAll = () => {
     setLeftInCash(countedAmount);
+    setSelectedSafeBoxId("none");
+    setDepositToSafeAmount(0);
     setCurrentStep("confirm");
   };
 
@@ -99,10 +120,16 @@ export function CloseShiftDialog({
     if (onCloseShift) {
       setIsSubmitting(true);
       try {
+        const safeBoxDeposit =
+          selectedSafeBoxId !== "none" && depositToSafeAmount > 0
+            ? { safeBoxId: selectedSafeBoxId, amount: depositToSafeAmount }
+            : undefined;
+
         await onCloseShift(
           countedAmount,
           leftInCash,
           discrepancyNotes || undefined,
+          safeBoxDeposit,
         );
         setIsOpen(false);
         resetForm();
@@ -118,6 +145,8 @@ export function CloseShiftDialog({
     setDiscrepancyReason("");
     setDiscrepancyNotes("");
     setLeftInCash(0);
+    setSelectedSafeBoxId("none");
+    setDepositToSafeAmount(0);
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -131,6 +160,15 @@ export function CloseShiftDialog({
     setLeftInCash(amount);
   };
 
+  const handleSafeBoxChange = (value: string) => {
+    setSelectedSafeBoxId(value);
+    if (value === "none") {
+      setDepositToSafeAmount(0);
+    }
+  };
+
+  const maxSafeDeposit = countedAmount - leftInCash;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -140,11 +178,11 @@ export function CloseShiftDialog({
         <DialogHeader>
           <DialogTitle>Cerrar turno - {shift.cashRegisterName}</DialogTitle>
           <DialogDescription>
-            {currentStep === "count" && "Contá el efectivo en caja."}
+            {currentStep === "count" && "Conta el efectivo en caja."}
             {currentStep === "discrepancy" &&
-              "Indicá el motivo de la diferencia."}
-            {currentStep === "distribute" && "Distribuí el efectivo."}
-            {currentStep === "confirm" && "Confirmá el cierre del turno."}
+              "Indica el motivo de la diferencia."}
+            {currentStep === "distribute" && "Distribui el efectivo."}
+            {currentStep === "confirm" && "Confirma el cierre del turno."}
           </DialogDescription>
         </DialogHeader>
 
@@ -239,7 +277,7 @@ export function CloseShiftDialog({
                 <Label htmlFor="discrepancyNotes">Nota (opcional)</Label>
                 <Textarea
                   id="discrepancyNotes"
-                  placeholder="Agregá detalles sobre la diferencia…"
+                  placeholder="Agrega detalles sobre la diferencia..."
                   maxLength={500}
                   rows={2}
                   value={discrepancyNotes}
@@ -253,6 +291,42 @@ export function CloseShiftDialog({
           {/* Step 3: Distribute cash */}
           {currentStep === "distribute" && (
             <div className="space-y-6">
+              {/* Safe box deposit */}
+              {safeBoxes.length > 0 && (
+                <div className="space-y-2 flex flex-col">
+                  <Label>Guardar en caja fuerte</Label>
+                  <div className="flex gap-4">
+                    <Select
+                      value={selectedSafeBoxId}
+                      onValueChange={handleSafeBoxChange}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Sin deposito" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin deposito</SelectItem>
+                        {safeBoxes.map((sb) => (
+                          <SelectItem key={sb.id} value={sb.id}>
+                            {sb.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedSafeBoxId !== "none" && (
+                      <CurrencyInput
+                        value={depositToSafeAmount}
+                        onValueChange={setDepositToSafeAmount}
+                        placeholder="0,00"
+                        className=" w-full"
+                        isAllowed={(values) =>
+                          values.floatValue === undefined ||
+                          values.floatValue <= countedAmount
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Dejar en caja</Label>
                 <div className="flex flex-wrap gap-2">
@@ -292,6 +366,22 @@ export function CloseShiftDialog({
                   >
                     $10.000
                   </Button>
+                  {selectedSafeBoxId !== "none" &&
+                    depositToSafeAmount > 0 &&
+                    countedAmount - depositToSafeAmount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        className="border-dashed border-green-400 text-green-400"
+                        onClick={() =>
+                          setQuickAmount(countedAmount - depositToSafeAmount)
+                        }
+                      >
+                        Dejar resto (
+                        {formatCurrency(countedAmount - depositToSafeAmount)})
+                      </Button>
+                    )}
                 </div>
                 <CurrencyInput
                   value={leftInCash}
@@ -305,31 +395,42 @@ export function CloseShiftDialog({
                 />
               </div>
 
-              <div
-                className={cn(
-                  "rounded-lg border p-3",
-                  leftInCash <= countedAmount
-                    ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
-                    : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950",
-                )}
-              >
+              <div className="rounded-lg border p-3">
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Efectivo contado</span>
-                    <span className="font-medium">
-                      {formatCurrency(countedAmount)}
-                    </span>
-                  </div>
                   <div className="flex justify-between">
                     <span>Queda en caja</span>
                     <span className="font-medium">
                       {formatCurrency(leftInCash)}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t pt-1">
+                  {selectedSafeBoxId !== "none" && depositToSafeAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span>Caja fuerte ({selectedSafeBoxName})</span>
+                      <span className="font-medium">
+                        {formatCurrency(depositToSafeAmount)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
                     <span>Se retira</span>
                     <span className="font-medium">
-                      {formatCurrency(countedAmount - leftInCash)}
+                      {formatCurrency(Math.max(0, withdrawAmount))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t pt-1 font-medium">
+                    <span>Total asignado</span>
+                    <span
+                      className={cn(
+                        isDistributionValid
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-red-600 dark:text-red-400",
+                      )}
+                    >
+                      {formatCurrency(
+                        leftInCash +
+                          depositToSafeAmount +
+                          Math.max(0, withdrawAmount),
+                      )}
                     </span>
                   </div>
                 </div>
@@ -371,15 +472,23 @@ export function CloseShiftDialog({
               </div>
 
               <div className="rounded-lg border p-4">
-                <h4 className="mb-3 font-medium">Distribución</h4>
+                <h4 className="mb-3 font-medium">Distribucion</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Queda en caja</span>
                     <span>{formatCurrency(leftInCash)}</span>
                   </div>
+                  {selectedSafeBoxId !== "none" && depositToSafeAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Deposito en caja fuerte ({selectedSafeBoxName})
+                      </span>
+                      <span>{formatCurrency(depositToSafeAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Se retira</span>
-                    <span>{formatCurrency(countedAmount - leftInCash)}</span>
+                    <span>{formatCurrency(Math.max(0, withdrawAmount))}</span>
                   </div>
                 </div>
               </div>
@@ -407,7 +516,7 @@ export function CloseShiftDialog({
           ) : currentStep === "confirm" ? (
             <>
               <Button variant="outline" onClick={handleBack}>
-                Atrás
+                Atras
               </Button>
               <Button
                 variant="destructive"
@@ -420,13 +529,11 @@ export function CloseShiftDialog({
           ) : (
             <>
               <Button variant="outline" onClick={handleBack}>
-                Atrás
+                Atras
               </Button>
               <Button
                 onClick={handleContinue}
-                disabled={
-                  currentStep === "distribute" && leftInCash > countedAmount
-                }
+                disabled={currentStep === "distribute" && !isDistributionValid}
               >
                 Continuar
               </Button>

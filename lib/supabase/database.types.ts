@@ -1740,6 +1740,104 @@ export type Database = {
           },
         ]
       }
+      safe_box_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          performed_by: string
+          safe_box_id: string
+          source_id: string | null
+          source_type: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          performed_by: string
+          safe_box_id: string
+          source_id?: string | null
+          source_type?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          performed_by?: string
+          safe_box_id?: string
+          source_id?: string | null
+          source_type?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safe_box_movements_safe_box_id_fkey"
+            columns: ["safe_box_id"]
+            isOneToOne: false
+            referencedRelation: "safe_boxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safe_boxes: {
+        Row: {
+          balance_date: string
+          created_at: string
+          currency: string
+          id: string
+          initial_balance: number
+          location_id: string | null
+          name: string
+          organization_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          balance_date?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          initial_balance?: number
+          location_id?: string | null
+          name: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          balance_date?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          initial_balance?: number
+          location_id?: string | null
+          name?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safe_boxes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safe_boxes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_items: {
         Row: {
           created_at: string

@@ -7,6 +7,7 @@ import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedLocations, getCachedCashRegisters } from "@/lib/services/locations-cached"
 import { getCachedPointsOfSale } from "@/lib/services/point-of-sale-cached"
+import { getCachedSafeBoxes } from "@/lib/services/safe-boxes-cached"
 import { UbicacionesPageClient } from "@/components/configuracion/ubicaciones-page-client"
 
 export default async function UbicacionesPage() {
@@ -22,10 +23,11 @@ async function UbicacionesContent() {
   if (!user) redirect("/login")
   const organizationId = await getOrganizationId()
 
-  const [locations, cashRegisters, pointsOfSale] = await Promise.all([
+  const [locations, cashRegisters, pointsOfSale, safeBoxes] = await Promise.all([
     getCachedLocations(organizationId),
     getCachedCashRegisters(organizationId),
     getCachedPointsOfSale(organizationId),
+    getCachedSafeBoxes(organizationId),
   ])
 
   return (
@@ -33,6 +35,7 @@ async function UbicacionesContent() {
       initialLocations={locations}
       initialCashRegisters={cashRegisters}
       initialPointsOfSale={pointsOfSale}
+      initialSafeBoxes={safeBoxes}
     />
   )
 }

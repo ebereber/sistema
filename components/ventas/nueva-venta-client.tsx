@@ -46,6 +46,7 @@ interface NuevaVentaClientProps {
   topSellingProducts: ProductForSale[]
   categories: Category[]
   allLocations: Location[]
+  activeSafeBoxes: Array<{ id: string; name: string }>
 }
 
 export function NuevaVentaClient({
@@ -53,6 +54,7 @@ export function NuevaVentaClient({
   topSellingProducts,
   categories,
   allLocations,
+  activeSafeBoxes,
 }: NuevaVentaClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -521,6 +523,7 @@ export function NuevaVentaClient({
           onRemoveReturnItem={handleRemoveReturnItem}
           onCancelExchange={handleCancelExchange}
           exchangeTotals={exchangeTotals}
+          activeSafeBoxes={activeSafeBoxes}
         />
       </div>
 
@@ -567,6 +570,7 @@ export function NuevaVentaClient({
                   onRemoveReturnItem={handleRemoveReturnItem}
                   onCancelExchange={handleCancelExchange}
                   exchangeTotals={exchangeTotals}
+                  activeSafeBoxes={activeSafeBoxes}
                 />
               </div>
             </DrawerContent>
