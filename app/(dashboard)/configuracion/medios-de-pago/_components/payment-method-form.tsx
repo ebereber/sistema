@@ -36,9 +36,16 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+export interface BankAccountOption {
+  id: string;
+  bank_name: string;
+  account_name: string;
+}
+
 interface PaymentMethodFormProps {
   type: PaymentMethodType;
   paymentMethod?: PaymentMethod;
+  bankAccounts?: BankAccountOption[];
   onSuccess: () => void;
   onCancel: () => void;
   onClick: () => void;
@@ -47,6 +54,7 @@ interface PaymentMethodFormProps {
 export function PaymentMethodForm({
   type,
   paymentMethod,
+  bankAccounts = [],
   onSuccess,
   onCancel,
   onClick,
@@ -60,6 +68,7 @@ export function PaymentMethodForm({
           // Modo edición: usar datos existentes
           name: paymentMethod.name,
           type: paymentMethod.type,
+          bank_account_id: paymentMethod.bank_account_id ?? null,
           availability: paymentMethod.availability,
           fee_percentage: paymentMethod.fee_percentage,
           fee_fixed: paymentMethod.fee_fixed,
@@ -70,6 +79,7 @@ export function PaymentMethodForm({
           // Modo crear: valores por defecto
           name: "",
           type: type,
+          bank_account_id: null,
           availability: "VENTAS_Y_COMPRAS",
           fee_percentage: 0,
           fee_fixed: 0,
@@ -83,6 +93,8 @@ export function PaymentMethodForm({
     try {
       const icon = PAYMENT_TYPE_CONFIG[data.type].icon;
 
+      const bankAccountId = data.type === "TRANSFERENCIA" ? (data.bank_account_id || null) : null;
+
       if (paymentMethod) {
         // EDITAR
         await updatePaymentMethodAction(paymentMethod.id, {
@@ -92,6 +104,7 @@ export function PaymentMethodForm({
           fee_fixed: data.fee_fixed ?? 0,
           requires_reference: data.requires_reference ?? false,
           is_active: data.is_active ?? true,
+          bank_account_id: bankAccountId,
         });
         toast.success("Medio de pago actualizado");
       } else {
@@ -106,6 +119,7 @@ export function PaymentMethodForm({
           requires_reference: data.requires_reference ?? false,
           is_active: data.is_active ?? true,
           is_system: false,
+          bank_account_id: bankAccountId,
         });
         toast.success("Medio de pago creado");
       }
@@ -169,6 +183,41 @@ export function PaymentMethodForm({
             </FormItem>
           )}
         />
+
+        {/* Cuenta bancaria (solo para TRANSFERENCIA) */}
+        {type === "TRANSFERENCIA" && bankAccounts.length > 0 && (
+          <FormField
+            control={form.control}
+            name="bank_account_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cuenta bancaria destino</FormLabel>
+                <Select
+                  value={field.value ?? "none"}
+                  onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleccionar cuenta" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Sin vincular</SelectItem>
+                    {bankAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.bank_name} - {acc.account_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription className="text-xs">
+                  Las transferencias recibidas se reflejarán en tesorería
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Disponibilidad */}
         <FormField

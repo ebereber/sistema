@@ -97,6 +97,7 @@ export interface PaymentMethod {
   amount: number;
   reference?: string;
   cash_register_id?: string;
+  bank_account_id?: string | null;
 }
 
 export interface GetCustomerPaymentsParams {

@@ -158,6 +158,7 @@ export function useCheckout({
             shortcut: (index + 1).toString(),
             type: m.type,
             requires_reference: m.requires_reference,
+            bank_account_id: m.bank_account_id ?? null,
           };
         });
 
@@ -557,6 +558,7 @@ export function useCheckout({
                 method_name: p.methodName,
                 amount: p.amount,
                 reference: p.reference || null,
+                bank_account_id: paymentMethods.find((m) => m.id === p.methodId)?.bank_account_id ?? null,
               }))
             : selectedPaymentMethod
               ? [
@@ -570,6 +572,7 @@ export function useCheckout({
                       exchangeTotals.balance - totalSelectedCreditNotes,
                     ),
                     reference: buildPaymentReference(),
+                    bank_account_id: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.bank_account_id ?? null,
                   },
                 ]
               : [];
@@ -623,6 +626,7 @@ export function useCheckout({
               method_name: p.methodName,
               amount: p.amount,
               reference: p.reference || null,
+              bank_account_id: paymentMethods.find((m) => m.id === p.methodId)?.bank_account_id ?? null,
             }))
           : selectedPaymentMethod && amountAfterCreditNotes > 0 && !isPending
             ? [
@@ -633,6 +637,7 @@ export function useCheckout({
                       ?.name || "",
                   amount: amountAfterCreditNotes,
                   reference: buildPaymentReference(),
+                  bank_account_id: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.bank_account_id ?? null,
                 },
               ]
             : [];

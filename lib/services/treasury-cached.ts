@@ -135,6 +135,15 @@ async function fetchBankAccountsWithBalances(
 
   if (mvError) throw mvError;
 
+  // Fetch cobros (customer_payment_methods linked to bank accounts)
+  const { data: cobros, error: cobrosError } = await supabaseAdmin
+    .from("customer_payment_methods")
+    .select("bank_account_id, amount, customer_payment:customer_payments(status)")
+    .in("bank_account_id", accountIds)
+    .not("bank_account_id", "is", null);
+
+  if (cobrosError) throw cobrosError;
+
   const balances: Record<string, number> = {};
   for (const acc of accounts) {
     balances[acc.id] = acc.initial_balance;
@@ -144,6 +153,14 @@ async function fetchBankAccountsWithBalances(
       balances[m.bank_account_id] += m.amount;
     } else {
       balances[m.bank_account_id] -= m.amount;
+    }
+  }
+  // Add cobros to balances (only completed payments)
+  for (const c of cobros || []) {
+    if (!c.bank_account_id) continue;
+    const payment = c.customer_payment as unknown as { status: string } | null;
+    if (payment?.status !== "cancelled") {
+      balances[c.bank_account_id] = (balances[c.bank_account_id] ?? 0) + c.amount;
     }
   }
 
@@ -186,12 +203,60 @@ async function fetchBankAccountDetail(
     }
   }
 
+  // Also fetch customer_payment_methods linked to this bank account
+  const { data: cobros, error: cobrosError } = await supabaseAdmin
+    .from("customer_payment_methods")
+    .select("id, amount, method_name, reference, created_at, customer_payment:customer_payments(payment_number, payment_date, status)")
+    .eq("bank_account_id", accountId);
+
+  if (cobrosError) throw cobrosError;
+
+  // Add cobros to balance (only completed payments)
+  for (const c of cobros || []) {
+    const payment = c.customer_payment as unknown as { payment_number: string; payment_date: string; status: string } | null;
+    if (payment?.status !== "cancelled") {
+      balance += c.amount;
+    }
+  }
+
   const typeLabels: Record<string, string> = {
     deposit: "Depósito",
     withdrawal: "Retiro",
     transfer_in: "Transferencia entrante",
     transfer_out: "Transferencia saliente",
   };
+
+  const bankMovements: TreasuryMovement[] = (movements || []).map((m) => ({
+    id: m.id,
+    date: formatDate(m.movement_date),
+    type: typeLabels[m.type] || m.type,
+    reference: m.reference,
+    description: m.description,
+    amount: m.amount,
+    isPositive: m.type === "deposit" || m.type === "transfer_in",
+  }));
+
+  // Add cobros as deposit movements
+  const cobroMovements: TreasuryMovement[] = (cobros || [])
+    .filter((c) => {
+      const payment = c.customer_payment as unknown as { status: string } | null;
+      return payment?.status !== "cancelled";
+    })
+    .map((c) => {
+      const payment = c.customer_payment as unknown as { payment_number: string; payment_date: string } | null;
+      return {
+        id: c.id,
+        date: formatDate(payment?.payment_date || c.created_at),
+        type: "Cobro por transferencia",
+        reference: payment?.payment_number || c.reference,
+        description: c.method_name,
+        amount: c.amount,
+        isPositive: true,
+      };
+    });
+
+  // Merge and sort by date descending
+  const allMovements = [...bankMovements, ...cobroMovements];
 
   return {
     id: account.id,
@@ -200,15 +265,7 @@ async function fetchBankAccountDetail(
     balance,
     currency: account.currency,
     accountType: "bank",
-    movements: (movements || []).map((m) => ({
-      id: m.id,
-      date: formatDate(m.movement_date),
-      type: typeLabels[m.type] || m.type,
-      reference: m.reference,
-      description: m.description,
-      amount: m.amount,
-      isPositive: m.type === "deposit" || m.type === "transfer_in",
-    })),
+    movements: allMovements,
   };
 }
 
@@ -434,13 +491,14 @@ export async function getCachedAllTreasuryMovements(
   cacheTag("treasury");
   cacheLife("minutes");
 
-  const [bankMovements, safeMovements, cashMovements] = await Promise.all([
+  const [bankMovements, safeMovements, cashMovements, cobroMovements] = await Promise.all([
     fetchAllBankMovements(organizationId),
     fetchAllSafeBoxMovements(organizationId),
     fetchAllCashRegisterMovements(organizationId),
+    fetchAllPaymentMethodCobros(organizationId),
   ]);
 
-  const all = [...bankMovements, ...safeMovements, ...cashMovements];
+  const all = [...bankMovements, ...safeMovements, ...cashMovements, ...cobroMovements];
 
   // Sort by date descending
   all.sort(
@@ -619,6 +677,58 @@ async function fetchAllCashRegisterMovements(
       editable: false,
     };
   });
+}
+
+// ── Payment method cobros (customer_payment_methods with bank_account_id) ──
+
+async function fetchAllPaymentMethodCobros(
+  organizationId: string,
+): Promise<UnifiedTreasuryMovement[]> {
+  // Get bank accounts for this org to map names
+  const { data: accounts, error: accErr } = await supabaseAdmin
+    .from("bank_accounts")
+    .select("id, account_name")
+    .eq("organization_id", organizationId);
+
+  if (accErr) throw accErr;
+  if (!accounts || accounts.length === 0) return [];
+
+  const accountMap = new Map(accounts.map((a) => [a.id, a.account_name]));
+  const accountIds = accounts.map((a) => a.id);
+
+  const { data: cobros, error: cobrosErr } = await supabaseAdmin
+    .from("customer_payment_methods")
+    .select("id, bank_account_id, amount, method_name, reference, created_at, customer_payment:customer_payments(payment_number, payment_date, status)")
+    .in("bank_account_id", accountIds)
+    .not("bank_account_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (cobrosErr) throw cobrosErr;
+
+  return (cobros || [])
+    .filter((c) => {
+      const payment = c.customer_payment as unknown as { status: string } | null;
+      return payment?.status !== "cancelled";
+    })
+    .map((c) => {
+      const payment = c.customer_payment as unknown as { payment_number: string; payment_date: string } | null;
+      const dateStr = payment?.payment_date || c.created_at;
+      return {
+        id: c.id,
+        date: formatDate(dateStr),
+        dateRaw: dateStr,
+        account: accountMap.get(c.bank_account_id!) || "Cuenta desconocida",
+        accountType: "bank_account" as const,
+        accountId: c.bank_account_id!,
+        type: "Cobro por transferencia",
+        reference: payment?.payment_number || c.reference,
+        description: c.method_name,
+        amount: c.amount,
+        isPositive: true,
+        editable: false,
+      };
+    });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────

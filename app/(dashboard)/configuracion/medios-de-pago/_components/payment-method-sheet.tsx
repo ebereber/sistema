@@ -18,7 +18,7 @@ import {
   DollarSign,
   FileCheck,
 } from "lucide-react";
-import { PaymentMethodForm } from "./payment-method-form";
+import { PaymentMethodForm, type BankAccountOption } from "./payment-method-form";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Banknote,
@@ -34,6 +34,7 @@ interface PaymentMethodSheetProps {
   currentStep: "type-selector" | "form";
   selectedType: PaymentMethodType | null;
   paymentMethod?: PaymentMethod;
+  bankAccounts?: BankAccountOption[];
   onTypeSelect: (type: PaymentMethodType) => void;
   onBack: () => void;
   onSuccess: () => void;
@@ -45,6 +46,7 @@ export function PaymentMethodSheet({
   currentStep,
   selectedType,
   paymentMethod,
+  bankAccounts,
   onTypeSelect,
   onBack,
   onSuccess,
@@ -103,6 +105,7 @@ export function PaymentMethodSheet({
               onClick={onBack}
               type={selectedType || paymentMethod!.type}
               paymentMethod={paymentMethod}
+              bankAccounts={bankAccounts}
               onSuccess={() => {
                 onSuccess();
                 onOpenChange(false);

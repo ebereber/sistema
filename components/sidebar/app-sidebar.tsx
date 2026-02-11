@@ -123,12 +123,12 @@ const NAV_ITEMS = [
     title: "Tesorería",
     url: "/tesoreria",
     icon: PanelLeft,
-    permission: "treasury:read",
+    permission: "settings:write",
     items: [
       {
         title: "Movimientos",
         url: "/movimientos",
-        permission: "treasury:read",
+        permission: "settings:write",
       },
     ],
   },

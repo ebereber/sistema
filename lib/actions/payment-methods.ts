@@ -36,6 +36,7 @@ export async function createPaymentMethodAction(data: {
   requires_reference?: boolean
   is_active?: boolean
   is_system?: boolean
+  bank_account_id?: string | null
 }) {
   const organizationId = await getOrganizationId()
 
@@ -65,6 +66,7 @@ export async function updatePaymentMethodAction(
     fee_fixed?: number
     requires_reference?: boolean
     is_active?: boolean
+    bank_account_id?: string | null
   }
 ) {
   const { data: pm, error } = await supabaseAdmin

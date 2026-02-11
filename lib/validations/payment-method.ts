@@ -22,6 +22,8 @@ export const paymentMethodSchema = z.object({
 
   type: z.enum(PAYMENT_METHOD_TYPES),
 
+  bank_account_id: z.string().uuid().nullable().optional(),
+
   availability: z.enum(PAYMENT_METHOD_AVAILABILITY).optional().default("VENTAS_Y_COMPRAS"),
 
   fee_percentage: z

@@ -68,6 +68,7 @@ export async function createCustomerPaymentAction(
     amount: m.amount,
     reference: m.reference || null,
     cash_register_id: m.cash_register_id || null,
+    bank_account_id: m.bank_account_id ?? null,
   }));
 
   const { error: methodsError } = await supabaseAdmin

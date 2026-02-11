@@ -446,6 +446,7 @@ export type Database = {
       customer_payment_methods: {
         Row: {
           amount: number
+          bank_account_id: string | null
           cash_register_id: string | null
           created_at: string
           customer_payment_id: string
@@ -456,6 +457,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          bank_account_id?: string | null
           cash_register_id?: string | null
           created_at?: string
           customer_payment_id: string
@@ -466,6 +468,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bank_account_id?: string | null
           cash_register_id?: string | null
           created_at?: string
           customer_payment_id?: string
@@ -475,6 +478,13 @@ export type Database = {
           reference?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "customer_payment_methods_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "customer_payment_methods_cash_register_id_fkey"
             columns: ["cash_register_id"]
@@ -1009,6 +1019,7 @@ export type Database = {
       payment_methods: {
         Row: {
           availability: string
+          bank_account_id: string | null
           created_at: string
           fee_fixed: number
           fee_percentage: number
@@ -1024,6 +1035,7 @@ export type Database = {
         }
         Insert: {
           availability?: string
+          bank_account_id?: string | null
           created_at?: string
           fee_fixed?: number
           fee_percentage?: number
@@ -1039,6 +1051,7 @@ export type Database = {
         }
         Update: {
           availability?: string
+          bank_account_id?: string | null
           created_at?: string
           fee_fixed?: number
           fee_percentage?: number
@@ -1053,6 +1066,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_methods_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_methods_organization_id_fkey"
             columns: ["organization_id"]

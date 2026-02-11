@@ -290,6 +290,7 @@ export interface PaymentInsert {
   method_name: string;
   amount: number;
   reference: string | null;
+  bank_account_id?: string | null;
 }
 
 /**
@@ -399,6 +400,7 @@ export async function createSale(
         amount: p.amount,
         reference: p.reference,
         cash_register_id: null,
+        bank_account_id: p.bank_account_id ?? null,
       }));
 
       const { error: rcbMethodsError } = await supabase

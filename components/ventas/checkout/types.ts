@@ -113,6 +113,7 @@ export interface PaymentMethod {
   shortcut: string;
   type: string;
   requires_reference: boolean;
+  bank_account_id: string | null;
 }
 
 export interface CheckoutDialogProps {

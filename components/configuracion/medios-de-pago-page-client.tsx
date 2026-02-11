@@ -11,10 +11,12 @@ import { PaymentMethodsTable } from "@/app/(dashboard)/configuracion/medios-de-p
 
 interface MediosDePagoPageClientProps {
   initialPaymentMethods: PaymentMethod[]
+  bankAccounts: Array<{ id: string; bank_name: string; account_name: string }>
 }
 
 export function MediosDePagoPageClient({
   initialPaymentMethods,
+  bankAccounts,
 }: MediosDePagoPageClientProps) {
   const router = useRouter()
   const [search, setSearch] = useState("")
@@ -103,6 +105,7 @@ export function MediosDePagoPageClient({
         onOpenChange={handleCloseSheet}
         currentStep={currentStep}
         paymentMethod={editingMethod ?? undefined}
+        bankAccounts={bankAccounts}
         selectedType={selectedType}
         onTypeSelect={handleTypeSelect}
         onBack={handleBack}

@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedPaymentMethods } from "@/lib/services/payment-methods-cached"
+import { getCachedActiveBankAccounts } from "@/lib/services/bank-accounts-cached"
 import { MediosDePagoPageClient } from "@/components/configuracion/medios-de-pago-page-client"
 
 export default async function MediosDePagoPage() {
@@ -21,9 +22,12 @@ async function MediosDePagoContent() {
   if (!user) redirect("/login")
   const organizationId = await getOrganizationId()
 
-  const paymentMethods = await getCachedPaymentMethods(organizationId)
+  const [paymentMethods, bankAccounts] = await Promise.all([
+    getCachedPaymentMethods(organizationId),
+    getCachedActiveBankAccounts(organizationId),
+  ])
 
-  return <MediosDePagoPageClient initialPaymentMethods={paymentMethods} />
+  return <MediosDePagoPageClient initialPaymentMethods={paymentMethods} bankAccounts={bankAccounts} />
 }
 
 function PageSkeleton() {
