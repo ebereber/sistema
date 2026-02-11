@@ -120,11 +120,25 @@ const NAV_ITEMS = [
     permission: "suppliers:read",
   },
   {
+    title: "Tesorería",
+    url: "/tesoreria",
+    icon: PanelLeft,
+    permission: "treasury:read",
+    items: [
+      {
+        title: "Movimientos",
+        url: "/movimientos",
+        permission: "treasury:read",
+      },
+    ],
+  },
+  {
     title: "Reportes",
     url: "/reportes",
     icon: ChartNoAxesColumnDecreasing,
     permission: "settings:write",
   },
+
   {
     title: "Importar",
     url: "/importar",
