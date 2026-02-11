@@ -559,6 +559,7 @@ export function useCheckout({
                 amount: p.amount,
                 reference: p.reference || null,
                 bank_account_id: paymentMethods.find((m) => m.id === p.methodId)?.bank_account_id ?? null,
+                type: paymentMethods.find((m) => m.id === p.methodId)?.type ?? null,
               }))
             : selectedPaymentMethod
               ? [
@@ -573,6 +574,7 @@ export function useCheckout({
                     ),
                     reference: buildPaymentReference(),
                     bank_account_id: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.bank_account_id ?? null,
+                    type: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.type ?? null,
                   },
                 ]
               : [];
@@ -599,6 +601,7 @@ export function useCheckout({
           note: note || undefined,
           globalDiscount,
           shiftId: shift?.id ?? null,
+          shiftCashRegisterId: shift?.cash_register?.id ?? null,
         });
 
         setExchangeResult(result);
@@ -627,6 +630,7 @@ export function useCheckout({
               amount: p.amount,
               reference: p.reference || null,
               bank_account_id: paymentMethods.find((m) => m.id === p.methodId)?.bank_account_id ?? null,
+              type: paymentMethods.find((m) => m.id === p.methodId)?.type ?? null,
             }))
           : selectedPaymentMethod && amountAfterCreditNotes > 0 && !isPending
             ? [
@@ -638,6 +642,7 @@ export function useCheckout({
                   amount: amountAfterCreditNotes,
                   reference: buildPaymentReference(),
                   bank_account_id: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.bank_account_id ?? null,
+                  type: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.type ?? null,
                 },
               ]
             : [];
@@ -675,7 +680,7 @@ export function useCheckout({
         total: calculateItemTotal(item),
       }));
 
-      const sale = await createSale(saleData, items, payments, location.id);
+      const sale = await createSale(saleData, items, payments, location.id, shift?.cash_register?.id ?? null);
 
       if (totalSelectedCreditNotes > 0 && selectedCreditNotes.size > 0) {
         for (const [creditNoteId, amount] of selectedCreditNotes.entries()) {

@@ -102,9 +102,11 @@ export async function createSupplierPaymentAction(
   if (paymentMethods.length > 0) {
     const methodsData = paymentMethods.map((m) => ({
       payment_id: payment.id,
+      payment_method_id: m.payment_method_id,
       method_name: m.method_name,
       reference: m.reference,
       cash_register_id: m.cash_register_id,
+      bank_account_id: m.bank_account_id ?? null,
       amount: m.amount,
     }));
 
@@ -136,6 +138,7 @@ export async function createSupplierPaymentAction(
 
   revalidateTag("supplier-payments", "minutes");
   revalidateTag("purchases", "minutes");
+  revalidateTag("treasury", "minutes");
 
   return payment as unknown as SupplierPayment;
 }
@@ -236,6 +239,7 @@ export async function cancelSupplierPaymentAction(
 
   revalidateTag("supplier-payments", "minutes");
   revalidateTag("purchases", "minutes");
+  revalidateTag("treasury", "minutes");
 }
 
 // ---------------------------------------------------------------------------

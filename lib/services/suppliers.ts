@@ -18,10 +18,12 @@ export async function getSuppliers(
   filters?: SupplierFilters,
 ): Promise<Supplier[]> {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   let query = supabase
     .from("suppliers")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("name", { ascending: true });
 
   if (filters?.search && filters.search.trim()) {

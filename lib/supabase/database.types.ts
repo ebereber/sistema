@@ -124,6 +124,7 @@ export type Database = {
           id: string
           notes: string | null
           performed_by: string
+          reference: string | null
           shift_id: string
           type: string
         }
@@ -133,6 +134,7 @@ export type Database = {
           id?: string
           notes?: string | null
           performed_by: string
+          reference?: string | null
           shift_id: string
           type: string
         }
@@ -142,6 +144,7 @@ export type Database = {
           id?: string
           notes?: string | null
           performed_by?: string
+          reference?: string | null
           shift_id?: string
           type?: string
         }
@@ -1870,6 +1873,7 @@ export type Database = {
           id: string
           notes: string | null
           performed_by: string
+          reference: string | null
           safe_box_id: string
           source_id: string | null
           source_type: string | null
@@ -1881,6 +1885,7 @@ export type Database = {
           id?: string
           notes?: string | null
           performed_by: string
+          reference?: string | null
           safe_box_id: string
           source_id?: string | null
           source_type?: string | null
@@ -1892,6 +1897,7 @@ export type Database = {
           id?: string
           notes?: string | null
           performed_by?: string
+          reference?: string | null
           safe_box_id?: string
           source_id?: string | null
           source_type?: string | null
@@ -2327,32 +2333,45 @@ export type Database = {
       supplier_payment_methods: {
         Row: {
           amount: number
+          bank_account_id: string | null
           cash_register_id: string | null
           created_at: string | null
           id: string
           method_name: string
           payment_id: string
+          payment_method_id: string | null
           reference: string | null
         }
         Insert: {
           amount: number
+          bank_account_id?: string | null
           cash_register_id?: string | null
           created_at?: string | null
           id?: string
           method_name: string
           payment_id: string
+          payment_method_id?: string | null
           reference?: string | null
         }
         Update: {
           amount?: number
+          bank_account_id?: string | null
           cash_register_id?: string | null
           created_at?: string | null
           id?: string
           method_name?: string
           payment_id?: string
+          payment_method_id?: string | null
           reference?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "supplier_payment_methods_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "supplier_payment_methods_cash_register_id_fkey"
             columns: ["cash_register_id"]
@@ -2365,6 +2384,13 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "supplier_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payment_methods_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
             referencedColumns: ["id"]
           },
         ]

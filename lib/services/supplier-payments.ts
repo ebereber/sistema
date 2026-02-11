@@ -44,9 +44,11 @@ export interface CreatePaymentAllocation {
 }
 
 export interface CreatePaymentMethod {
+  payment_method_id: string | null;
   method_name: string;
   reference?: string | null;
   cash_register_id?: string | null;
+  bank_account_id?: string | null;
   amount: number;
 }
 
@@ -164,12 +166,14 @@ export async function getSupplierPaymentById(
 // Get pending purchases for a supplier
 export async function getPendingPurchases(supplierId: string) {
   const supabase = createClient();
+  const organizationId = await getClientOrganizationId();
 
   const { data, error } = await supabase
     .from("purchases")
     .select(
       "id, voucher_number, purchase_number, total, amount_paid, invoice_date, payment_status",
     )
+    .eq("organization_id", organizationId)
     .eq("supplier_id", supplierId)
     .neq("payment_status", "paid")
     .eq("status", "completed")

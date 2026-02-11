@@ -9,7 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { TreasuryAccountDetail } from "@/lib/services/treasury-cached";
+import type {
+  TreasuryAccountDetail,
+  TreasuryMovement,
+} from "@/lib/services/treasury-cached";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -17,21 +20,51 @@ interface TesoreriaDetailClientProps {
   account: TreasuryAccountDetail;
 }
 
-export function TesoreriaDetailClient({
-  account,
-}: TesoreriaDetailClientProps) {
+function ReferenceLink({
+  reference,
+  sourceId,
+  sourceType,
+}: {
+  reference: string | null;
+  sourceId?: string | null;
+  sourceType?: string | null;
+}) {
+  if (!reference) return <span className="text-muted-foreground">-</span>;
+
+  if (sourceType === "customer_payment" && sourceId) {
+    return (
+      <Link
+        href={`/cobranzas/${sourceId}`}
+        className="font-mono text-sm underline-offset-4 hover:underline"
+      >
+        {reference}
+      </Link>
+    );
+  }
+
+  if (sourceType === "supplier_payment" && sourceId) {
+    return (
+      <Link
+        href={`/pagos/${sourceId}`}
+        className="font-mono text-sm underline-offset-4 hover:underline"
+      >
+        {reference}
+      </Link>
+    );
+  }
+
+  return (
+    <span className="font-mono text-sm text-muted-foreground">{reference}</span>
+  );
+}
+
+export function TesoreriaDetailClient({ account }: TesoreriaDetailClientProps) {
   const currencySymbol = account.currency === "USD" ? "US$" : "$";
 
   const subtitleByType: Record<string, string> = {
     bank: "Cuenta bancaria",
     cash: "Caja de efectivo",
     safe: "Caja fuerte",
-  };
-
-  const movementsLabel: Record<string, string> = {
-    bank: "Mostrando movimientos de la cuenta bancaria",
-    cash: "Mostrando turnos de caja cerrados",
-    safe: "Mostrando movimientos de la caja fuerte",
   };
 
   return (
@@ -72,7 +105,7 @@ export function TesoreriaDetailClient({
       {/* Tabla de movimientos */}
       <div>
         <p className="pb-2 text-sm text-muted-foreground">
-          {movementsLabel[account.accountType]}
+          Mostrando movimientos recientes
         </p>
 
         {account.movements.length === 0 ? (
@@ -94,7 +127,7 @@ export function TesoreriaDetailClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {account.movements.map((movement) => (
+                {account.movements.map((movement: TreasuryMovement) => (
                   <TableRow key={movement.id}>
                     <TableCell className="font-medium">
                       {movement.date}
@@ -102,14 +135,12 @@ export function TesoreriaDetailClient({
                     <TableCell>
                       <Badge variant="outline">{movement.type}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {movement.reference ? (
-                        <span className="font-mono text-sm">
-                          {movement.reference}
-                        </span>
-                      ) : (
-                        <span className="font-mono text-sm">-</span>
-                      )}
+                    <TableCell>
+                      <ReferenceLink
+                        reference={movement.reference}
+                        sourceId={movement.sourceId}
+                        sourceType={movement.sourceType}
+                      />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {movement.description || "-"}

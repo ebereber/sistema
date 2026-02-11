@@ -71,7 +71,10 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { UnifiedTreasuryMovement } from "@/lib/services/treasury-cached";
+import type {
+  UnifiedTreasuryMovement,
+  TreasuryCategory,
+} from "@/lib/services/treasury-cached";
 import {
   createTreasuryTransferAction,
   createManualMovementAction,
@@ -108,7 +111,9 @@ export function MovimientosPageClient({
   const [dateFilterValue, setDateFilterValue] = React.useState("30");
   const [dateFilterUnit, setDateFilterUnit] = React.useState("días");
   const [dateFilterActive, setDateFilterActive] = React.useState(false);
-  const [selectedTypes, setSelectedTypes] = React.useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = React.useState<
+    TreasuryCategory[]
+  >([]);
 
   // Transfer dialog
   const [transferOpen, setTransferOpen] = React.useState(false);
@@ -150,11 +155,15 @@ export function MovimientosPageClient({
 
   // ── Derived data ───────────────────────────────────────────────
 
-  // Get unique types from movements for dynamic filter
-  const availableTypes = React.useMemo(() => {
-    const types = new Set(movements.map((m) => m.type));
-    return Array.from(types).sort();
-  }, [movements]);
+  // Fixed category options for filter
+  const categoryOptions: { value: TreasuryCategory; label: string }[] = [
+    { value: "cobro_cliente", label: "Cobros de clientes" },
+    { value: "pago_proveedor", label: "Pagos a proveedores" },
+    { value: "movimiento_manual", label: "Movimientos manuales" },
+    { value: "transferencia", label: "Transferencias" },
+    { value: "deposito_caja_fuerte", label: "Depósitos en caja fuerte" },
+    { value: "movimiento_caja", label: "Movimientos de caja" },
+  ];
 
   // Filter accounts for manual movements (no cash registers)
   const manualAccounts = React.useMemo(
@@ -204,9 +213,9 @@ export function MovimientosPageClient({
       }
     }
 
-    // Type filter
-    if (selectedTypes.length > 0) {
-      result = result.filter((m) => selectedTypes.includes(m.type));
+    // Category filter
+    if (selectedCategories.length > 0) {
+      result = result.filter((m) => selectedCategories.includes(m.category));
     }
 
     return result;
@@ -217,7 +226,7 @@ export function MovimientosPageClient({
     dateFilterType,
     dateFilterValue,
     dateFilterUnit,
-    selectedTypes,
+    selectedCategories,
   ]);
 
   // ── Handlers ───────────────────────────────────────────────────
@@ -712,23 +721,23 @@ export function MovimientosPageClient({
               </PopoverContent>
             </Popover>
 
-            {/* Type Filter */}
+            {/* Category Filter */}
             <Popover open={typeFilterOpen} onOpenChange={setTypeFilterOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
                     "h-8 justify-start border-dashed",
-                    selectedTypes.length > 0 && "border-solid bg-accent",
+                    selectedCategories.length > 0 && "border-solid bg-accent",
                   )}
                 >
                   Tipo
-                  {selectedTypes.length > 0 && (
+                  {selectedCategories.length > 0 && (
                     <Badge
                       variant="secondary"
                       className="ml-1 h-5 rounded-sm px-1"
                     >
-                      {selectedTypes.length}
+                      {selectedCategories.length}
                     </Badge>
                   )}
                 </Button>
@@ -739,17 +748,17 @@ export function MovimientosPageClient({
                   <CommandList>
                     <CommandEmpty>No se encontraron resultados.</CommandEmpty>
                     <CommandGroup>
-                      {availableTypes.map((type) => {
-                        const isSelected = selectedTypes.includes(type);
+                      {categoryOptions.map((opt) => {
+                        const isSelected = selectedCategories.includes(opt.value);
                         return (
                           <CommandItem
-                            key={type}
-                            value={type}
+                            key={opt.value}
+                            value={opt.label}
                             onSelect={() => {
-                              setSelectedTypes(
+                              setSelectedCategories(
                                 isSelected
-                                  ? selectedTypes.filter((t) => t !== type)
-                                  : [...selectedTypes, type],
+                                  ? selectedCategories.filter((c) => c !== opt.value)
+                                  : [...selectedCategories, opt.value],
                               );
                             }}
                           >
@@ -763,7 +772,7 @@ export function MovimientosPageClient({
                             >
                               <Check className="h-3.5 w-3.5" />
                             </div>
-                            <span className="ml-2 truncate">{type}</span>
+                            <span className="ml-2 truncate">{opt.label}</span>
                           </CommandItem>
                         );
                       })}
@@ -774,14 +783,14 @@ export function MovimientosPageClient({
             </Popover>
 
             {/* Clear filters */}
-            {(search || dateFilterActive || selectedTypes.length > 0) && (
+            {(search || dateFilterActive || selectedCategories.length > 0) && (
               <Button
                 variant="ghost"
                 className="h-8 text-xs"
                 onClick={() => {
                   setSearch("");
                   setDateFilterActive(false);
-                  setSelectedTypes([]);
+                  setSelectedCategories([]);
                 }}
               >
                 Limpiar filtros

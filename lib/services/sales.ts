@@ -291,6 +291,7 @@ export interface PaymentInsert {
   amount: number;
   reference: string | null;
   bank_account_id?: string | null;
+  type?: string | null;
 }
 
 /**
@@ -301,6 +302,7 @@ export async function createSale(
   items: SaleItemInsert[],
   payments: PaymentInsert[],
   locationId: string,
+  shiftCashRegisterId?: string | null,
 ) {
   const supabase = createClient();
   // 1. Obtener usuario actual
@@ -399,7 +401,7 @@ export async function createSale(
         method_name: p.method_name,
         amount: p.amount,
         reference: p.reference,
-        cash_register_id: null,
+        cash_register_id: p.type === "EFECTIVO" ? (shiftCashRegisterId || null) : null,
         bank_account_id: p.bank_account_id ?? null,
       }));
 
@@ -951,6 +953,7 @@ export interface CreateExchangeParams {
   note?: string;
   globalDiscount?: GlobalDiscount | null;
   shiftId: string | null;
+  shiftCashRegisterId?: string | null;
 }
 
 /**
@@ -970,6 +973,7 @@ export async function createExchange(
     note,
     globalDiscount,
     shiftId,
+    shiftCashRegisterId,
   } = params;
 
   const supabase = createClient();
@@ -1223,7 +1227,8 @@ export async function createExchange(
             method_name: p.method_name,
             amount: p.amount,
             reference: p.reference,
-            cash_register_id: null,
+            cash_register_id: p.type === "EFECTIVO" ? (shiftCashRegisterId || null) : null,
+            bank_account_id: p.bank_account_id ?? null,
           }));
 
           const { error: rcbMethodsError } = await supabase

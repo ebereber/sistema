@@ -19,7 +19,10 @@ export async function createTreasuryTransferAction(data: {
   const user = await getServerUser();
   if (!user) throw new Error("No autenticado");
 
-  if (data.source_type === data.destination_type && data.source_id === data.destination_id) {
+  if (
+    data.source_type === data.destination_type &&
+    data.source_id === data.destination_id
+  ) {
     throw new Error("La cuenta de origen y destino no pueden ser la misma");
   }
 
@@ -27,9 +30,9 @@ export async function createTreasuryTransferAction(data: {
     throw new Error("El monto debe ser mayor a 0");
   }
 
-  // Generate a shared reference ID to link both movements
-  const transferRef = `TRF-${Date.now()}`;
-  const refDescription = data.description || "Transferencia de fondos";
+  // Generate a shared reference to link both movements
+  const transferRef = `TRF-${crypto.randomUUID().slice(0, 8)}`;
+  const cleanDescription = data.description || "Transferencia de fondos";
 
   // 1. Create withdrawal in source account
   await createMovementInAccount({
@@ -38,7 +41,7 @@ export async function createTreasuryTransferAction(data: {
     direction: "out",
     amount: data.amount,
     reference: data.reference || transferRef,
-    description: refDescription,
+    description: cleanDescription,
     sourceType: "transfer",
     date: data.date,
     userId: user.id,
@@ -51,7 +54,7 @@ export async function createTreasuryTransferAction(data: {
     direction: "in",
     amount: data.amount,
     reference: data.reference || transferRef,
-    description: refDescription,
+    description: cleanDescription,
     sourceType: "transfer",
     date: data.date,
     userId: user.id,
@@ -96,16 +99,14 @@ export async function createManualMovementAction(data: {
 
     if (error) throw error;
   } else {
-    const { error } = await supabaseAdmin
-      .from("safe_box_movements")
-      .insert({
-        safe_box_id: data.account_id,
-        type: data.type,
-        amount: data.amount,
-        notes: data.description || null,
-        source_type: "manual",
-        performed_by: user.id,
-      });
+    const { error } = await supabaseAdmin.from("safe_box_movements").insert({
+      safe_box_id: data.account_id,
+      type: data.type,
+      amount: data.amount,
+      notes: data.description || null,
+      source_type: "manual",
+      performed_by: user.id,
+    });
 
     if (error) throw error;
   }
@@ -260,6 +261,9 @@ async function createMovementInAccount(params: {
     userId,
   } = params;
 
+  // Midday UTC avoids timezone shifting the date to the previous day (e.g. in UTC-3)
+  const dateTimestamp = `${date}T12:00:00.000Z`;
+
   if (accountType === "bank_account") {
     const type = direction === "in" ? "transfer_in" : "transfer_out";
     const { error } = await supabaseAdmin
@@ -272,22 +276,21 @@ async function createMovementInAccount(params: {
         description,
         source_type: sourceType,
         performed_by: userId,
-        movement_date: date,
+        movement_date: dateTimestamp,
       });
 
     if (error) throw error;
   } else if (accountType === "safe_box") {
     const type = direction === "in" ? "deposit" : "withdrawal";
-    const { error } = await supabaseAdmin
-      .from("safe_box_movements")
-      .insert({
-        safe_box_id: accountId,
-        type,
-        amount,
-        notes: `${description} (Ref: ${reference})`,
-        source_type: sourceType,
-        performed_by: userId,
-      });
+    const { error } = await supabaseAdmin.from("safe_box_movements").insert({
+      safe_box_id: accountId,
+      type,
+      amount,
+      notes: description,
+      reference: reference || null,
+      source_type: sourceType,
+      performed_by: userId,
+    });
 
     if (error) throw error;
   } else if (accountType === "cash_register") {
@@ -322,7 +325,8 @@ async function createMovementInAccount(params: {
         shift_id: openShift.id,
         type,
         amount,
-        notes: `${description} (Ref: ${reference})`,
+        notes: description,
+        reference: reference || null,
         performed_by: userId,
       });
 

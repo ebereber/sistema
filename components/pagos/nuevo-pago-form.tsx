@@ -67,7 +67,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -88,7 +87,7 @@ import { SupplierDialog } from "@/components/proveedores/supplier-dialog";
 import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
 import { createSupplierPaymentAction } from "@/lib/actions/supplier-payments";
 import { getPendingPurchases } from "@/lib/services/supplier-payments";
-import { getSuppliers, type Supplier } from "@/lib/services/suppliers";
+import type { Supplier } from "@/lib/services/suppliers";
 
 // Types
 interface PendingPurchase {
@@ -106,30 +105,45 @@ interface PendingPurchase {
 
 interface PaymentMethodItem {
   id: string;
+  payment_method_id: string;
   method_name: string;
   reference: string;
-  cash_register_id: string;
+  cash_register_id: string | null;
+  bank_account_id: string | null;
   amount: number;
 }
 
-const PAYMENT_METHODS = [
-  "Efectivo",
-  "Transferencia",
-  "Tarjeta de débito",
-  "Tarjeta de crédito",
-  "Cheque",
-  "Otro",
-];
+export interface ConfiguredPaymentMethod {
+  id: string;
+  name: string;
+  type: string;
+  requires_reference: boolean;
+  bank_account_id: string | null;
+}
 
-export function NuevoPagoForm() {
+export interface BankAccountOption {
+  id: string;
+  bank_name: string;
+  account_name: string;
+}
+
+interface NuevoPagoFormProps {
+  paymentMethods: ConfiguredPaymentMethod[];
+  bankAccounts: BankAccountOption[];
+  initialSuppliers: Supplier[];
+}
+
+export function NuevoPagoForm({
+  paymentMethods: configuredMethods,
+  bankAccounts,
+  initialSuppliers,
+}: NuevoPagoFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const purchaseIdFromUrl = searchParams.get("purchaseId");
 
   // Data from DB
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
 
   // Form state
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
@@ -149,14 +163,15 @@ export function NuevoPagoForm() {
   // Payment method dialog state
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
-  const [dialogMethod, setDialogMethod] = useState("Efectivo");
+  const [dialogMethodId, setDialogMethodId] = useState(configuredMethods[0]?.id || "");
   const [dialogReference, setDialogReference] = useState("");
   const [dialogCashRegisterId, setDialogCashRegisterId] = useState("");
+  const [dialogBankAccountId, setDialogBankAccountId] = useState("");
   const [dialogAmount, setDialogAmount] = useState("");
 
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
-  const { cashRegisters, isLoading: isLoadingRegisters } = useUserCashRegisters(
+  const { cashRegisters } = useUserCashRegisters(
     (registers) => {
       if (registers.length > 0) {
         setDialogCashRegisterId(registers[0].id);
@@ -164,16 +179,14 @@ export function NuevoPagoForm() {
     },
   );
 
-  // Load initial data
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const suppliersData = await getSuppliers({ active: true });
-        setSuppliers(suppliersData);
+  // Get the selected configured method
+  const selectedConfiguredMethod = configuredMethods.find((m) => m.id === dialogMethodId);
 
-        // If purchaseId in URL, load that purchase and pre-select
-        if (purchaseIdFromUrl && !initialLoadDone) {
+  // Load initial data (only for purchaseId from URL)
+  useEffect(() => {
+    async function loadFromUrl() {
+      if (purchaseIdFromUrl && !initialLoadDone) {
+        try {
           const { getPurchaseById } = await import("@/lib/services/purchases");
           const purchase = await getPurchaseById(purchaseIdFromUrl);
 
@@ -193,16 +206,14 @@ export function NuevoPagoForm() {
             );
           }
           setInitialLoadDone(true);
+        } catch (error) {
+          console.error("Error loading data:", error);
+          toast.error("Error al cargar datos");
         }
-      } catch (error) {
-        console.error("Error loading data:", error);
-        toast.error("Error al cargar datos");
-      } finally {
-        setIsLoading(false);
       }
     }
 
-    loadData();
+    loadFromUrl();
   }, [purchaseIdFromUrl, initialLoadDone]);
 
   // Load pending purchases when supplier changes
@@ -235,7 +246,6 @@ export function NuevoPagoForm() {
     setSelectedSupplierId(supplierId);
     setOpenSupplier(false);
     loadPendingPurchases(supplierId);
-    // Reset payment methods when changing supplier
     setPaymentMethods([]);
     setOnAccountAmount(0);
   };
@@ -311,18 +321,22 @@ export function NuevoPagoForm() {
   // Payment method handlers
   const openAddPaymentDialog = () => {
     setEditingPaymentId(null);
-    setDialogMethod("Efectivo");
+    setDialogMethodId(configuredMethods[0]?.id || "");
     setDialogReference("");
-    // Keep default cash register
+    setDialogBankAccountId("");
+    if (cashRegisters.length > 0) {
+      setDialogCashRegisterId(cashRegisters[0].id);
+    }
     setDialogAmount(difference > 0 ? difference.toFixed(2) : "");
     setOpenPaymentDialog(true);
   };
 
   const openEditPaymentDialog = (payment: PaymentMethodItem) => {
     setEditingPaymentId(payment.id);
-    setDialogMethod(payment.method_name);
+    setDialogMethodId(payment.payment_method_id);
     setDialogReference(payment.reference);
-    setDialogCashRegisterId(payment.cash_register_id);
+    setDialogCashRegisterId(payment.cash_register_id || "");
+    setDialogBankAccountId(payment.bank_account_id || "");
     setDialogAmount(payment.amount.toString());
     setOpenPaymentDialog(true);
   };
@@ -335,15 +349,34 @@ export function NuevoPagoForm() {
       return;
     }
 
+    if (!dialogMethodId) {
+      toast.error("Seleccioná un método de pago");
+      return;
+    }
+
+    const method = configuredMethods.find((m) => m.id === dialogMethodId);
+    if (!method) return;
+
+    // Determine bank_account_id
+    let bankAccountId: string | null = null;
+    if (method.type === "TRANSFERENCIA") {
+      bankAccountId = method.bank_account_id || dialogBankAccountId || null;
+    }
+
+    // Determine cash_register_id
+    const cashRegisterId = method.type === "EFECTIVO" ? dialogCashRegisterId || null : null;
+
     if (editingPaymentId) {
       setPaymentMethods(
         paymentMethods.map((pm) =>
           pm.id === editingPaymentId
             ? {
                 ...pm,
-                method_name: dialogMethod,
+                payment_method_id: dialogMethodId,
+                method_name: method.name,
                 reference: dialogReference,
-                cash_register_id: dialogCashRegisterId,
+                cash_register_id: cashRegisterId,
+                bank_account_id: bankAccountId,
                 amount,
               }
             : pm,
@@ -352,9 +385,11 @@ export function NuevoPagoForm() {
     } else {
       const newPayment: PaymentMethodItem = {
         id: `temp-${Date.now()}`,
-        method_name: dialogMethod,
+        payment_method_id: dialogMethodId,
+        method_name: method.name,
         reference: dialogReference,
-        cash_register_id: dialogCashRegisterId,
+        cash_register_id: cashRegisterId,
+        bank_account_id: bankAccountId,
         amount,
       };
       setPaymentMethods([...paymentMethods, newPayment]);
@@ -450,9 +485,11 @@ export function NuevoPagoForm() {
       }));
 
       const methods = paymentMethods.map((pm) => ({
+        payment_method_id: pm.payment_method_id,
         method_name: pm.method_name,
         reference: pm.reference || null,
         cash_register_id: pm.cash_register_id || null,
+        bank_account_id: pm.bank_account_id || null,
         amount: pm.amount,
       }));
 
@@ -475,20 +512,12 @@ export function NuevoPagoForm() {
   const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
   const hasPurchases = purchases.length > 0;
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto space-y-6 p-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            <Skeleton className="h-48" />
-            <Skeleton className="h-64" />
-          </div>
-          <Skeleton className="h-64" />
-        </div>
-      </div>
-    );
-  }
+  // Get bank account name for display
+  const getBankAccountName = (bankAccountId: string | null) => {
+    if (!bankAccountId) return null;
+    const ba = bankAccounts.find((b) => b.id === bankAccountId);
+    return ba ? `${ba.bank_name} - ${ba.account_name}` : null;
+  };
 
   return (
     <div className="container mx-auto space-y-6 p-6">
@@ -642,8 +671,8 @@ export function NuevoPagoForm() {
                 <CardContent className="space-y-4">
                   {loadingPurchases ? (
                     <div className="space-y-2">
-                      <Skeleton className="h-10 w-full" />
-                      <Skeleton className="h-32 w-full" />
+                      <div className="h-10 w-full animate-pulse rounded bg-muted" />
+                      <div className="h-32 w-full animate-pulse rounded bg-muted" />
                     </div>
                   ) : !hasPurchases ? (
                     <p className="py-4 text-sm text-muted-foreground">
@@ -809,8 +838,17 @@ export function NuevoPagoForm() {
                           <TableBody>
                             {paymentMethods.map((payment) => (
                               <TableRow key={payment.id}>
-                                <TableCell className="font-medium">
-                                  {payment.method_name}
+                                <TableCell>
+                                  <div>
+                                    <span className="font-medium">
+                                      {payment.method_name}
+                                    </span>
+                                    {payment.bank_account_id && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {getBankAccountName(payment.bank_account_id)}
+                                      </p>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">
                                   {payment.reference || "-"}
@@ -970,20 +1008,96 @@ export function NuevoPagoForm() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Método de pago *</Label>
-                <Select value={dialogMethod} onValueChange={setDialogMethod}>
+                <Select value={dialogMethodId} onValueChange={setDialogMethodId}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Seleccionar método" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PAYMENT_METHODS.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
+                    {configuredMethods.map((method) => (
+                      <SelectItem key={method.id} value={method.id}>
+                        {method.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label>Monto *</Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0.00"
+                  value={dialogAmount}
+                  onChange={(e) => setDialogAmount(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Cash register selector — only for EFECTIVO */}
+            {selectedConfiguredMethod?.type === "EFECTIVO" && (
+              <div className="space-y-2">
+                <Label>Caja *</Label>
+                <Select
+                  value={dialogCashRegisterId}
+                  onValueChange={setDialogCashRegisterId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar caja" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cashRegisters.map((cr) => (
+                      <SelectItem key={cr.id} value={cr.id}>
+                        {cr.name}
+                        {(cr as Record<string, unknown>).is_default
+                          ? " (Principal)"
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Bank account — for TRANSFERENCIA */}
+            {selectedConfiguredMethod?.type === "TRANSFERENCIA" && (
+              <div className="space-y-2">
+                {selectedConfiguredMethod.bank_account_id ? (
+                  <>
+                    <Label>Cuenta bancaria</Label>
+                    <p className="text-sm text-muted-foreground rounded-md border p-3">
+                      Se registrará en:{" "}
+                      <span className="font-medium text-foreground">
+                        {getBankAccountName(selectedConfiguredMethod.bank_account_id)}
+                      </span>
+                    </p>
+                  </>
+                ) : bankAccounts.length > 0 ? (
+                  <>
+                    <Label>Cuenta bancaria</Label>
+                    <Select
+                      value={dialogBankAccountId}
+                      onValueChange={setDialogBankAccountId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar cuenta (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin vincular</SelectItem>
+                        {bankAccounts.map((ba) => (
+                          <SelectItem key={ba.id} value={ba.id}>
+                            {ba.bank_name} - {ba.account_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                ) : null}
+              </div>
+            )}
+
+            {/* Reference field — show when method requires it */}
+            {selectedConfiguredMethod?.requires_reference && (
               <div className="space-y-2">
                 <Label>Referencia</Label>
                 <Input
@@ -992,40 +1106,7 @@ export function NuevoPagoForm() {
                   onChange={(e) => setDialogReference(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Caja *</Label>
-              <Select
-                value={dialogCashRegisterId}
-                onValueChange={setDialogCashRegisterId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar caja" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashRegisters.map((cr) => (
-                    <SelectItem key={cr.id} value={cr.id}>
-                      {cr.name}
-                      {(cr as Record<string, unknown>).is_default
-                        ? " (Principal)"
-                        : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Monto *</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="0.00"
-                value={dialogAmount}
-                onChange={(e) => setDialogAmount(e.target.value)}
-              />
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button
