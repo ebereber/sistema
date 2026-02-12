@@ -12,6 +12,7 @@ import {
 } from "@/lib/validations/sale";
 import { Loader2 } from "lucide-react";
 import type { Location } from "@/lib/services/locations";
+import { getVoucherDisplayName } from "@/lib/utils/fiscal";
 import { CreditNotesSelector } from "./credit-notes-selector";
 import { LocationSelector } from "./location-selector-dialog";
 import type { AvailableCreditNote, CheckoutView } from "./types";
@@ -35,6 +36,7 @@ interface CheckoutSummaryProps {
   // Voucher
   selectedVoucher: string;
   onVoucherChange: (value: string) => void;
+  availableVoucherTypes: string[];
   // Submit
   isSubmitting: boolean;
   needsPayment: boolean;
@@ -69,6 +71,7 @@ export function CheckoutSummary({
   onToggleCreditNote,
   selectedVoucher,
   onVoucherChange,
+  availableVoucherTypes,
   isSubmitting,
   needsPayment,
   isPending,
@@ -137,22 +140,29 @@ export function CheckoutSummary({
           className="flex flex-col gap-3"
         >
           <div className="flex gap-4">
-            <Label
-              htmlFor="voucher-COMPROBANTE_X"
-              className="flex w-full cursor-pointer gap-3 rounded-md border p-4 has-[:checked]:border-primary has-[:checked]:bg-primary/5 dark:has-[:checked]:bg-primary/10"
-            >
-              <RadioGroupItem
-                value="COMPROBANTE_X"
-                id="voucher-COMPROBANTE_X"
-                className="mt-px"
-              />
-              <div className="flex flex-1 flex-col gap-1.5 leading-snug">
-                <div className="text-sm font-medium">Comprobante X</div>
-              </div>
-              <kbd className="pointer-events-none hidden h-5 min-w-5 select-none items-center justify-center gap-1 rounded-sm border border-muted-foreground/30 px-1 font-sans text-xs font-medium text-muted-foreground md:block">
-                C
-              </kbd>
-            </Label>
+            {availableVoucherTypes.map((type, index) => (
+              <Label
+                key={type}
+                htmlFor={`voucher-${type}`}
+                className="flex w-full cursor-pointer gap-3 rounded-md border p-4 has-[:checked]:border-primary has-[:checked]:bg-primary/5 dark:has-[:checked]:bg-primary/10"
+              >
+                <RadioGroupItem
+                  value={type}
+                  id={`voucher-${type}`}
+                  className="mt-px"
+                />
+                <div className="flex flex-1 flex-col gap-1.5 leading-snug">
+                  <div className="text-sm font-medium">
+                    {getVoucherDisplayName(type)}
+                  </div>
+                </div>
+                {index === 0 && (
+                  <kbd className="pointer-events-none hidden h-5 min-w-5 select-none items-center justify-center gap-1 rounded-sm border border-muted-foreground/30 px-1 font-sans text-xs font-medium text-muted-foreground md:block">
+                    C
+                  </kbd>
+                )}
+              </Label>
+            ))}
           </div>
         </RadioGroup>
       </div>

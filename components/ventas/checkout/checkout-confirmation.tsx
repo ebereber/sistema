@@ -19,6 +19,9 @@ interface CheckoutConfirmationProps {
   saleNumber: string | null;
   total: number;
   onNewSale: () => void;
+  cae?: string | null;
+  voucherNumber?: number | null;
+  voucherType?: string;
 }
 
 export function CheckoutConfirmation({
@@ -27,6 +30,9 @@ export function CheckoutConfirmation({
   saleNumber,
   total,
   onNewSale,
+  cae,
+  voucherNumber,
+  voucherType,
 }: CheckoutConfirmationProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
@@ -84,6 +90,15 @@ export function CheckoutConfirmation({
                 {saleNumber}
               </p>
               <p className="text-3xl font-bold">{formatPrice(total)}</p>
+              {cae && (
+                <div className="mt-2 rounded-md border bg-muted/50 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">
+                    CAE: {cae}
+                    {voucherNumber != null &&
+                      ` | Comp. N° ${String(voucherNumber).padStart(8, "0")}`}
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

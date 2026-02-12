@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      arca_credentials: {
+        Row: {
+          certificate: string | null
+          created_at: string | null
+          id: string
+          organization_id: string
+          private_key: string | null
+          updated_at: string | null
+          ws_sr_padron_ticket: Json | null
+          ws_sr_padron_ticket_expiration: string | null
+          wsfe_ticket: Json | null
+          wsfe_ticket_expiration: string | null
+        }
+        Insert: {
+          certificate?: string | null
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          private_key?: string | null
+          updated_at?: string | null
+          ws_sr_padron_ticket?: Json | null
+          ws_sr_padron_ticket_expiration?: string | null
+          wsfe_ticket?: Json | null
+          wsfe_ticket_expiration?: string | null
+        }
+        Update: {
+          certificate?: string | null
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          private_key?: string | null
+          updated_at?: string | null
+          ws_sr_padron_ticket?: Json | null
+          ws_sr_padron_ticket_expiration?: string | null
+          wsfe_ticket?: Json | null
+          wsfe_ticket_expiration?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arca_credentials_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_account_movements: {
         Row: {
           amount: number
@@ -2030,6 +2077,9 @@ export type Database = {
       sales: {
         Row: {
           amount_paid: number
+          arca_response: Json | null
+          cae: string | null
+          cae_expiration: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
@@ -2039,6 +2089,7 @@ export type Database = {
           location_id: string | null
           notes: string | null
           organization_id: string
+          point_of_sale_number: number | null
           related_sale_id: string | null
           sale_date: string
           sale_number: string
@@ -2049,10 +2100,14 @@ export type Database = {
           tax: number
           total: number
           updated_at: string
+          voucher_number: number | null
           voucher_type: string
         }
         Insert: {
           amount_paid?: number
+          arca_response?: Json | null
+          cae?: string | null
+          cae_expiration?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -2062,6 +2117,7 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           organization_id: string
+          point_of_sale_number?: number | null
           related_sale_id?: string | null
           sale_date?: string
           sale_number: string
@@ -2072,10 +2128,14 @@ export type Database = {
           tax: number
           total: number
           updated_at?: string
+          voucher_number?: number | null
           voucher_type?: string
         }
         Update: {
           amount_paid?: number
+          arca_response?: Json | null
+          cae?: string | null
+          cae_expiration?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -2085,6 +2145,7 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           organization_id?: string
+          point_of_sale_number?: number | null
           related_sale_id?: string | null
           sale_date?: string
           sale_number?: string
@@ -2095,6 +2156,7 @@ export type Database = {
           tax?: number
           total?: number
           updated_at?: string
+          voucher_number?: number | null
           voucher_type?: string
         }
         Relationships: [

@@ -15,7 +15,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, ChevronLeft } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { CheckoutConfirmation } from "./checkout-confirmation";
 import { CheckoutSummary } from "./checkout-summary";
@@ -70,6 +70,12 @@ export function CheckoutDialog({
         )}
       >
         <SheetDescription className="hidden"></SheetDescription>
+        {checkout.isArcaProcessing && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm font-medium">Solicitando CAE...</p>
+          </div>
+        )}
         {checkout.currentView === "confirmation" ? (
           <CheckoutConfirmation
             isExchangeMode={isExchangeMode}
@@ -77,6 +83,9 @@ export function CheckoutDialog({
             saleNumber={checkout.saleNumber}
             total={checkout.total}
             onNewSale={checkout.handleNewSale}
+            cae={checkout.arcaCae}
+            voucherNumber={checkout.arcaVoucherNumber}
+            voucherType={checkout.selectedVoucher}
           />
         ) : (
           <>
@@ -258,6 +267,7 @@ export function CheckoutDialog({
                   onToggleCreditNote={checkout.toggleCreditNote}
                   selectedVoucher={checkout.selectedVoucher}
                   onVoucherChange={checkout.setSelectedVoucher}
+                  availableVoucherTypes={checkout.availableVoucherTypes}
                   isSubmitting={checkout.isSubmitting}
                   needsPayment={checkout.needsPayment}
                   isPending={checkout.isPending}

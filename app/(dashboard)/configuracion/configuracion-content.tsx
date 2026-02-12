@@ -38,6 +38,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { saveArcaCredentialsAction } from "@/lib/actions/arca";
 import {
   confirmDelegationAction,
   saveFiscalConfigAction,
@@ -75,6 +76,7 @@ interface ConfiguracionContentProps {
   fiscalConfig: FiscalConfig | null;
   fiscalPointsOfSale: FiscalPointOfSale[];
   pointsOfSale: PointOfSale[];
+  hasArcaCredentials: boolean;
 }
 
 export function ConfiguracionContent({
@@ -82,6 +84,7 @@ export function ConfiguracionContent({
   fiscalConfig,
   fiscalPointsOfSale,
   pointsOfSale,
+  hasArcaCredentials,
 }: ConfiguracionContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -141,6 +144,16 @@ export function ConfiguracionContent({
   const [delegationCheckbox, setDelegationCheckbox] = useState(false);
   const [isConfirmingDelegation, setIsConfirmingDelegation] = useState(false);
   const isDelegationConfirmed = fiscalConfig?.delegacion_confirmada ?? false;
+
+  // Certificate upload
+  const [isSavingCerts, setIsSavingCerts] = useState(false);
+  const [certsUploaded, setCertsUploaded] = useState(hasArcaCredentials);
+  const certInputRef = useRef<HTMLInputElement>(null);
+  const keyInputRef = useRef<HTMLInputElement>(null);
+  const [certFileName, setCertFileName] = useState<string | null>(null);
+  const [keyFileName, setKeyFileName] = useState<string | null>(null);
+  const [certContent, setCertContent] = useState<string | null>(null);
+  const [keyContent, setKeyContent] = useState<string | null>(null);
 
   // Checklist state
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
@@ -321,13 +334,45 @@ export function ConfiguracionContent({
     }
   };
 
+  const handleFileRead = (
+    file: File,
+    setContent: (v: string) => void,
+    setName: (v: string) => void,
+  ) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setContent(e.target?.result as string);
+      setName(file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleUploadCertificates = async () => {
+    if (!certContent || !keyContent) {
+      toast.error("Seleccioná ambos archivos (certificado y clave privada)");
+      return;
+    }
+    setIsSavingCerts(true);
+    try {
+      await saveArcaCredentialsAction(certContent, keyContent);
+      setCertsUploaded(true);
+      toast.success("Certificados guardados");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar certificados");
+    } finally {
+      setIsSavingCerts(false);
+    }
+  };
+
   // --- Checklist completion ---
   const step1Completed = hasFiscalData;
   const step2Completed = fiscalConfig?.delegacion_web_service ?? false;
   const step3Completed = isDelegationConfirmed;
-  const step4Completed = fiscalConfig?.punto_venta_creado_arca ?? false;
-  /* const step5Completed = fiscalPointsOfSale.length > 0; */
-  const step5Completed = pointsOfSale.some((pos) => pos.enabled_for_arca);
+  const step4Completed = certsUploaded;
+  const step5Completed = fiscalConfig?.punto_venta_creado_arca ?? false;
+  const step6Completed = pointsOfSale.some((pos) => pos.enabled_for_arca);
 
   const steps = [
     {
@@ -416,8 +461,88 @@ export function ConfiguracionContent({
     },
     {
       id: 4,
-      title: "Creá un punto de venta con facturación electrónica en ARCA",
+      title: "Cargá tus certificados ARCA",
       completed: step4Completed,
+      expandable: true,
+      content: (
+        <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
+          <p className="max-w-xl text-sm text-muted-foreground">
+            Subí el certificado (.crt) y la clave privada (.key) que generaste
+            para tu CUIT. Estos archivos se usan para firmar los comprobantes.
+          </p>
+          <div className="flex flex-col gap-3 pt-1">
+            <div className="flex flex-col gap-2 md:flex-row">
+              <div className="flex-1">
+                <input
+                  ref={certInputRef}
+                  type="file"
+                  accept=".crt,.pem,.cer"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file)
+                      handleFileRead(file, setCertContent, setCertFileName);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => certInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {certFileName ?? "Certificado (.crt)"}
+                </Button>
+              </div>
+              <div className="flex-1">
+                <input
+                  ref={keyInputRef}
+                  type="file"
+                  accept=".key,.pem"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file)
+                      handleFileRead(file, setKeyContent, setKeyFileName);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => keyInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {keyFileName ?? "Clave privada (.key)"}
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Button
+                disabled={
+                  isSavingCerts ||
+                  certsUploaded ||
+                  !certContent ||
+                  !keyContent
+                }
+                onClick={handleUploadCertificates}
+              >
+                {isSavingCerts && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {certsUploaded
+                  ? "Certificados cargados"
+                  : "Guardar certificados"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 5,
+      title: "Creá un punto de venta con facturación electrónica en ARCA",
+      completed: step5Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -429,7 +554,7 @@ export function ConfiguracionContent({
           <div className="flex flex-col gap-2 pt-1 md:flex-row">
             <Button
               variant="secondary"
-              disabled={step4Completed || !step3Completed}
+              disabled={step5Completed || !step4Completed}
               onClick={() =>
                 updateFiscalSettingsAction({
                   punto_venta_creado_arca: true,
@@ -454,9 +579,9 @@ export function ConfiguracionContent({
       ),
     },
     {
-      id: 5,
+      id: 6,
       title: "Creá tu punto de venta en La Pyme",
-      completed: step5Completed,
+      completed: step6Completed,
       expandable: true,
       content: (
         <div className="-mt-1 space-y-3 pb-4 pl-11 pr-6">
@@ -468,7 +593,7 @@ export function ConfiguracionContent({
             <Link href="/configuracion/puntos-de-venta">
               <Button>
                 <span className="inline-flex items-center gap-1">
-                  {step5Completed
+                  {step6Completed
                     ? "Ver puntos de venta"
                     : "Crear punto de venta"}
                   <ExternalLink className="h-3 w-3" />

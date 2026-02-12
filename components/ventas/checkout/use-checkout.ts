@@ -14,8 +14,16 @@ import {
   type SaleItemInsert,
 } from "@/lib/services/sales";
 
+import {
+  createArcaInvoiceAction,
+  getArcaReadinessAction,
+} from "@/lib/actions/arca";
 import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre";
 import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
+import {
+  getAvailableFiscalVoucherTypes,
+  isFiscalVoucher,
+} from "@/lib/utils/fiscal";
 import {
   checkStockAvailability,
   type StockCheckResult,
@@ -138,6 +146,20 @@ export function useCheckout({
   const [showStockWarning, setShowStockWarning] = useState(false);
   const skipStockCheckRef = useRef(false);
 
+  // ARCA states
+  const [arcaReady, setArcaReady] = useState(false);
+  const [availableVoucherTypes, setAvailableVoucherTypes] = useState<string[]>([
+    "COMPROBANTE_X",
+  ]);
+  const [isArcaProcessing, setIsArcaProcessing] = useState(false);
+  const [arcaCae, setArcaCae] = useState<string | null>(null);
+  const [arcaVoucherNumber, setArcaVoucherNumber] = useState<number | null>(
+    null,
+  );
+  const arcaReadinessRef = useRef<{
+    emisorCondicionIva: string | null;
+  } | null>(null);
+
   // Load payment methods
   useEffect(() => {
     async function loadPaymentMethods() {
@@ -205,6 +227,37 @@ export function useCheckout({
     }
   }, [open, shift]);
 
+  // Load ARCA readiness when dialog opens
+  useEffect(() => {
+    async function checkArcaReadiness() {
+      try {
+        const readiness = await getArcaReadinessAction();
+        setArcaReady(readiness.ready);
+        arcaReadinessRef.current = {
+          emisorCondicionIva: readiness.emisorCondicionIva,
+        };
+
+        if (readiness.ready && readiness.emisorCondicionIva) {
+          const types = getAvailableFiscalVoucherTypes(
+            readiness.emisorCondicionIva,
+            customer.taxCategory,
+          );
+          setAvailableVoucherTypes(types);
+        } else {
+          setAvailableVoucherTypes(["COMPROBANTE_X"]);
+        }
+      } catch (error) {
+        console.error("Error checking ARCA readiness:", error);
+        setArcaReady(false);
+        setAvailableVoucherTypes(["COMPROBANTE_X"]);
+      }
+    }
+
+    if (open) {
+      checkArcaReadiness();
+    }
+  }, [open, customer.taxCategory]);
+
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
@@ -226,6 +279,9 @@ export function useCheckout({
       setExchangeResult(null);
       setDueDate("30");
       setPendingAmount(0);
+      setArcaCae(null);
+      setArcaVoucherNumber(null);
+      setIsArcaProcessing(false);
     }
   }, [open]);
 
@@ -688,6 +744,27 @@ export function useCheckout({
         }
       }
 
+      // ARCA: solicitar CAE si es comprobante fiscal
+      if (isFiscalVoucher(selectedVoucher)) {
+        setIsArcaProcessing(true);
+        try {
+          const arcaResult = await createArcaInvoiceAction(sale.id);
+          if (arcaResult.success) {
+            setArcaCae(arcaResult.cae ?? null);
+            setArcaVoucherNumber(arcaResult.voucherNumber ?? null);
+          } else {
+            toast.warning(
+              `Venta guardada. Error ARCA: ${arcaResult.error}`,
+            );
+          }
+        } catch (arcaError) {
+          console.error("Error procesando ARCA:", arcaError);
+          toast.warning("Venta guardada pero no se pudo obtener el CAE");
+        } finally {
+          setIsArcaProcessing(false);
+        }
+      }
+
       // Sync stock to integrations (non-blocking, fire-and-forget)
       const productIds = items
         .map((item) => item.product_id)
@@ -843,6 +920,13 @@ export function useCheckout({
     setDueDate,
     pendingAmount,
     handleMarkAsPending,
+
+    // ARCA
+    arcaReady,
+    availableVoucherTypes,
+    isArcaProcessing,
+    arcaCae,
+    arcaVoucherNumber,
 
     // Handlers
     handlePaymentMethodClick,

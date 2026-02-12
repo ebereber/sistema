@@ -7,6 +7,7 @@ import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getFiscalConfig, getFiscalPointsOfSale } from "@/lib/services/fiscal";
 import { getOrganization } from "@/lib/services/organization";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { getCachedPointsOfSale } from "@/lib/services/point-of-sale-cached";
 import { ConfiguracionContent } from "./configuracion-content";
@@ -30,12 +31,18 @@ async function ConfiguracionData() {
   if (!user) redirect("/login");
   const organizationId = await getOrganizationId();
 
-  const [organization, fiscalConfig, fiscalPointsOfSale, pointsOfSale] =
+  const [organization, fiscalConfig, fiscalPointsOfSale, pointsOfSale, arcaCreds] =
     await Promise.all([
       getOrganization(organizationId),
       getFiscalConfig(organizationId),
       getFiscalPointsOfSale(organizationId),
-      getCachedPointsOfSale(organizationId), // Para asegurar que tenemos los datos más recientes de los puntos de venta
+      getCachedPointsOfSale(organizationId),
+      supabaseAdmin
+        .from("arca_credentials")
+        .select("certificate, private_key")
+        .eq("organization_id", organizationId)
+        .maybeSingle()
+        .then((r) => r.data),
     ]);
 
   return (
@@ -44,6 +51,7 @@ async function ConfiguracionData() {
       fiscalConfig={fiscalConfig}
       fiscalPointsOfSale={fiscalPointsOfSale}
       pointsOfSale={pointsOfSale}
+      hasArcaCredentials={!!(arcaCreds?.certificate && arcaCreds?.private_key)}
     />
   );
 }
