@@ -9,8 +9,13 @@ export interface MeliItem {
   variations: MeliVariation[];
   date_created: string;
   seller_custom_field: string | null;
+  attributes?: Array<{
+    id: string;
+    name: string;
+    value_id: string | null;
+    value_name: string | null;
+  }>;
 }
-
 export interface MeliVariation {
   id: number;
   price: number;
@@ -56,7 +61,13 @@ export interface MeliOrderPayment {
 
 export interface MeliOrder {
   id: number;
-  status: "confirmed" | "payment_required" | "payment_in_process" | "paid" | "partially_paid" | "cancelled";
+  status:
+    | "confirmed"
+    | "payment_required"
+    | "payment_in_process"
+    | "paid"
+    | "partially_paid"
+    | "cancelled";
   total_amount: number;
   paid_amount: number;
   currency_id: string;

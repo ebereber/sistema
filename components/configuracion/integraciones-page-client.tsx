@@ -57,6 +57,7 @@ import {
   syncProductsFromTiendanubeAction,
 } from "@/lib/actions/tiendanube";
 import type { Tables } from "@/lib/supabase/types";
+import { ProductDeduplicationPanel } from "./product-deduplication-panel";
 
 type TiendanubeStore = Tables<"tiendanube_stores">;
 type MeliAccount = Tables<"mercadolibre_accounts">;
@@ -139,24 +140,27 @@ export function IntegracionesPageClient({
         initialStore.store_id,
         userId,
       );
-
+      const parts = [
+        `Creados: ${result.created}`,
+        `Actualizados: ${result.updated}`,
+      ];
+      if (result.linked > 0) {
+        parts.push(`Vinculados: ${result.linked}`);
+      }
+      const description = parts.join(", ");
       if (result.errors.length > 0) {
         toast.warning("Sincronización completada con errores", {
-          description: `Creados: ${result.created}, Actualizados: ${result.updated}, Errores: ${result.errors.length}`,
+          description: `${description}, Errores: ${result.errors.length}`,
         });
       } else {
-        toast.success("Sincronización completada", {
-          description: `Creados: ${result.created}, Actualizados: ${result.updated}`,
-        });
+        toast.success("Sincronización completada", { description });
       }
 
       router.refresh();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al sincronizar", {
-        description: errorMessage,
-      });
+      toast.error("Error al sincronizar", { description: errorMessage });
     } finally {
       setIsSyncing(false);
     }
@@ -222,23 +226,28 @@ export function IntegracionesPageClient({
       const result = await syncProductsFromMercadoLibreAction();
       const desc = `Creados: ${result.created}, Actualizados: ${result.updated}${result.removed > 0 ? `, Desvinculados: ${result.removed}` : ""}`;
 
+      const parts = [
+        `Creados: ${result.created}`,
+        `Actualizados: ${result.updated}`,
+      ];
+      if (result.linked > 0) {
+        parts.push(`Vinculados: ${result.linked}`);
+      }
+      const description = parts.join(", ");
+
       if (result.errors.length > 0) {
         toast.warning("Sincronización completada con errores", {
-          description: `${desc}, Errores: ${result.errors.length}`,
+          description: `${description}, Errores: ${result.errors.length}`,
         });
       } else {
-        toast.success("Sincronización completada", {
-          description: desc,
-        });
+        toast.success("Sincronización completada", { description });
       }
 
       router.refresh();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Error desconocido";
-      toast.error("Error al sincronizar", {
-        description: errorMessage,
-      });
+      toast.error("Error al sincronizar", { description: errorMessage });
     } finally {
       setIsMeliSyncing(false);
     }
@@ -770,6 +779,7 @@ export function IntegracionesPageClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ProductDeduplicationPanel />
     </div>
   );
 }

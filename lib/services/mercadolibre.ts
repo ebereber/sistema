@@ -47,7 +47,7 @@ export async function getMeliItems(
     const ids = chunk.join(",");
     const response = await meliApiFetch(
       account,
-      `/items?ids=${ids}&attributes=id,title,price,available_quantity,status,pictures,variations,category_id,date_created,seller_custom_field`,
+      `/items?ids=${ids}&attributes=id,title,price,available_quantity,status,pictures,variations,category_id,date_created,seller_custom_field,attributes`, // ← agregar attributes
     );
     if (!response.ok) continue;
 

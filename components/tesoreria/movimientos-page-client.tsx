@@ -12,8 +12,8 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import * as React from "react";
 import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -70,17 +70,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import type {
-  UnifiedTreasuryMovement,
-  TreasuryCategory,
-} from "@/lib/services/treasury-cached";
 import {
-  createTreasuryTransferAction,
   createManualMovementAction,
-  updateManualMovementAction,
+  createTreasuryTransferAction,
   deleteManualMovementAction,
+  updateManualMovementAction,
 } from "@/lib/actions/treasury";
+import type {
+  TreasuryCategory,
+  UnifiedTreasuryMovement,
+} from "@/lib/services/treasury-cached";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -251,7 +252,9 @@ export function MovimientosPageClient({
 
   async function handleTransferSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const sourceAcc = accounts.find((a) => `${a.type}:${a.id}` === transferSource);
+    const sourceAcc = accounts.find(
+      (a) => `${a.type}:${a.id}` === transferSource,
+    );
     const destAcc = accounts.find((a) => `${a.type}:${a.id}` === transferDest);
 
     if (!sourceAcc || !destAcc) return;
@@ -370,8 +373,7 @@ export function MovimientosPageClient({
     transferSource !== transferDest &&
     parseFloat(transferAmount) > 0;
 
-  const isManualValid =
-    manualAccount && parseFloat(manualAmount) > 0;
+  const isManualValid = manualAccount && parseFloat(manualAmount) > 0;
 
   // ── Render helpers ─────────────────────────────────────────────
 
@@ -393,7 +395,10 @@ export function MovimientosPageClient({
             <SelectGroup>
               <SelectLabel>Cuentas Bancarias</SelectLabel>
               {filtered(bankAccounts).map((a) => (
-                <SelectItem key={`bank_account:${a.id}`} value={`bank_account:${a.id}`}>
+                <SelectItem
+                  key={`bank_account:${a.id}`}
+                  value={`bank_account:${a.id}`}
+                >
                   {a.name}
                 </SelectItem>
               ))}
@@ -413,7 +418,10 @@ export function MovimientosPageClient({
             <SelectGroup>
               <SelectLabel>Cajas Registradoras</SelectLabel>
               {filtered(cashRegisters).map((a) => (
-                <SelectItem key={`cash_register:${a.id}`} value={`cash_register:${a.id}`}>
+                <SelectItem
+                  key={`cash_register:${a.id}`}
+                  value={`cash_register:${a.id}`}
+                >
                   {a.name}
                 </SelectItem>
               ))}
@@ -428,12 +436,8 @@ export function MovimientosPageClient({
     value: string,
     onValueChange: (val: string) => void,
   ) {
-    const manualBanks = manualAccounts.filter(
-      (a) => a.type === "bank_account",
-    );
-    const manualSafes = manualAccounts.filter(
-      (a) => a.type === "safe_box",
-    );
+    const manualBanks = manualAccounts.filter((a) => a.type === "bank_account");
+    const manualSafes = manualAccounts.filter((a) => a.type === "safe_box");
 
     return (
       <Select value={value} onValueChange={onValueChange}>
@@ -445,7 +449,10 @@ export function MovimientosPageClient({
             <SelectGroup>
               <SelectLabel>Cuentas Bancarias</SelectLabel>
               {manualBanks.map((a) => (
-                <SelectItem key={`bank_account:${a.id}`} value={`bank_account:${a.id}`}>
+                <SelectItem
+                  key={`bank_account:${a.id}`}
+                  value={`bank_account:${a.id}`}
+                >
                   {a.name}
                 </SelectItem>
               ))}
@@ -514,10 +521,7 @@ export function MovimientosPageClient({
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label className="text-right">Origen</Label>
                   <div className="col-span-3">
-                    {renderAccountSelect(
-                      transferSource,
-                      setTransferSource,
-                    )}
+                    {renderAccountSelect(transferSource, setTransferSource)}
                   </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -749,7 +753,9 @@ export function MovimientosPageClient({
                     <CommandEmpty>No se encontraron resultados.</CommandEmpty>
                     <CommandGroup>
                       {categoryOptions.map((opt) => {
-                        const isSelected = selectedCategories.includes(opt.value);
+                        const isSelected = selectedCategories.includes(
+                          opt.value,
+                        );
                         return (
                           <CommandItem
                             key={opt.value}
@@ -757,7 +763,9 @@ export function MovimientosPageClient({
                             onSelect={() => {
                               setSelectedCategories(
                                 isSelected
-                                  ? selectedCategories.filter((c) => c !== opt.value)
+                                  ? selectedCategories.filter(
+                                      (c) => c !== opt.value,
+                                    )
                                   : [...selectedCategories, opt.value],
                               );
                             }}
@@ -832,9 +840,31 @@ export function MovimientosPageClient({
                       <Badge variant="outline">{movement.type}</Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-muted-foreground">
-                        {movement.reference || "-"}
-                      </span>
+                      {movement.reference ? (
+                        movement.reference.startsWith("RCB-") ? (
+                          <Link
+                            href={`/cobranzas?search=${movement.reference}`}
+                            className="font-mono text-sm text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {movement.reference}
+                          </Link>
+                        ) : movement.reference.startsWith("OP-") ? (
+                          <Link
+                            href={`/pagos?search=${movement.reference}`}
+                            className="font-mono text-sm text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {movement.reference}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-sm text-muted-foreground">
+                            {movement.reference}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className="max-w-[200px] truncate text-muted-foreground">
@@ -844,9 +874,7 @@ export function MovimientosPageClient({
                     <TableCell
                       className={cn(
                         "text-right font-medium",
-                        movement.isPositive
-                          ? "text-green-600"
-                          : "text-red-600",
+                        movement.isPositive ? "text-green-600" : "text-red-600",
                       )}
                     >
                       {movement.isPositive ? "+" : "-"}$
@@ -1020,10 +1048,7 @@ export function MovimientosPageClient({
               <div className="space-y-4">
                 <div className="flex flex-col gap-2">
                   <Label>Cuenta</Label>
-                  <Input
-                    value={editMovement?.account || ""}
-                    disabled
-                  />
+                  <Input value={editMovement?.account || ""} disabled />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
@@ -1096,10 +1121,7 @@ export function MovimientosPageClient({
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Fecha</Label>
-                  <Popover
-                    open={editDateOpen}
-                    onOpenChange={setEditDateOpen}
-                  >
+                  <Popover open={editDateOpen} onOpenChange={setEditDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -1130,9 +1152,7 @@ export function MovimientosPageClient({
               <SheetFooter className="mt-6 flex flex-col gap-2">
                 <Button
                   type="submit"
-                  disabled={
-                    parseFloat(editAmount) <= 0 || editLoading
-                  }
+                  disabled={parseFloat(editAmount) <= 0 || editLoading}
                 >
                   {editLoading ? "Guardando..." : "Guardar cambios"}
                 </Button>

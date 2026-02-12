@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { extractI18n, parsePrice } from "@/lib/tiendanube";
 import type { TiendanubeProduct } from "@/types/tiendanube";
 import { revalidateTag } from "next/cache";
+import { findExistingProduct, isProductMappedTo } from "../product-matching";
 
 // ============================================================================
 // STORE CONNECTION
@@ -69,11 +70,17 @@ export async function disconnectTiendanubeStoreAction(
 export async function syncProductsFromTiendanubeAction(
   storeId: string,
   userId: string,
-): Promise<{ created: number; updated: number; errors: string[] }> {
+): Promise<{
+  created: number;
+  updated: number;
+  linked: number; // NUEVO: productos existentes vinculados
+  errors: string[];
+}> {
   const organizationId = await getOrganizationId();
   const errors: string[] = [];
   let created = 0;
   let updated = 0;
+  let linked = 0; // NUEVO
 
   // 1. Get all products from Tiendanube
   const tnProducts = await getAllTiendanubeProducts(storeId);
@@ -90,7 +97,10 @@ export async function syncProductsFromTiendanubeAction(
 
   // 3. Get or create Tiendanube categories locally
   const tnCategories = await getTiendanubeCategories(storeId);
-  const categoryMap = await syncCategoriesFromTiendanube(tnCategories, organizationId);
+  const categoryMap = await syncCategoriesFromTiendanube(
+    tnCategories,
+    organizationId,
+  );
 
   // 4. Get the main location for stock assignment
   const { data: mainLocation } = await supabaseAdmin
@@ -116,7 +126,7 @@ export async function syncProductsFromTiendanubeAction(
       const productData = mapTiendanubeProductToLocal(tnProduct, categoryMap);
 
       if (existing) {
-        // Update existing product
+        // Update existing mapped product
         await updateLocalProductFromTiendanube(
           existing.local_product_id,
           productData,
@@ -134,25 +144,31 @@ export async function syncProductsFromTiendanubeAction(
 
         updated++;
       } else {
-        // Create new product
-        const newProduct = await createLocalProductFromTiendanube(
-          productData,
-          variant.stock ?? 0,
-          locationId,
-          userId,
-          organizationId,
-        );
+        // Use new find-or-create function
+        const { id: productId, wasCreated } =
+          await findOrCreateLocalProductFromTiendanube(
+            productData,
+            variant.stock ?? 0,
+            locationId,
+            userId,
+            organizationId,
+            storeId,
+          );
 
         // Create mapping
         await supabaseAdmin.from("tiendanube_product_map").insert({
           store_id: storeId,
-          local_product_id: newProduct.id,
+          local_product_id: productId,
           tiendanube_product_id: tnProduct.id,
           tiendanube_variant_id: variant.id,
           last_synced_at: new Date().toISOString(),
         });
 
-        created++;
+        if (wasCreated) {
+          created++;
+        } else {
+          linked++; // Existing product was linked
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
@@ -162,7 +178,7 @@ export async function syncProductsFromTiendanubeAction(
 
   revalidateTag("products", "minutes");
 
-  return { created, updated, errors };
+  return { created, updated, linked, errors };
 }
 
 // ============================================================================
@@ -365,7 +381,10 @@ export async function importTiendanubeOrderAction(
   const tax = total - subtotal + discount; // Derive tax
 
   // Resolve local customer from TN order data
-  const customerId = await resolveCustomerFromTiendanubeOrder(tnOrder, organizationId);
+  const customerId = await resolveCustomerFromTiendanubeOrder(
+    tnOrder,
+    organizationId,
+  );
 
   // Create the local sale as PENDING (payment comes via order/paid webhook)
   const { data: sale, error: saleError } = await supabaseAdmin
@@ -509,9 +528,7 @@ export async function createPaymentForTiendanubeOrderAction(
 
   // customer_id is required for customer_payments
   if (!sale.customer_id) {
-    console.error(
-      `Cannot create payment for sale ${sale.id}: no customer_id`,
-    );
+    console.error(`Cannot create payment for sale ${sale.id}: no customer_id`);
     return;
   }
 
@@ -703,13 +720,71 @@ function mapTiendanubeProductToLocal(
 /**
  * Create a local product from Tiendanube data.
  */
-async function createLocalProductFromTiendanube(
+async function findOrCreateLocalProductFromTiendanube(
   productData: ReturnType<typeof mapTiendanubeProductToLocal>,
   stock: number,
   locationId: string | undefined,
   userId: string,
   organizationId: string,
-) {
+  storeId: string,
+): Promise<{ id: string; name: string; wasCreated: boolean }> {
+  // First, check if a product with this SKU/barcode already exists
+  const matchResult = await findExistingProduct(
+    { sku: productData.sku, barcode: productData.barcode },
+    organizationId,
+  );
+
+  if (matchResult.found && matchResult.productId) {
+    // Check if this product is already mapped to this TN store
+    const alreadyMapped = await isProductMappedTo(
+      matchResult.productId,
+      "tiendanube",
+      storeId,
+    );
+
+    if (alreadyMapped) {
+      // Product exists and is already mapped - just return it
+      const { data: existingProduct } = await supabaseAdmin
+        .from("products")
+        .select("id, name")
+        .eq("id", matchResult.productId)
+        .single();
+
+      return {
+        id: matchResult.productId,
+        name: existingProduct?.name || productData.name,
+        wasCreated: false,
+      };
+    }
+
+    // Product exists but isn't mapped to this TN store
+    // Update it with the latest data and return it
+    await updateLocalProductFromTiendanube(
+      matchResult.productId,
+      productData,
+      stock,
+      locationId,
+      userId,
+    );
+
+    console.log(
+      `[TN Sync] Matched existing product by ${matchResult.matchedBy}: ${productData.sku || productData.barcode} → ${matchResult.productId}`,
+    );
+
+    const { data: existingProduct } = await supabaseAdmin
+      .from("products")
+      .select("id, name")
+      .eq("id", matchResult.productId)
+      .single();
+
+    return {
+      id: matchResult.productId,
+      name: existingProduct?.name || productData.name,
+      wasCreated: false,
+    };
+  }
+
+  // No existing product found - create a new one
   const { data: product, error } = await supabaseAdmin
     .from("products")
     .insert({
@@ -742,7 +817,7 @@ async function createLocalProductFromTiendanube(
     }
   }
 
-  return product;
+  return { id: product.id, name: product.name, wasCreated: true };
 }
 
 /**

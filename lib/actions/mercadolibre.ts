@@ -11,6 +11,27 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { MeliItem } from "@/types/mercadolibre";
 import { revalidateTag } from "next/cache";
+import { findExistingProduct, isProductMappedTo } from "../product-matching";
+
+/**
+ * Extract SKU from a MeLi item.
+ * Priority: seller_custom_field > attributes.SELLER_SKU > item.id
+ */
+function extractMeliSku(item: MeliItem): string {
+  // 1. Try seller_custom_field
+  if (item.seller_custom_field) {
+    return item.seller_custom_field;
+  }
+
+  // 2. Try SELLER_SKU attribute
+  const skuAttr = item.attributes?.find((a) => a.id === "SELLER_SKU");
+  if (skuAttr?.value_name) {
+    return skuAttr.value_name;
+  }
+
+  // 3. Fallback to item ID
+  return item.id;
+}
 
 // ============================================================================
 // DISCONNECT
@@ -172,6 +193,7 @@ interface MeliProductData {
 export async function syncProductsFromMercadoLibreAction(): Promise<{
   created: number;
   updated: number;
+  linked: number; // NUEVO: productos existentes vinculados
   removed: number;
   errors: string[];
 }> {
@@ -184,6 +206,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
 
   let created = 0;
   let updated = 0;
+  let linked = 0; // NUEVO
   const errors: string[] = [];
 
   // 1. Get all item IDs
@@ -202,7 +225,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
     (existingMappings || []).map((m) => [m.meli_item_id, m]),
   );
 
-  // 3b. Build set of current MeLi IDs (including variation keys) and clean orphans
+  // 3b. Build set of current MeLi IDs and clean orphans
   const currentMeliIds = new Set<string>();
   for (const item of meliItems) {
     if (item.variations && item.variations.length > 1) {
@@ -230,7 +253,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
 
   const removed = orphanedMappings.length;
 
-  // 4. Get main location for stock assignment
+  // 4. Get main location
   const { data: mainLocation } = await supabaseAdmin
     .from("locations")
     .select("id")
@@ -241,14 +264,14 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
 
   const locationId = mainLocation?.id;
 
-  // 5. Fetch price list for reverse-price calculation
+  // 5. Fetch price list
   const priceListData = await fetchPriceListForAccount(account.price_list_id);
 
   // 6. Process each item
   for (const item of meliItems) {
     try {
       if (item.variations && item.variations.length > 1) {
-        // Item WITH multiple variations → each variation = 1 local product
+        // Item WITH multiple variations
         for (const variation of item.variations) {
           const mapKey = `${item.id}-${variation.id}`;
           const existing = mappingByMeliId.get(mapKey);
@@ -260,11 +283,16 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
 
           const productData: MeliProductData = {
             name,
-            price: getMeliReversePrice(variation.price || item.price, priceListData),
+            price: getMeliReversePrice(
+              variation.price || item.price,
+              priceListData,
+            ),
             stock: variation.available_quantity,
             image_url: getItemImage(item, variation.picture_ids),
             active: item.status === "active",
-            sku: variation.seller_custom_field || `${item.id}-${variation.id}`,
+            sku:
+              variation.seller_custom_field ||
+              extractMeliSku(item) + `-${variation.id}`,
           };
 
           if (existing) {
@@ -281,22 +309,31 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
               .eq("meli_item_id", mapKey);
             updated++;
           } else {
-            const newProduct = await createLocalProductFromMeli(
-              productData,
-              locationId,
-              user.id,
-              organizationId,
-            );
+            // Use new find-or-create function
+            const { id: productId, wasCreated } =
+              await findOrCreateLocalProductFromMeli(
+                productData,
+                locationId,
+                user.id,
+                organizationId,
+                account.meli_user_id,
+              );
+
             await supabaseAdmin.from("mercadolibre_product_map").insert({
               meli_user_id: account.meli_user_id,
-              local_product_id: newProduct.id,
+              local_product_id: productId,
               meli_item_id: mapKey,
             });
-            created++;
+
+            if (wasCreated) {
+              created++;
+            } else {
+              linked++; // Existing product was linked
+            }
           }
         }
       } else {
-        // Simple item (no variations or 1 variation)
+        // Simple item
         const existing = mappingByMeliId.get(item.id);
 
         const productData: MeliProductData = {
@@ -305,7 +342,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
           stock: item.available_quantity,
           image_url: item.pictures?.[0]?.secure_url || null,
           active: item.status === "active",
-          sku: item.seller_custom_field || item.id,
+          sku: extractMeliSku(item),
         };
 
         if (existing) {
@@ -322,18 +359,27 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
             .eq("meli_item_id", item.id);
           updated++;
         } else {
-          const newProduct = await createLocalProductFromMeli(
-            productData,
-            locationId,
-            user.id,
-            organizationId,
-          );
+          // Use new find-or-create function
+          const { id: productId, wasCreated } =
+            await findOrCreateLocalProductFromMeli(
+              productData,
+              locationId,
+              user.id,
+              organizationId,
+              account.meli_user_id,
+            );
+
           await supabaseAdmin.from("mercadolibre_product_map").insert({
             meli_user_id: account.meli_user_id,
-            local_product_id: newProduct.id,
+            local_product_id: productId,
             meli_item_id: item.id,
           });
-          created++;
+
+          if (wasCreated) {
+            created++;
+          } else {
+            linked++; // Existing product was linked
+          }
         }
       }
     } catch (err) {
@@ -345,7 +391,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
   revalidateTag("products", "minutes");
   revalidateTag("mercadolibre", "minutes");
 
-  return { created, updated, removed, errors };
+  return { created, updated, linked, removed, errors };
 }
 
 // ============================================================================
@@ -363,7 +409,93 @@ function getItemImage(
   return item.pictures?.[0]?.secure_url || null;
 }
 
-async function createLocalProductFromMeli(
+async function findOrCreateLocalProductFromMeli(
+  data: MeliProductData,
+  locationId: string | undefined,
+  userId: string,
+  organizationId: string,
+  meliUserId: number,
+): Promise<{ id: string; wasCreated: boolean }> {
+  // First, check if a product with this SKU/barcode already exists
+  const matchResult = await findExistingProduct(
+    { sku: data.sku, barcode: null }, // MeLi doesn't provide barcode in item data
+    organizationId,
+  );
+
+  if (matchResult.found && matchResult.productId) {
+    // Check if this product is already mapped to this MeLi account
+    const alreadyMapped = await isProductMappedTo(
+      matchResult.productId,
+      "mercadolibre",
+      meliUserId,
+    );
+
+    if (alreadyMapped) {
+      // Product exists and is already mapped - just return it
+      return { id: matchResult.productId, wasCreated: false };
+    }
+
+    // Product exists but isn't mapped to this MeLi account
+    // Update it with the latest data and return it
+    await updateLocalProductFromMeli(
+      matchResult.productId,
+      data,
+      locationId,
+      userId,
+    );
+
+    console.log(
+      `[MeLi Sync] Matched existing product by ${matchResult.matchedBy}: ${data.sku} → ${matchResult.productId}`,
+    );
+
+    return { id: matchResult.productId, wasCreated: false };
+  }
+
+  // No existing product found - create a new one
+  const { data: product, error } = await supabaseAdmin
+    .from("products")
+    .insert({
+      name: data.name,
+      sku: data.sku,
+      price: data.price,
+      cost: null,
+      image_url: data.image_url,
+      active: data.active,
+      stock_quantity: data.stock,
+      track_stock: true,
+      product_type: "PRODUCT",
+      visibility: "SALES_AND_PURCHASES",
+      tax_rate: 21,
+      currency: "ARS",
+      organization_id: organizationId,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+
+  if (locationId) {
+    await supabaseAdmin.from("stock").insert({
+      product_id: product.id,
+      location_id: locationId,
+      quantity: data.stock,
+    });
+
+    if (data.stock > 0) {
+      await supabaseAdmin.from("stock_movements").insert({
+        product_id: product.id,
+        location_to_id: locationId,
+        quantity: data.stock,
+        reason: "Sincronización desde MercadoLibre",
+        reference_type: "MERCADOLIBRE_SYNC",
+        created_by: userId,
+      });
+    }
+  }
+
+  return { id: product.id, wasCreated: true };
+}
+/* async function createLocalProductFromMeli(
   data: MeliProductData,
   locationId: string | undefined,
   userId: string,
@@ -411,7 +543,7 @@ async function createLocalProductFromMeli(
   }
 
   return product;
-}
+} */
 
 async function updateLocalProductFromMeli(
   localProductId: string,
@@ -496,7 +628,10 @@ export async function importMeliOrderAction(
   // Fetch the order from MeLi
   const { getMeliOrder } = await import("@/lib/services/mercadolibre");
   const meliOrder = await getMeliOrder(account, meliOrderId);
-  if (!meliOrder) throw new Error(`No se pudo obtener la orden ${meliOrderId} de MercadoLibre`);
+  if (!meliOrder)
+    throw new Error(
+      `No se pudo obtener la orden ${meliOrderId} de MercadoLibre`,
+    );
 
   // Get main location
   const { data: mainLocation } = await supabaseAdmin
@@ -521,11 +656,16 @@ export async function importMeliOrderAction(
   if (numError) throw numError;
 
   // Determine initial status based on payment
-  const isPaid = meliOrder.status === "paid" || meliOrder.paid_amount >= meliOrder.total_amount;
+  const isPaid =
+    meliOrder.status === "paid" ||
+    meliOrder.paid_amount >= meliOrder.total_amount;
   const status = isPaid ? "COMPLETED" : "PENDING";
 
   // Resolve local customer
-  const customerId = await resolveCustomerFromMeliOrder(meliOrder, account.organization_id);
+  const customerId = await resolveCustomerFromMeliOrder(
+    meliOrder,
+    account.organization_id,
+  );
 
   // Create the local sale
   const { data: sale, error: saleError } = await supabaseAdmin
@@ -633,7 +773,10 @@ export async function importMeliOrderAction(
     try {
       await createPaymentForMeliOrder(sale.id, customerId, meliOrder, account);
     } catch (err) {
-      console.error(`Error creating payment for MeLi order ${meliOrderId}:`, err);
+      console.error(
+        `Error creating payment for MeLi order ${meliOrderId}:`,
+        err,
+      );
     }
   }
 
@@ -677,7 +820,9 @@ export async function handleMeliOrderPaymentUpdate(
   const meliOrder = await getMeliOrder(account, meliOrderId);
   if (!meliOrder) return;
 
-  const isPaid = meliOrder.status === "paid" || meliOrder.paid_amount >= meliOrder.total_amount;
+  const isPaid =
+    meliOrder.status === "paid" ||
+    meliOrder.paid_amount >= meliOrder.total_amount;
   if (!isPaid) return;
 
   if (!sale.customer_id) {
@@ -685,7 +830,12 @@ export async function handleMeliOrderPaymentUpdate(
     return;
   }
 
-  await createPaymentForMeliOrder(sale.id, sale.customer_id, meliOrder, account);
+  await createPaymentForMeliOrder(
+    sale.id,
+    sale.customer_id,
+    meliOrder,
+    account,
+  );
 
   // Update sale status
   await supabaseAdmin
@@ -780,7 +930,9 @@ async function resolveCustomerFromMeliOrder(
   const buyer = meliOrder.buyer;
   if (!buyer) return null;
 
-  const name = [buyer.first_name, buyer.last_name].filter(Boolean).join(" ") || buyer.nickname;
+  const name =
+    [buyer.first_name, buyer.last_name].filter(Boolean).join(" ") ||
+    buyer.nickname;
   if (!name) return null;
 
   // Try to find by email first
@@ -870,7 +1022,10 @@ export async function syncSaleStockToMercadoLibre(
   const meliUserIds = [...new Set(mappings.map((m) => m.meli_user_id))];
 
   // Fetch accounts with valid tokens
-  const accounts = new Map<number, Awaited<ReturnType<typeof getMeliAccount>>>();
+  const accounts = new Map<
+    number,
+    Awaited<ReturnType<typeof getMeliAccount>>
+  >();
   for (const meliUserId of meliUserIds) {
     const { data: accountData } = await supabaseAdmin
       .from("mercadolibre_accounts")
@@ -907,7 +1062,10 @@ export async function syncSaleStockToMercadoLibre(
     );
 
   const productMap = new Map(
-    (products || []).map((p) => [p.id, { stock: p.stock_quantity ?? 0, price: p.price ?? 0 }]),
+    (products || []).map((p) => [
+      p.id,
+      { stock: p.stock_quantity ?? 0, price: p.price ?? 0 },
+    ]),
   );
 
   // Sync all in parallel
@@ -919,9 +1077,18 @@ export async function syncSaleStockToMercadoLibre(
       const product = productMap.get(m.local_product_id);
       const stock = Math.max(0, product?.stock ?? 0);
       const priceList = priceListsByUserId.get(m.meli_user_id);
-      const adjustedPrice = getMeliAdjustedPrice(product?.price ?? 0, priceList);
+      const adjustedPrice = getMeliAdjustedPrice(
+        product?.price ?? 0,
+        priceList,
+      );
       const { itemId, variationId } = parseMeliItemKey(m.meli_item_id);
-      return updateMeliItemStock(account, itemId, variationId, stock, adjustedPrice);
+      return updateMeliItemStock(
+        account,
+        itemId,
+        variationId,
+        stock,
+        adjustedPrice,
+      );
     }),
   );
 
@@ -965,9 +1132,7 @@ export async function syncPricesToMercadoLibreAction(): Promise<{
       mappings.map((m) => m.local_product_id),
     );
 
-  const priceMap = new Map(
-    (products || []).map((p) => [p.id, p.price ?? 0]),
-  );
+  const priceMap = new Map((products || []).map((p) => [p.id, p.price ?? 0]));
 
   const priceListData = await fetchPriceListForAccount(account.price_list_id);
 
