@@ -30,10 +30,25 @@ export async function createCategoryAction(data: {
   subcategories?: string[];
 }): Promise<Category> {
   const organizationId = await getOrganizationId();
+  const trimmedName = data.name.trim();
+
+  // Verificar si ya existe una categoría activa con ese nombre
+  const { data: existing } = await supabaseAdmin
+    .from("categories")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("active", true)
+    .ilike("name", trimmedName)
+    .is("parent_id", null)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    throw new Error("Ya existe una categoría con ese nombre");
+  }
 
   const { data: parent, error } = await supabaseAdmin
     .from("categories")
-    .insert({ name: data.name.trim(), organization_id: organizationId })
+    .insert({ name: trimmedName, organization_id: organizationId })
     .select()
     .single();
 
@@ -58,7 +73,7 @@ export async function createCategoryAction(data: {
     }
   }
 
-  revalidateTag("categories", "minutes"); // ← con dos argumentos
+  revalidateTag("categories", "minutes");
   return parent;
 }
 

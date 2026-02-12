@@ -205,49 +205,55 @@ export function RoleFormSheet({
                   <TableRow>
                     <TableHead className="w-full">Módulo</TableHead>
                     <TableHead className="w-16 text-center">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-1 text-xs"
-                        onClick={() => toggleAllColumn("read")}
-                        disabled={isLoading || isSystem}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="flex w-full cursor-pointer items-center justify-center gap-1 text-xs"
+                        onClick={() => { if (!(isLoading || isSystem)) toggleAllColumn("read"); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!(isLoading || isSystem)) toggleAllColumn("read"); } }}
                       >
                         <Checkbox
                           checked={isAllChecked("read")}
                           className="pointer-events-none"
                           tabIndex={-1}
+                          disabled={isLoading || isSystem}
                         />
                         Ver
-                      </button>
+                      </div>
                     </TableHead>
                     <TableHead className="w-16 text-center">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-1 text-xs"
-                        onClick={() => toggleAllColumn("write")}
-                        disabled={isLoading || isSystem}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="flex w-full cursor-pointer items-center justify-center gap-1 text-xs"
+                        onClick={() => { if (!(isLoading || isSystem)) toggleAllColumn("write"); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!(isLoading || isSystem)) toggleAllColumn("write"); } }}
                       >
                         <Checkbox
                           checked={isAllChecked("write")}
                           className="pointer-events-none"
                           tabIndex={-1}
+                          disabled={isLoading || isSystem}
                         />
                         Editar
-                      </button>
+                      </div>
                     </TableHead>
                     <TableHead className="w-16 text-center">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-1 text-xs"
-                        onClick={() => toggleAllColumn("export")}
-                        disabled={isLoading || isSystem}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="flex w-full cursor-pointer items-center justify-center gap-1 text-xs"
+                        onClick={() => { if (!(isLoading || isSystem)) toggleAllColumn("export"); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!(isLoading || isSystem)) toggleAllColumn("export"); } }}
                       >
                         <Checkbox
                           checked={isAllChecked("export")}
                           className="pointer-events-none"
                           tabIndex={-1}
+                          disabled={isLoading || isSystem}
                         />
                         Exportar
-                      </button>
+                      </div>
                     </TableHead>
                   </TableRow>
                 </TableHeader>

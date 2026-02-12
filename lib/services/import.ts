@@ -48,11 +48,15 @@ async function getOrCreateCategory(
 ): Promise<string | null> {
   if (!categoryName) return null;
 
+  const trimmedName = categoryName.trim();
+
+  // Buscar categoría existente
   let query = supabase
     .from("categories")
     .select("id, name")
     .eq("organization_id", organizationId)
-    .ilike("name", categoryName.trim());
+    .eq("active", true)
+    .ilike("name", trimmedName);
 
   if (parentId) {
     query = query.eq("parent_id", parentId);
@@ -60,17 +64,20 @@ async function getOrCreateCategory(
     query = query.is("parent_id", null);
   }
 
-  const { data: existing } = await query.maybeSingle();
-  if (existing) return existing.id;
+  const { data: existing } = await query.limit(1);
+  if (existing && existing.length > 0) {
+    return existing[0].id;
+  }
 
-  // Fallback: accent-insensitive search across all categories
+  // Fallback: búsqueda sin acentos
   const { data: allCats } = await supabase
     .from("categories")
     .select("id, name, parent_id")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .eq("active", true);
 
   if (allCats) {
-    const normalizedInput = normalizeText(categoryName.trim().toLowerCase());
+    const normalizedInput = normalizeText(trimmedName.toLowerCase());
     const match = allCats.find(
       (c) =>
         normalizeText(c.name.toLowerCase()) === normalizedInput &&
@@ -79,11 +86,11 @@ async function getOrCreateCategory(
     if (match) return match.id;
   }
 
-  // Create new category
+  // Crear nueva categoría
   const { data: created, error } = await supabase
     .from("categories")
     .insert({
-      name: categoryName.trim(),
+      name: trimmedName,
       organization_id: organizationId,
       parent_id: parentId,
     })

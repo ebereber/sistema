@@ -1,6 +1,12 @@
 "use client";
 
-import { Package, Search, TrendingUp } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Package,
+  Search,
+  TrendingUp,
+} from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -12,10 +18,19 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Category } from "@/lib/services/categories";
 import type { ProductForSale } from "@/lib/services/sales";
 
+import { Button } from "../ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ProductItem } from "./product-item";
 
 export interface ProductSearchPanelRef {
@@ -136,29 +151,58 @@ export const ProductSearchPanel = forwardRef<
       </div>
 
       {/* Category tabs */}
-      <div className=" ">
-        <ScrollArea className="w-full">
-          <Tabs
-            defaultValue="all"
-            value={selectedCategory || "all"}
-            onValueChange={handleCategoryChange}
-          >
-            <TabsList className="inline-flex h-9 w-max">
-              <TabsTrigger value="all" className="text-xs">
-                Todos
-              </TabsTrigger>
-              {categories.map((category) => (
-                <TabsTrigger
-                  key={category.id}
-                  value={category.id}
-                  className="text-xs"
-                >
-                  {category.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </ScrollArea>
+      <div className="flex-shrink-0 pb-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              className="w-full justify-between"
+            >
+              {selectedCategory
+                ? categories.find((c) => c.id === selectedCategory)?.name
+                : "Todas las categorías"}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-full p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Buscar categoría..." />
+              <CommandList>
+                <CommandEmpty>No se encontró categoría.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="all"
+                    onSelect={() => handleCategoryChange("all")}
+                  >
+                    <Check
+                      className={`mr-2 h-4 w-4 ${
+                        !selectedCategory ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                    Todas las categorías
+                  </CommandItem>
+                  {categories.map((category) => (
+                    <CommandItem
+                      key={category.id}
+                      value={category.name}
+                      onSelect={() => handleCategoryChange(category.id)}
+                    >
+                      <Check
+                        className={`mr-2 h-4 w-4 ${
+                          selectedCategory === category.id
+                            ? "opacity-100"
+                            : "opacity-0"
+                        }`}
+                      />
+                      {category.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Products list */}
