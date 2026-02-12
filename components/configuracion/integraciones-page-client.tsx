@@ -140,14 +140,13 @@ export function IntegracionesPageClient({
         initialStore.store_id,
         userId,
       );
-      const parts = [
-        `Creados: ${result.created}`,
-        `Actualizados: ${result.updated}`,
-      ];
+
+      const parts = [`Creados: ${result.created}`];
       if (result.linked > 0) {
         parts.push(`Vinculados: ${result.linked}`);
       }
       const description = parts.join(", ");
+
       if (result.errors.length > 0) {
         toast.warning("Sincronización completada con errores", {
           description: `${description}, Errores: ${result.errors.length}`,
@@ -224,14 +223,13 @@ export function IntegracionesPageClient({
     setIsMeliSyncing(true);
     try {
       const result = await syncProductsFromMercadoLibreAction();
-      const desc = `Creados: ${result.created}, Actualizados: ${result.updated}${result.removed > 0 ? `, Desvinculados: ${result.removed}` : ""}`;
 
-      const parts = [
-        `Creados: ${result.created}`,
-        `Actualizados: ${result.updated}`,
-      ];
+      const parts = [`Creados: ${result.created}`];
       if (result.linked > 0) {
         parts.push(`Vinculados: ${result.linked}`);
+      }
+      if (result.removed > 0) {
+        parts.push(`Desvinculados: ${result.removed}`);
       }
       const description = parts.join(", ");
 

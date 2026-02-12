@@ -1,8 +1,8 @@
 "use server";
 
-import { getOrganizationId } from "@/lib/auth/get-organization";
 import { syncSaleStockToMercadoLibre } from "@/lib/actions/mercadolibre";
 import { syncSaleStockToTiendanube } from "@/lib/actions/tiendanube";
+import { getOrganizationId } from "@/lib/auth/get-organization";
 import type {
   BulkFilters,
   PriceHistory,
@@ -12,6 +12,10 @@ import type {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidateTag } from "next/cache";
 import * as XLSX from "xlsx";
+import {
+  syncProductsToPlatforms,
+  syncProductToPlatforms,
+} from "./sync-product-to-platforms";
 
 // ============================================================================
 // INDIVIDUAL MUTATIONS
@@ -244,10 +248,12 @@ export async function updateProductAction(
   revalidateTag("products", "minutes");
   revalidateTag(`product-${id}`, "minutes");
 
-  // Sync stock to integrations (fire-and-forget)
-  if (!isCombo && data.stockByLocation) {
-    syncSaleStockToTiendanube([id]).catch(() => {});
-    syncSaleStockToMercadoLibre([id]).catch(() => {});
+  // Sync price and stock to all connected platforms (fire-and-forget)
+  // This runs in background - user doesn't wait for it
+  if (!isCombo) {
+    syncProductToPlatforms(id).catch((err) => {
+      console.error(`Error syncing product ${id} to platforms:`, err);
+    });
   }
 
   return product;
@@ -507,6 +513,14 @@ export async function bulkUpdatePricesAction(params: {
   }
 
   revalidateTag("products", "minutes");
+
+  // Sync prices to all connected platforms (fire-and-forget)
+  if (productIds.length > 0) {
+    syncProductsToPlatforms(productIds).catch((err) => {
+      console.error("Error syncing bulk prices to platforms:", err);
+    });
+  }
+
   return updatedCount;
 }
 

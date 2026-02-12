@@ -72,15 +72,13 @@ export async function syncProductsFromTiendanubeAction(
   userId: string,
 ): Promise<{
   created: number;
-  updated: number;
-  linked: number; // NUEVO: productos existentes vinculados
+  linked: number;
   errors: string[];
 }> {
   const organizationId = await getOrganizationId();
   const errors: string[] = [];
   let created = 0;
-  let updated = 0;
-  let linked = 0; // NUEVO
+  let linked = 0;
 
   // 1. Get all products from Tiendanube
   const tnProducts = await getAllTiendanubeProducts(storeId);
@@ -126,23 +124,14 @@ export async function syncProductsFromTiendanubeAction(
       const productData = mapTiendanubeProductToLocal(tnProduct, categoryMap);
 
       if (existing) {
-        // Update existing mapped product
-        await updateLocalProductFromTiendanube(
-          existing.local_product_id,
-          productData,
-          variant.stock ?? 0,
-          locationId,
-          userId,
-        );
-
-        // Update mapping sync time
+        // Product already mapped - only update sync timestamp, don't touch local data
+        // Local system is the source of truth
         await supabaseAdmin
           .from("tiendanube_product_map")
           .update({ last_synced_at: new Date().toISOString() })
           .eq("store_id", storeId)
           .eq("tiendanube_product_id", tnProduct.id);
-
-        updated++;
+        // Don't count as updated since we didn't change product data
       } else {
         // Use new find-or-create function
         const { id: productId, wasCreated } =
@@ -178,9 +167,8 @@ export async function syncProductsFromTiendanubeAction(
 
   revalidateTag("products", "minutes");
 
-  return { created, updated, linked, errors };
+  return { created, linked, errors };
 }
-
 // ============================================================================
 // STOCK SYNC: Local → Tiendanube
 // ============================================================================
@@ -720,6 +708,10 @@ function mapTiendanubeProductToLocal(
 /**
  * Create a local product from Tiendanube data.
  */
+/**
+ * Find or create a local product from Tiendanube data.
+ * If a product with the same SKU/barcode exists, returns it instead of creating a duplicate.
+ */
 async function findOrCreateLocalProductFromTiendanube(
   productData: ReturnType<typeof mapTiendanubeProductToLocal>,
   stock: number,
@@ -758,17 +750,10 @@ async function findOrCreateLocalProductFromTiendanube(
     }
 
     // Product exists but isn't mapped to this TN store
-    // Update it with the latest data and return it
-    await updateLocalProductFromTiendanube(
-      matchResult.productId,
-      productData,
-      stock,
-      locationId,
-      userId,
-    );
-
+    // Only create the mapping - DON'T overwrite local data
+    // Local system is the source of truth
     console.log(
-      `[TN Sync] Matched existing product by ${matchResult.matchedBy}: ${productData.sku || productData.barcode} → ${matchResult.productId}`,
+      `[TN Sync] Linked existing product by ${matchResult.matchedBy}: ${productData.sku || productData.barcode} → ${matchResult.productId}`,
     );
 
     const { data: existingProduct } = await supabaseAdmin

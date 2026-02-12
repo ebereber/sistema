@@ -192,8 +192,7 @@ interface MeliProductData {
  */
 export async function syncProductsFromMercadoLibreAction(): Promise<{
   created: number;
-  updated: number;
-  linked: number; // NUEVO: productos existentes vinculados
+  linked: number;
   removed: number;
   errors: string[];
 }> {
@@ -205,8 +204,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
   if (!account) throw new Error("No hay cuenta de MercadoLibre conectada");
 
   let created = 0;
-  let updated = 0;
-  let linked = 0; // NUEVO
+  let linked = 0;
   const errors: string[] = [];
 
   // 1. Get all item IDs
@@ -292,22 +290,18 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
             active: item.status === "active",
             sku:
               variation.seller_custom_field ||
-              extractMeliSku(item) + `-${variation.id}`,
+              `${extractMeliSku(item)}-${variation.id}`,
           };
 
           if (existing) {
-            await updateLocalProductFromMeli(
-              existing.local_product_id,
-              productData,
-              locationId,
-              user.id,
-            );
+            // Product already mapped - only update sync timestamp, don't touch local data
+            // Local system is the source of truth
             await supabaseAdmin
               .from("mercadolibre_product_map")
               .update({ last_synced_at: new Date().toISOString() })
               .eq("meli_user_id", account.meli_user_id)
               .eq("meli_item_id", mapKey);
-            updated++;
+            // Don't count as updated since we didn't change product data
           } else {
             // Use new find-or-create function
             const { id: productId, wasCreated } =
@@ -346,18 +340,14 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
         };
 
         if (existing) {
-          await updateLocalProductFromMeli(
-            existing.local_product_id,
-            productData,
-            locationId,
-            user.id,
-          );
+          // Product already mapped - only update sync timestamp, don't touch local data
+          // Local system is the source of truth
           await supabaseAdmin
             .from("mercadolibre_product_map")
             .update({ last_synced_at: new Date().toISOString() })
             .eq("meli_user_id", account.meli_user_id)
             .eq("meli_item_id", item.id);
-          updated++;
+          // Don't count as updated since we didn't change product data
         } else {
           // Use new find-or-create function
           const { id: productId, wasCreated } =
@@ -391,7 +381,7 @@ export async function syncProductsFromMercadoLibreAction(): Promise<{
   revalidateTag("products", "minutes");
   revalidateTag("mercadolibre", "minutes");
 
-  return { created, updated, linked, removed, errors };
+  return { created, linked, removed, errors };
 }
 
 // ============================================================================
@@ -409,6 +399,10 @@ function getItemImage(
   return item.pictures?.[0]?.secure_url || null;
 }
 
+/**
+ * Find or create a local product from MercadoLibre data.
+ * If a product with the same SKU/barcode exists, returns it instead of creating a duplicate.
+ */
 async function findOrCreateLocalProductFromMeli(
   data: MeliProductData,
   locationId: string | undefined,
@@ -436,16 +430,10 @@ async function findOrCreateLocalProductFromMeli(
     }
 
     // Product exists but isn't mapped to this MeLi account
-    // Update it with the latest data and return it
-    await updateLocalProductFromMeli(
-      matchResult.productId,
-      data,
-      locationId,
-      userId,
-    );
-
+    // Only create the mapping - DON'T overwrite local data
+    // Local system is the source of truth
     console.log(
-      `[MeLi Sync] Matched existing product by ${matchResult.matchedBy}: ${data.sku} → ${matchResult.productId}`,
+      `[MeLi Sync] Linked existing product by ${matchResult.matchedBy}: ${data.sku} → ${matchResult.productId}`,
     );
 
     return { id: matchResult.productId, wasCreated: false };
@@ -495,6 +483,7 @@ async function findOrCreateLocalProductFromMeli(
 
   return { id: product.id, wasCreated: true };
 }
+
 /* async function createLocalProductFromMeli(
   data: MeliProductData,
   locationId: string | undefined,
