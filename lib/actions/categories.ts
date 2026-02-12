@@ -6,6 +6,19 @@ import { revalidateTag } from "next/cache";
 import { type Category } from "../services/categories";
 
 export async function deleteCategoryAction(id: string): Promise<void> {
+  // Verificar productos asociados
+  const { count } = await supabaseAdmin
+    .from("products")
+    .select("id", { count: "exact", head: true })
+    .eq("category_id", id)
+    .eq("active", true);
+
+  if (count && count > 0) {
+    throw new Error(
+      `No se puede eliminar: tiene ${count} producto(s) asociado(s). Reasignalos primero.`,
+    );
+  }
+
   // Soft delete children first
   const { error: childError } = await supabaseAdmin
     .from("categories")
@@ -141,17 +154,31 @@ export async function updateCategoryWithSubsAction(
     }
   }
 
-  // Create new subs
-  const newSubs = subcategories
-    .filter((s) => !s.id && s.name.trim())
-    .map((s) => ({
-      name: s.name.trim(),
+  const newSubs = subcategories.filter((s) => !s.id && s.name.trim());
+
+  for (const sub of newSubs) {
+    const trimmedName = sub.name.trim();
+
+    // Verificar si ya existe
+    const { data: existing } = await supabaseAdmin
+      .from("categories")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .eq("parent_id", id)
+      .ilike("name", trimmedName)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      continue; // Saltear duplicados silenciosamente o throw si preferís
+    }
+
+    const { error } = await supabaseAdmin.from("categories").insert({
+      name: trimmedName,
       parent_id: id,
       organization_id: organizationId,
-    }));
+    });
 
-  if (newSubs.length > 0) {
-    const { error } = await supabaseAdmin.from("categories").insert(newSubs);
     if (error) throw error;
   }
 
@@ -163,15 +190,30 @@ export async function createSubcategoryAction(
   name: string,
 ): Promise<Category> {
   const organizationId = await getOrganizationId();
+  const trimmedName = name.trim();
+
+  // Verificar si ya existe
+  const { data: existing } = await supabaseAdmin
+    .from("categories")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("active", true)
+    .eq("parent_id", parentId)
+    .ilike("name", trimmedName)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    throw new Error("Ya existe una subcategoría con ese nombre");
+  }
 
   const { data: subcategory, error } = await supabaseAdmin
     .from("categories")
     .insert({
-      name: name.trim(),
+      name: trimmedName,
       parent_id: parentId,
       organization_id: organizationId,
     })
-    .select() // ← agregar
+    .select()
     .single();
 
   if (error) throw error;
