@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ColaboradoresPageClient } from "@/components/configuracion/colaboradores-page-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
@@ -13,6 +14,7 @@ import { getCachedLocationsWithRegisters } from "@/lib/services/locations-cached
 import { getCachedRoles } from "@/lib/services/roles-cached";
 
 export default async function ColaboradoresPage() {
+  await requirePermission("settings:write");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <ColaboradoresContent />

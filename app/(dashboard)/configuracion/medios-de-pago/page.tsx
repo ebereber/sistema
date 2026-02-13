@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Loader2 } from "lucide-react"
 
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedPaymentMethods } from "@/lib/services/payment-methods-cached"
@@ -10,6 +11,7 @@ import { getCachedActiveBankAccounts } from "@/lib/services/bank-accounts-cached
 import { MediosDePagoPageClient } from "@/components/configuracion/medios-de-pago-page-client"
 
 export default async function MediosDePagoPage() {
+  await requirePermission("settings:write")
   return (
     <Suspense fallback={<PageSkeleton />}>
       <MediosDePagoContent />

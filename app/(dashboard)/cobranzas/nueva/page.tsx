@@ -2,9 +2,12 @@ import { Suspense } from "react"
 
 import { Loader2 } from "lucide-react"
 
+import { requirePermission } from "@/lib/auth/check-permission"
+
 import { NuevaCobranzaContent } from "./nueva-cobranza-content"
 
-export default function NuevaCobranzaPage() {
+export default async function NuevaCobranzaPage() {
+  await requirePermission("sales:read")
   return (
     <Suspense
       fallback={

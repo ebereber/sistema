@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
@@ -16,6 +17,7 @@ export default async function CompraDetallePage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requirePermission("purchases:read")
   const { id } = await params
   return (
     <Suspense fallback={<DetailSkeleton />}>

@@ -1,5 +1,6 @@
-const page = () => {
-  return <div>page</div>;
-};
+import { requirePermission } from "@/lib/auth/check-permission";
 
-export default page;
+export default async function EditarCobranzaPage() {
+  await requirePermission("sales:read");
+  return <div>page</div>;
+}

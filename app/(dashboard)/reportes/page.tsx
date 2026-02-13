@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/auth/check-permission";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -27,7 +28,8 @@ interface Report {
   disabledMessage?: string;
 }
 
-export default function ReportesPage() {
+export default async function ReportesPage() {
+  await requirePermission("reports:read");
   // Categorías de reportes
   const categories = [
     {

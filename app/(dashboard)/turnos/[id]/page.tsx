@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { TurnoDetalleClient } from "@/components/turnos/turno-detalle-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
   getCachedShiftActivities,
@@ -16,6 +17,7 @@ export default async function TurnoDetallePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermission("shifts:read");
   const { id } = await params;
   return (
     <Suspense fallback={<LoadingSkeleton />}>

@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedTreasuryOverview } from "@/lib/services/treasury-cached";
 import { TesoreriaPageClient } from "@/components/tesoreria/tesoreria-page-client";
 
 export default async function TesoreriaPage() {
+  await requirePermission("treasury:read");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <TesoreriaContent />

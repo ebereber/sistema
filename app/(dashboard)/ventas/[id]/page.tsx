@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { VentaDetailClient } from "@/components/ventas/venta-detail-client"
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedSaleById } from "@/lib/services/sales-cached"
@@ -12,6 +13,7 @@ export default async function VentasDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requirePermission("sales:read")
   const { id } = await params
   return (
     <Suspense fallback={<LoadingSkeleton />}>

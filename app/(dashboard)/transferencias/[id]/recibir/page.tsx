@@ -1,4 +1,5 @@
 import { RecibirTransferenciaClient } from "@/components/transferencias/recibir-transferencia-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getTransferById } from "@/lib/services/transfers";
 import { notFound } from "next/navigation";
 
@@ -9,6 +10,7 @@ interface RecibirTransferenciaPageProps {
 export default async function RecibirTransferenciaPage({
   params,
 }: RecibirTransferenciaPageProps) {
+  await requirePermission("inventory:write");
   const { id } = await params;
 
   try {

@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedBankAccounts } from "@/lib/services/bank-accounts-cached";
 import { BancosPageClient } from "@/components/configuracion/bancos-page-client";
 
 export default async function BancosPage() {
+  await requirePermission("settings:write");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <BancosContent />

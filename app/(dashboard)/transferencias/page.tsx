@@ -1,4 +1,5 @@
 import { TransferenciasClient } from "@/components/transferencias/transferencias-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getTransfers } from "@/lib/services/transfers";
 
 interface TransferenciasPageProps {
@@ -12,6 +13,7 @@ interface TransferenciasPageProps {
 export default async function TransferenciasPage({
   searchParams,
 }: TransferenciasPageProps) {
+  await requirePermission("inventory:write");
   const params = await searchParams;
   const statusFilter = params.status ? params.status.split(",") : undefined;
   const page = params.page ? parseInt(params.page) : 1;

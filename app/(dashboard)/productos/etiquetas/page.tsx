@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import {
   getCachedCategories,
@@ -33,6 +34,7 @@ export default async function EtiquetasPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("products:read");
   const params = await searchParams;
   const organizationId = await getOrganizationId();
 

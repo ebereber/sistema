@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedLocations, getCachedCashRegisters } from "@/lib/services/locations-cached"
@@ -11,6 +12,7 @@ import { getCachedSafeBoxes } from "@/lib/services/safe-boxes-cached"
 import { UbicacionesPageClient } from "@/components/configuracion/ubicaciones-page-client"
 
 export default async function UbicacionesPage() {
+  await requirePermission("settings:write")
   return (
     <Suspense fallback={<PageSkeleton />}>
       <UbicacionesContent />

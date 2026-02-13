@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { ProductosPageClient } from "@/components/productos/productos-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedLocations } from "@/lib/services/locations-cached";
@@ -26,6 +27,7 @@ export default async function ProductosPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("products:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

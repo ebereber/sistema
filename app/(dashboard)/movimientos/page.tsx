@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedAllTreasuryMovements } from "@/lib/services/treasury-cached";
@@ -15,6 +16,7 @@ import {
 } from "@/components/tesoreria/movimientos-page-client";
 
 export default async function MovimientosPage() {
+  await requirePermission("treasury:read");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <MovimientosContent />

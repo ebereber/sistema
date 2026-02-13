@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedTreasuryAccountDetail } from "@/lib/services/treasury-cached";
 import { TesoreriaDetailClient } from "@/components/tesoreria/tesoreria-detail-client";
@@ -16,6 +17,7 @@ export default async function TesoreriaDetailPage({
   params,
   searchParams,
 }: TesoreriaDetailPageProps) {
+  await requirePermission("treasury:read");
   const { id } = await params;
   const { type } = await searchParams;
 

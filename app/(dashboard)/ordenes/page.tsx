@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { OrdenesPageClient } from "@/components/ordenes/ordenes-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchaseOrders } from "@/lib/services/purchase-orders-cached";
@@ -23,6 +24,7 @@ export default async function OrdenesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("orders:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

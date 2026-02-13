@@ -2,9 +2,12 @@ import { Suspense } from "react"
 
 import { Loader2 } from "lucide-react"
 
+import { requirePermission } from "@/lib/auth/check-permission"
+
 import { NuevaNcContent } from "./nueva-nc-content"
 
-export default function NuevaNcPage() {
+export default async function NuevaNcPage() {
+  await requirePermission("sales:write")
   return (
     <Suspense
       fallback={

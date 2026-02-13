@@ -3,12 +3,14 @@ import { redirect } from "next/navigation"
 
 import { Loader2 } from "lucide-react"
 
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedCategoriesHierarchy } from "@/lib/services/categories-cached"
 import { CategoriasPageClient } from "@/components/configuracion/categorias-page-client"
 
 export default async function CategoriasPage() {
+  await requirePermission("settings:write")
   return (
     <Suspense fallback={<PageSkeleton />}>
       <CategoriasContent />

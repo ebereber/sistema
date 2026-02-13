@@ -1,4 +1,5 @@
 import { TransferenciaDetalleClient } from "@/components/transferencias/transferencia-detalle-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getTransferById } from "@/lib/services/transfers";
 import { notFound } from "next/navigation";
 
@@ -8,6 +9,7 @@ interface TransferenciaDetailPageProps {
 export default async function TransferenciaDetailPage({
   params,
 }: TransferenciaDetailPageProps) {
+  await requirePermission("inventory:write");
   const { id } = await params;
 
   let transfer;

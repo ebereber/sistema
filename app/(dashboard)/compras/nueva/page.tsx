@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import {
@@ -19,6 +20,7 @@ export default async function NuevaCompraPage({
 }: {
   searchParams: Promise<{ duplicateFrom?: string; purchaseOrderId?: string }>
 }) {
+  await requirePermission("purchases:write")
   const params = await searchParams
   return (
     <Suspense fallback={<FormSkeleton />}>

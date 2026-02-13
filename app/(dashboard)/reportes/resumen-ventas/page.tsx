@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { ResumenVentasClient } from "@/components/reportes/resumen-ventas-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSalesReportAction } from "@/lib/actions/reports";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -150,6 +151,7 @@ export default async function ResumenVentasPage({
     sellerIds?: string;
   }>;
 }) {
+  await requirePermission("reports:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

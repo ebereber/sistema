@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { CustomersPageClient } from "@/components/clientes/customers-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCustomers } from "@/lib/services/customers-cached";
@@ -19,6 +20,7 @@ export default async function ClientesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("customers:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { EditarProductoClient } from "@/components/productos/editar-producto-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCategories } from "@/lib/services/categories-cached";
@@ -22,6 +23,7 @@ export default async function ProductoDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermission("products:read");
   const { id } = await params;
   return (
     <Suspense fallback={<DetailSkeleton />}>

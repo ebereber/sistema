@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { CobranzasPageClient } from "@/components/cobranzas/cobranzas-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getServerUserScope } from "@/lib/auth/get-server-user-scope";
@@ -21,6 +22,7 @@ export default async function CobranzasPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("sales:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

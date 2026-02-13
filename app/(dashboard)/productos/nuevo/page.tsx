@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { NuevoProductoClient } from "@/components/productos/nuevo-producto-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedCategories } from "@/lib/services/categories-cached";
@@ -33,6 +34,7 @@ export default async function NuevoProductoPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("products:write");
   const params = await searchParams;
   return (
     <Suspense fallback={<FormSkeleton />}>

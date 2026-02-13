@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { NuevaVentaClient } from "@/components/ventas/nueva-venta-client"
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedLocations } from "@/lib/services/locations-cached"
@@ -14,6 +15,7 @@ import {
 import { getCachedActiveSafeBoxes } from "@/lib/services/safe-boxes-cached"
 
 export default async function NuevaVentaPage() {
+  await requirePermission("sales:write")
   return (
     <Suspense fallback={<PageSkeleton />}>
       <NuevaVentaContent />

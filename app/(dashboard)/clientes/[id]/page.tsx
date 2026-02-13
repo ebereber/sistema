@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
@@ -17,6 +18,7 @@ export default async function ClientePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermission("customers:read");
   const { id } = await params;
   return (
     <Suspense fallback={<PageSkeleton />}>

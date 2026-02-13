@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { ComprasPageClient } from "@/components/compras/compras-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchases } from "@/lib/services/purchases-cached";
@@ -22,6 +23,7 @@ export default async function ComprasPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("purchases:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

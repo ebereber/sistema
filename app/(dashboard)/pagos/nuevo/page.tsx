@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPaymentMethods } from "@/lib/services/payment-methods-cached";
@@ -10,7 +11,8 @@ import { getCachedActiveBankAccounts } from "@/lib/services/bank-accounts-cached
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached";
 import { NuevoPagoForm } from "@/components/pagos/nuevo-pago-form";
 
-export default function NuevoPagoPage() {
+export default async function NuevoPagoPage() {
+  await requirePermission("purchases:write");
   return (
     <Suspense fallback={<LoadingSkeleton />}>
       <NuevoPagoContent />

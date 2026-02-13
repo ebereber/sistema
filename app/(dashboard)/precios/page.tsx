@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { PreciosPageClient } from "@/components/precios/precios-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedProducts } from "@/lib/services/products-cached";
@@ -14,6 +15,7 @@ export default async function PreciosPage({
 }: {
   searchParams: Promise<{ search?: string; page?: string }>;
 }) {
+  await requirePermission("products:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

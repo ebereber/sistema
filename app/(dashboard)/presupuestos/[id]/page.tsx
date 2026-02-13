@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PresupuestoDetalleClient } from "@/components/presupuestos/presupuesto-detalle-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedQuoteById } from "@/lib/services/quotes-cached";
@@ -13,6 +14,7 @@ export default async function PresupuestoDetallePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermission("sales:read");
   const { id } = await params;
   return (
     <Suspense fallback={<LoadingSkeleton />}>

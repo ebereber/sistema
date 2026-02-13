@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { Loader2 } from "lucide-react";
 
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getFiscalConfig, getFiscalPointsOfSale } from "@/lib/services/fiscal";
@@ -12,7 +13,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCachedPointsOfSale } from "@/lib/services/point-of-sale-cached";
 import { ConfiguracionContent } from "./configuracion-content";
 
-export default function ConfiguracionPage() {
+export default async function ConfiguracionPage() {
+  await requirePermission("settings:write");
   return (
     <Suspense
       fallback={

@@ -3,11 +3,13 @@ import { Suspense } from "react";
 
 import { IntegracionesPageClient } from "@/components/configuracion/integraciones-page-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export default async function IntegracionesPage() {
+  await requirePermission("settings:write");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <IntegracionesContent />

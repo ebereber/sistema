@@ -3,11 +3,13 @@ import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { PurchaseOrderForm } from "@/components/ordenes/purchase-order-form";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedLocations } from "@/lib/services/locations-cached";
 
 export default async function NuevaOrdenPage() {
+  await requirePermission("orders:write");
   return (
     <Suspense fallback={<LoadingSkeleton />}>
       <NuevaOrdenContent />

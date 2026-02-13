@@ -3,12 +3,14 @@ import { redirect } from "next/navigation"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedSuppliers } from "@/lib/services/suppliers-cached"
 import { SuppliersPageClient } from "@/components/proveedores/suppliers-page-client"
 
 export default async function ProveedoresPage() {
+  await requirePermission("suppliers:read")
   return (
     <Suspense fallback={<PageSkeleton />}>
       <SuppliersContent />

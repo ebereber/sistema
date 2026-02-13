@@ -3,6 +3,7 @@ import { Suspense } from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { VentasPageClient } from "@/components/ventas/ventas-page-client"
+import { requirePermission } from "@/lib/auth/check-permission"
 import { getOrganizationId } from "@/lib/auth/get-organization"
 import { getServerUser } from "@/lib/auth/get-server-user"
 import { getCachedSales } from "@/lib/services/sales-cached"
@@ -22,6 +23,7 @@ export default async function VentasPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  await requirePermission("sales:read")
   const params = await searchParams
   return (
     <Suspense fallback={<PageSkeleton />}>

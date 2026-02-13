@@ -3,11 +3,13 @@ import { Suspense } from "react";
 
 import { RolesPageClient } from "@/components/configuracion/roles-page-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedRoles } from "@/lib/services/roles-cached";
 
 export default async function RolesPage() {
+  await requirePermission("settings:write");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <RolesContent />

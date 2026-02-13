@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { OrdenDetalleClient } from "@/components/ordenes/orden-detalle-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPurchaseOrderById } from "@/lib/services/purchase-orders-cached";
@@ -14,6 +15,7 @@ export default async function OrdenDetallePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermission("orders:read");
   const { id } = await params;
   return (
     <Suspense fallback={<LoadingSkeleton />}>

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { PagosPageClient } from "@/components/pagos/pagos-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedSupplierPayments } from "@/lib/services/supplier-payments-cached";
@@ -22,6 +23,7 @@ export default async function PagosPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("purchases:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { InventoryPageClient } from "@/components/inventario/inventory-page-client";
+import { requirePermission } from "@/lib/auth/check-permission";
 import { getOrganizationId } from "@/lib/auth/get-organization";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
@@ -30,6 +31,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requirePermission("inventory:read");
   const params = await searchParams;
   return (
     <Suspense fallback={<PageSkeleton />}>
