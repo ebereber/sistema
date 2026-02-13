@@ -72,7 +72,7 @@ const NAV_ITEMS = [
     items: [
       { title: "Cobranzas", url: "/cobranzas", permission: "sales:read" },
       { title: "Presupuestos", url: "/presupuestos", permission: "sales:read" },
-      { title: "Turnos", url: "/turnos", permission: "sales:read" },
+      { title: "Turnos", url: "/turnos", permission: "shifts:read" },
     ],
   },
   {
@@ -98,13 +98,9 @@ const NAV_ITEMS = [
       {
         title: "Transferencias",
         url: "/transferencias",
-        permission: "products:read",
+        permission: "inventory:write",
       },
-      {
-        title: "Inventario",
-        url: "/inventario",
-        permission: "products:read",
-      },
+      { title: "Inventario", url: "/inventario", permission: "inventory:read" },
     ],
   },
   {
@@ -123,12 +119,12 @@ const NAV_ITEMS = [
     title: "Tesorería",
     url: "/tesoreria",
     icon: PanelLeft,
-    permission: "settings:write",
+    permission: "treasury:read",
     items: [
       {
         title: "Movimientos",
         url: "/movimientos",
-        permission: "settings:write",
+        permission: "treasury:read",
       },
     ],
   },
@@ -136,14 +132,13 @@ const NAV_ITEMS = [
     title: "Reportes",
     url: "/reportes",
     icon: ChartNoAxesColumnDecreasing,
-    permission: "settings:write",
+    permission: "reports:read",
   },
-
   {
     title: "Importar",
     url: "/importar",
     icon: Import,
-    permission: "settings:write",
+    permission: "import:write",
   },
   {
     title: "Configuración",

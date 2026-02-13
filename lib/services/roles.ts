@@ -19,14 +19,20 @@ export interface RoleWithCount extends Role {
 export const PERMISSION_MODULES = [
   { key: "sales", label: "Ventas" },
   { key: "products", label: "Productos" },
+  { key: "inventory", label: "Inventario" },
   { key: "customers", label: "Clientes" },
   { key: "purchases", label: "Compras" },
   { key: "suppliers", label: "Proveedores" },
   { key: "orders", label: "Órdenes de compra" },
+  { key: "treasury", label: "Tesorería" },
+  { key: "reports", label: "Reportes" },
 ] as const;
 
 export const STANDALONE_PERMISSIONS = [
-  { key: "settings:write", label: "Configuración completa" },
+  { key: "settings:write", label: "Configuración del sistema" },
+  { key: "import:write", label: "Importar datos" },
+  { key: "shifts:read", label: "Ver turnos" },
+  { key: "shifts:write", label: "Gestionar turnos" },
 ] as const;
 
 export const SPECIAL_ACTIONS_LIST = [

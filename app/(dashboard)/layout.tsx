@@ -5,8 +5,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 import { AppHeader } from "@/components/sidebar/app-header";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { UserProvider } from "@/lib/auth/user-provider";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { UserProvider } from "@/lib/auth/user-provider";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -50,7 +50,7 @@ export default async function DashboardLayout({
 
   return (
     <UserProvider>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <AppSidebar />
         <SidebarInset>
           <AppHeader />
