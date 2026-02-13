@@ -26,10 +26,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useActiveShift } from "@/hooks/use-active-shift";
 import { useUserCashRegisters } from "@/hooks/use-user-cash-registers";
-import { depositFromShiftToSafeBoxAction } from "@/lib/actions/safe-boxes";
 import { useCurrentUser } from "@/lib/auth/user-provider";
+import type { Shift, ShiftSummary } from "@/lib/services/shifts";
 import {
   type CartItem as CartItemType,
   type CartTotals,
@@ -88,6 +87,23 @@ interface CartPanelProps {
   onCancelExchange?: () => void;
   exchangeTotals?: ExchangeTotals;
   activeSafeBoxes?: Array<{ id: string; name: string }>;
+  // Shift props (managed by parent)
+  shift: Shift | null;
+  shiftSummary: ShiftSummary | null;
+  isShiftLoading: boolean;
+  onOpenShift: (cashRegisterId: string, openingAmount: number) => Promise<void>;
+  onCloseShift: (
+    countedAmount: number,
+    leftInCash: number,
+    discrepancyNotes?: string,
+    safeBoxDeposit?: { safeBoxId: string; amount: number },
+  ) => Promise<void>;
+  onRefetchShift: () => Promise<void>;
+  onDepositToSafeBox: (
+    safeBoxId: string,
+    amount: number,
+    notes?: string,
+  ) => Promise<void>;
 }
 
 export function CartPanel({
@@ -114,6 +130,13 @@ export function CartPanel({
   onCancelExchange,
   exchangeTotals,
   activeSafeBoxes = [],
+  shift,
+  shiftSummary,
+  isShiftLoading,
+  onOpenShift,
+  onCloseShift,
+  onRefetchShift,
+  onDepositToSafeBox,
 }: CartPanelProps) {
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
@@ -121,14 +144,6 @@ export function CartPanel({
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [saveQuoteDialogOpen, setSaveQuoteDialogOpen] = useState(false);
-  const {
-    shift,
-    summary,
-    isLoading: isShiftLoading,
-    openNewShift,
-    closeCurrentShift,
-    refetch: refetchShift,
-  } = useActiveShift();
 
   const [selectedCashRegisterId, setSelectedCashRegisterId] = useState<
     string | null
@@ -174,7 +189,7 @@ export function CartPanel({
       return;
     }
     try {
-      await openNewShift(selectedCashRegisterId, openingAmount);
+      await onOpenShift(selectedCashRegisterId, openingAmount);
       toast.success("Turno abierto");
     } catch (error) {
       console.error("Error opening shift:", error);
@@ -191,17 +206,7 @@ export function CartPanel({
     safeBoxDeposit?: { safeBoxId: string; amount: number },
   ) => {
     try {
-      await closeCurrentShift(countedAmount, leftInCash, undefined, notes);
-
-      // Deposit to safe box after closing shift if requested
-      if (safeBoxDeposit && shift) {
-        await depositFromShiftToSafeBoxAction({
-          shiftId: shift.id,
-          safeBoxId: safeBoxDeposit.safeBoxId,
-          amount: safeBoxDeposit.amount,
-        });
-      }
-
+      await onCloseShift(countedAmount, leftInCash, notes, safeBoxDeposit);
       toast.success("Turno cerrado");
     } catch (error) {
       console.error("Error closing shift:", error);
@@ -218,13 +223,7 @@ export function CartPanel({
   ) => {
     if (!shift) return;
     try {
-      await depositFromShiftToSafeBoxAction({
-        shiftId: shift.id,
-        safeBoxId,
-        amount,
-        notes,
-      });
-      await refetchShift();
+      await onDepositToSafeBox(safeBoxId, amount, notes);
       toast.success("Deposito en caja fuerte realizado");
     } catch (error) {
       console.error("Error depositing to safe box:", error);
@@ -242,14 +241,13 @@ export function CartPanel({
           </h2>
           {isShiftLoading ? (
             <Spinner />
-          ) : shift && summary ? (
+          ) : shift ? (
             <ActiveShiftDialog
               shift={shift}
-              summary={summary}
               safeBoxes={activeSafeBoxes}
               onDepositToSafeBox={handleDepositToSafeBox}
               onCloseShift={handleCloseShift}
-              onRefresh={refetchShift}
+              onRefresh={onRefetchShift}
               trigger={
                 <Button
                   variant="link"

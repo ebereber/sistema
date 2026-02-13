@@ -65,7 +65,7 @@ export async function getCashRegistersByLocation(
     )
     .eq("location_id", locationId)
     .eq("status", "active")
-    .order("name");
+    .order("created_at", { ascending: true });
 
   if (error) throw error;
 

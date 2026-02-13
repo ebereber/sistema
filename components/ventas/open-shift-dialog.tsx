@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { getLastClosedShift } from "@/lib/services/shifts";
+import { getLastClosedShiftAction } from "@/lib/actions/shifts";
 import { useEffect, useState } from "react";
 import {
   Select,
@@ -53,13 +53,16 @@ export function OpenShiftDialog({
 
       setIsLoadingPrevious(true);
       try {
-        const lastShift = await getLastClosedShift(selectedCashRegisterId);
+        const lastShift = await getLastClosedShiftAction(
+          selectedCashRegisterId,
+        );
+        console.log("Last shift result:", lastShift); // <-- agregá esto
         if (
           lastShift?.left_in_cash !== null &&
           lastShift?.left_in_cash !== undefined
         ) {
-          setPreviousAmount(Number(lastShift.left_in_cash));
-          setOpeningAmount(Number(lastShift.left_in_cash));
+          setPreviousAmount(lastShift.left_in_cash);
+          setOpeningAmount(lastShift.left_in_cash);
         } else {
           setPreviousAmount(null);
           setShowEditAmount(true);

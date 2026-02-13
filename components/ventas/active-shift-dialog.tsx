@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { getShiftSummaryAction } from "@/lib/actions/shifts";
 import type { Shift, ShiftSummary } from "@/lib/services/shifts";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
@@ -45,7 +46,6 @@ interface ShiftActivity {
 
 interface ActiveShiftDialogProps {
   shift: Shift;
-  summary: ShiftSummary;
   safeBoxes: Array<{ id: string; name: string }>;
   onDepositToSafeBox: (
     safeBoxId: string,
@@ -65,7 +65,6 @@ interface ActiveShiftDialogProps {
 
 export function ActiveShiftDialog({
   shift,
-  summary,
   safeBoxes,
   onDepositToSafeBox,
   onCloseShift,
@@ -74,6 +73,8 @@ export function ActiveShiftDialog({
   trigger,
 }: ActiveShiftDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [summary, setSummary] = useState<ShiftSummary | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [activities, setActivities] = useState<ShiftActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
@@ -202,6 +203,17 @@ export function ActiveShiftDialog({
     }
   }, [shift]);
 
+  // Load summary when dialog opens
+  useEffect(() => {
+    if (isOpen && shift?.id) {
+      setIsLoadingSummary(true);
+      getShiftSummaryAction(shift.id)
+        .then((data) => setSummary(data))
+        .catch((err) => console.error("Error loading summary:", err))
+        .finally(() => setIsLoadingSummary(false));
+    }
+  }, [isOpen, shift?.id]);
+
   // Load activities when dialog opens or detail expands
   useEffect(() => {
     if (isOpen && showDetail) {
@@ -295,38 +307,48 @@ export function ActiveShiftDialog({
               )}
 
               {/* Collections summary */}
-              <div className="rounded-lg border p-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Cobranzas brutas
-                    </span>
-                    <span>{formatCurrency(summary.grossCollections)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Devoluciones</span>
-                    <span>{formatCurrency(summary.refunds)}</span>
-                  </div>
-                  <div className="flex justify-between border-t pt-2 font-medium">
-                    <span>Cobranzas netas</span>
-                    <span>{formatCurrency(summary.netCollections)}</span>
-                  </div>
+              {isLoadingSummary || !summary ? (
+                <div className="rounded-lg border p-4 space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="rounded-lg border p-4">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Cobranzas brutas
+                        </span>
+                        <span>{formatCurrency(summary.grossCollections)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Devoluciones</span>
+                        <span>{formatCurrency(summary.refunds)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2 font-medium">
+                        <span>Cobranzas netas</span>
+                        <span>{formatCurrency(summary.netCollections)}</span>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Detail toggle and current amount */}
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowDetail(!showDetail)}
-                >
-                  {showDetail ? "Ocultar detalle" : "Ver detalle"}
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Monto en caja: {formatCurrency(summary.currentCashAmount)}
-                </span>
-              </div>
+                  {/* Detail toggle and current amount */}
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDetail(!showDetail)}
+                    >
+                      {showDetail ? "Ocultar detalle" : "Ver detalle"}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Monto en caja: {formatCurrency(summary.currentCashAmount)}
+                    </span>
+                  </div>
+                </>
+              )}
 
               {/* Activities list */}
               {showDetail && (
@@ -393,7 +415,7 @@ export function ActiveShiftDialog({
               shift={{
                 id: shift.id,
                 cashRegisterName: shift.cash_register?.name || "Caja",
-                currentCashAmount: summary.currentCashAmount,
+                currentCashAmount: summary?.currentCashAmount ?? 0,
               }}
               safeBoxes={safeBoxes}
               onCloseShift={handleCloseShift}
@@ -447,13 +469,13 @@ export function ActiveShiftDialog({
                 className="w-full"
                 isAllowed={(values) =>
                   values.floatValue === undefined ||
-                  values.floatValue <= summary.currentCashAmount
+                  values.floatValue <= (summary?.currentCashAmount ?? 0)
                 }
                 autoFocus
               />
               <p className="text-xs text-muted-foreground">
                 Disponible en caja:{" "}
-                {formatCurrency(summary.currentCashAmount)}
+                {formatCurrency(summary?.currentCashAmount ?? 0)}
               </p>
             </div>
 
@@ -485,7 +507,7 @@ export function ActiveShiftDialog({
               disabled={
                 !depositSafeBoxId ||
                 depositAmount <= 0 ||
-                depositAmount > summary.currentCashAmount ||
+                depositAmount > (summary?.currentCashAmount ?? 0) ||
                 isDepositing
               }
             >

@@ -20,15 +20,24 @@ import {
   ProductSearchPanel,
   type ProductSearchPanelRef,
 } from "@/components/ventas/product-search-panel";
-import { useActiveShift } from "@/hooks/use-active-shift";
+import {
+  addCashToShiftAction,
+  closeShiftAction,
+  getActiveShiftAction,
+  getShiftSummaryAction,
+  openShiftAction,
+  removeCashFromShiftAction,
+} from "@/lib/actions/shifts";
 import type { Category } from "@/lib/services/categories";
 import type { Location } from "@/lib/services/locations";
+import type { Shift, ShiftSummary } from "@/lib/services/shifts";
 import {
   type ProductForSale,
   getAdjustedPrice,
   getSaleForExchange,
   getSaleItemsForDuplicate,
 } from "@/lib/services/sales";
+import { useShiftStore } from "@/lib/store/shift-store";
 import { useSaleCartStore } from "@/lib/store/sale-cart-store";
 import {
   type CartItem,
@@ -47,6 +56,7 @@ interface NuevaVentaClientProps {
   categories: Category[];
   allLocations: Location[];
   activeSafeBoxes: Array<{ id: string; name: string }>;
+  initialShift: Shift | null;
 }
 
 export function NuevaVentaClient({
@@ -55,6 +65,7 @@ export function NuevaVentaClient({
   categories,
   allLocations,
   activeSafeBoxes,
+  initialShift,
 }: NuevaVentaClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,7 +99,100 @@ export function NuevaVentaClient({
     clear,
   } = useSaleCartStore();
 
-  const { shift } = useActiveShift();
+  // Shift store
+  const { shift, summary: shiftSummary, isLoading: isShiftLoading, setShift, setSummary, setLoading, clearShift } = useShiftStore();
+
+  // Initialize shift store from server-fetched data
+  const shiftInitialized = useRef(false);
+  useEffect(() => {
+    if (!shiftInitialized.current) {
+      shiftInitialized.current = true;
+      setShift(initialShift);
+      setLoading(false);
+    }
+  }, [initialShift, setShift, setLoading]);
+
+  // Shift handlers
+  const handleOpenShift = useCallback(
+    async (cashRegisterId: string, openingAmount: number) => {
+      const newShift = await openShiftAction(cashRegisterId, openingAmount);
+      setShift(newShift);
+      setSummary({
+        grossCollections: 0,
+        refunds: 0,
+        netCollections: 0,
+        cashIn: 0,
+        cashOut: 0,
+        currentCashAmount: openingAmount,
+      });
+    },
+    [setShift, setSummary],
+  );
+
+  const handleCloseShift = useCallback(
+    async (
+      countedAmount: number,
+      leftInCash: number,
+      discrepancyNotes?: string,
+      safeBoxDeposit?: { safeBoxId: string; amount: number },
+    ) => {
+      if (!shift) throw new Error("No hay turno activo");
+
+      const { depositFromShiftToSafeBoxAction } = await import(
+        "@/lib/actions/safe-boxes"
+      );
+
+      await closeShiftAction(shift.id, {
+        countedAmount,
+        leftInCash,
+        discrepancyNotes,
+      });
+
+      if (safeBoxDeposit) {
+        await depositFromShiftToSafeBoxAction({
+          shiftId: shift.id,
+          safeBoxId: safeBoxDeposit.safeBoxId,
+          amount: safeBoxDeposit.amount,
+        });
+      }
+
+      clearShift();
+    },
+    [shift, clearShift],
+  );
+
+  const handleRefetchShift = useCallback(async () => {
+    setLoading(true);
+    try {
+      const activeShift = await getActiveShiftAction();
+      setShift(activeShift);
+      if (activeShift) {
+        const summary = await getShiftSummaryAction(activeShift.id);
+        setSummary(summary);
+      } else {
+        setSummary(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [setShift, setSummary, setLoading]);
+
+  const handleDepositToSafeBox = useCallback(
+    async (safeBoxId: string, amount: number, notes?: string) => {
+      if (!shift) return;
+      const { depositFromShiftToSafeBoxAction } = await import(
+        "@/lib/actions/safe-boxes"
+      );
+      await depositFromShiftToSafeBoxAction({
+        shiftId: shift.id,
+        safeBoxId,
+        amount,
+        notes,
+      });
+      await handleRefetchShift();
+    },
+    [shift, handleRefetchShift],
+  );
 
   // Checkout state (UI-only, no persistence needed)
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -524,6 +628,13 @@ export function NuevaVentaClient({
           onCancelExchange={handleCancelExchange}
           exchangeTotals={exchangeTotals}
           activeSafeBoxes={activeSafeBoxes}
+          shift={shift}
+          shiftSummary={shiftSummary}
+          isShiftLoading={isShiftLoading}
+          onOpenShift={handleOpenShift}
+          onCloseShift={handleCloseShift}
+          onRefetchShift={handleRefetchShift}
+          onDepositToSafeBox={handleDepositToSafeBox}
         />
       </div>
 
@@ -571,6 +682,13 @@ export function NuevaVentaClient({
                   onCancelExchange={handleCancelExchange}
                   exchangeTotals={exchangeTotals}
                   activeSafeBoxes={activeSafeBoxes}
+                  shift={shift}
+                  shiftSummary={shiftSummary}
+                  isShiftLoading={isShiftLoading}
+                  onOpenShift={handleOpenShift}
+                  onCloseShift={handleCloseShift}
+                  onRefetchShift={handleRefetchShift}
+                  onDepositToSafeBox={handleDepositToSafeBox}
                 />
               </div>
             </DrawerContent>

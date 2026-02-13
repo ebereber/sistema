@@ -13,6 +13,7 @@ import {
   getCachedTopSellingProducts,
 } from "@/lib/services/products-cached";
 import { getCachedActiveSafeBoxes } from "@/lib/services/safe-boxes-cached";
+import { getActiveShiftAction } from "@/lib/actions/shifts";
 
 export default async function NuevaVentaPage() {
   await requirePermission("sales:write");
@@ -29,14 +30,21 @@ async function NuevaVentaContent() {
   if (!user.active) redirect("/acceso-pendiente");
   const organizationId = await getOrganizationId();
 
-  const [allProducts, topSelling, categories, locations, activeSafeBoxes] =
-    await Promise.all([
-      getCachedAllProductsForPOS(organizationId),
-      getCachedTopSellingProducts(organizationId, 20),
-      getCachedCategories(organizationId),
-      getCachedLocations(organizationId),
-      getCachedActiveSafeBoxes(organizationId),
-    ]);
+  const [
+    allProducts,
+    topSelling,
+    categories,
+    locations,
+    activeSafeBoxes,
+    activeShift,
+  ] = await Promise.all([
+    getCachedAllProductsForPOS(organizationId),
+    getCachedTopSellingProducts(organizationId, 20),
+    getCachedCategories(organizationId),
+    getCachedLocations(organizationId),
+    getCachedActiveSafeBoxes(organizationId),
+    getActiveShiftAction(),
+  ]);
 
   return (
     <NuevaVentaClient
@@ -45,6 +53,7 @@ async function NuevaVentaContent() {
       categories={categories}
       allLocations={locations}
       activeSafeBoxes={activeSafeBoxes}
+      initialShift={activeShift}
     />
   );
 }
