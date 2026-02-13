@@ -1,41 +1,42 @@
-import { redirect } from "next/navigation"
-import { Suspense } from "react"
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton"
-import { NuevaVentaClient } from "@/components/ventas/nueva-venta-client"
-import { requirePermission } from "@/lib/auth/check-permission"
-import { getOrganizationId } from "@/lib/auth/get-organization"
-import { getServerUser } from "@/lib/auth/get-server-user"
-import { getCachedLocations } from "@/lib/services/locations-cached"
+import { Skeleton } from "@/components/ui/skeleton";
+import { NuevaVentaClient } from "@/components/ventas/nueva-venta-client";
+import { requirePermission } from "@/lib/auth/check-permission";
+import { getOrganizationId } from "@/lib/auth/get-organization";
+import { getServerUser } from "@/lib/auth/get-server-user";
+import { getCachedLocations } from "@/lib/services/locations-cached";
 import {
   getCachedAllProductsForPOS,
   getCachedCategories,
   getCachedTopSellingProducts,
-} from "@/lib/services/products-cached"
-import { getCachedActiveSafeBoxes } from "@/lib/services/safe-boxes-cached"
+} from "@/lib/services/products-cached";
+import { getCachedActiveSafeBoxes } from "@/lib/services/safe-boxes-cached";
 
 export default async function NuevaVentaPage() {
-  await requirePermission("sales:write")
+  await requirePermission("sales:write");
   return (
     <Suspense fallback={<PageSkeleton />}>
       <NuevaVentaContent />
     </Suspense>
-  )
+  );
 }
 
 async function NuevaVentaContent() {
-  const user = await getServerUser()
-  if (!user) redirect("/login")
-  if (!user.active) redirect("/acceso-pendiente")
-  const organizationId = await getOrganizationId()
+  const user = await getServerUser();
+  if (!user) redirect("/login");
+  if (!user.active) redirect("/acceso-pendiente");
+  const organizationId = await getOrganizationId();
 
-  const [allProducts, topSelling, categories, locations, activeSafeBoxes] = await Promise.all([
-    getCachedAllProductsForPOS(organizationId),
-    getCachedTopSellingProducts(organizationId, 20),
-    getCachedCategories(organizationId),
-    getCachedLocations(organizationId),
-    getCachedActiveSafeBoxes(organizationId),
-  ])
+  const [allProducts, topSelling, categories, locations, activeSafeBoxes] =
+    await Promise.all([
+      getCachedAllProductsForPOS(organizationId),
+      getCachedTopSellingProducts(organizationId, 20),
+      getCachedCategories(organizationId),
+      getCachedLocations(organizationId),
+      getCachedActiveSafeBoxes(organizationId),
+    ]);
 
   return (
     <NuevaVentaClient
@@ -45,7 +46,7 @@ async function NuevaVentaContent() {
       allLocations={locations}
       activeSafeBoxes={activeSafeBoxes}
     />
-  )
+  );
 }
 
 function PageSkeleton() {
@@ -66,5 +67,5 @@ function PageSkeleton() {
         <Skeleton className="h-full w-full rounded-lg" />
       </div>
     </div>
-  )
+  );
 }

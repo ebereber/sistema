@@ -101,6 +101,7 @@ const NAV_ITEMS = [
         permission: "inventory:write",
       },
       { title: "Inventario", url: "/inventario", permission: "inventory:read" },
+      { title: "Precios", url: "/precios", permission: "products:write" },
     ],
   },
   {
